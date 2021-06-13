@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useState } from "react";
 import Draggable from "react-draggable";
 
 interface props {
@@ -8,11 +8,19 @@ interface props {
 }
 
 const window: React.FC<props> = ({ windowTitle, visible, setVisible }) => {
+  const [zIndex, setZIndex] = useState(10);
+
   return (
-    <Draggable>
-      <div className="absolute">
+    <Draggable handle=".handle">
+      <div
+        tabIndex={0}
+        style={{ zIndex }}
+        onFocus={() => setZIndex(999)}
+        onBlur={() => setZIndex(10)}
+        className="absolute cursor-default resize focus:outline-none focus:ring-0"
+      >
         <div
-          className={`p-[2px] flex flex-col relative h-[256px] w-[512px] bg-secondary ${
+          className={`p-[2px] flex flex-col relative min-w-[256px] min-h-[256px] bg-secondary resizable ${
             visible ? "block" : "hidden"
           }`}
         >
@@ -21,12 +29,12 @@ const window: React.FC<props> = ({ windowTitle, visible, setVisible }) => {
           <div className="absolute inset-y-0 right-0 w-[2px] bg-black" />
           <div className="absolute inset-x-0 bottom-0 h-[2px] bg-black" />
 
-          <div className="flex flex-row items-center p-[2px] border-2 justify-between bg-blueAccent border-secondary">
+          <div className="flex flex-row items-center p-[2px] border-2 justify-between bg-blueAccent border-secondary handle select-none">
             <p className="font-sans font-bold text-white">{windowTitle}</p>
 
             <button
               onClick={() => setVisible(false)}
-              className="relative flex items-center justify-center w-6 h-6 bg-secondary active:opacity-60"
+              className="relative flex items-center justify-center w-6 h-6 bg-secondary active:opacity-60 focus:outline-none focus:ring-0"
             >
               <div className="absolute inset-x-0 top-0 h-[2px] bg-white" />
               <div className="absolute inset-y-0 left-0 w-[2px] bg-white" />
