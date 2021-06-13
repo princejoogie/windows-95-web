@@ -13,9 +13,14 @@ const footer: React.FC = () => {
   }, []);
 
   const getTime = (time: Date): string => {
-    const hour = time.getHours();
-    const min = time.getMinutes();
-    return "1:42 PM";
+    var hours = time.getHours();
+    var minutes: any = time.getMinutes();
+    var ampm = hours >= 12 ? "pm" : "am";
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    minutes = minutes < 10 ? "0" + minutes : minutes;
+    var strTime = hours + ":" + minutes + " " + ampm;
+    return strTime;
   };
 
   return (
