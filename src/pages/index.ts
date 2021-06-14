@@ -1,1 +1,1 @@
-export { default as Win95 } from "./win-95";
+export { default as Calculator } from "./calculator";

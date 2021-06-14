@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { startIcon } from "../../assets";
+import { WhiteBlackBorder, GrayWhiteBorder } from "../border";
 
 const footer: React.FC = () => {
   const [time, setTime] = useState(new Date());
@@ -15,7 +16,7 @@ const footer: React.FC = () => {
   const getTime = (time: Date): string => {
     var hours = time.getHours();
     var minutes: any = time.getMinutes();
-    var ampm = hours >= 12 ? "pm" : "am";
+    var ampm = hours >= 12 ? "PM" : "AM";
     hours = hours % 12;
     hours = hours ? hours : 12; // the hour '0' should be '12'
     minutes = minutes < 10 ? "0" + minutes : minutes;
@@ -26,19 +27,13 @@ const footer: React.FC = () => {
   return (
     <footer className="flex flex-row items-center justify-between w-full h-12 p-1 border-t-2 border-white bg-secondary ">
       <button className="relative flex flex-row items-center h-full px-2 py-1 select-none active:opacity-60 focus:outline-none focus:ring-0">
-        <div className="absolute inset-x-0 top-0 h-[2px] bg-white" />
-        <div className="absolute inset-y-0 left-0 w-[2px] bg-white" />
-        <div className="absolute inset-y-0 right-0 w-[2px] bg-black" />
-        <div className="absolute inset-x-0 bottom-0 h-[2px] bg-black" />
+        <WhiteBlackBorder />
         <img src={startIcon} alt={startIcon} className="h-full" />
         <p className="ml-1 font-sans text-lg font-semibold text-black">Start</p>
       </button>
 
       <div className="relative flex flex-row items-center h-full px-2 py-1 select-none">
-        <div className="absolute inset-x-0 top-0 h-[2px] bg-primary" />
-        <div className="absolute inset-y-0 left-0 w-[2px] bg-primary" />
-        <div className="absolute inset-y-0 right-0 w-[2px] bg-white" />
-        <div className="absolute inset-x-0 bottom-0 h-[2px] bg-white" />
+        <GrayWhiteBorder />
         <p className="font-sans">{getTime(time)}</p>
       </div>
     </footer>

@@ -1,13 +1,21 @@
 import React, { useState } from "react";
 import Draggable from "react-draggable";
+import { WhiteBlackBorder } from "../border";
 
 interface props {
   windowTitle: string;
   visible: boolean;
   setVisible: React.Dispatch<React.SetStateAction<boolean>>;
+  icon?: string;
 }
 
-const window: React.FC<props> = ({ windowTitle, visible, setVisible }) => {
+const window: React.FC<props> = ({
+  windowTitle,
+  visible,
+  setVisible,
+  icon,
+  children,
+}) => {
   const [zIndex, setZIndex] = useState(10);
 
   return (
@@ -24,25 +32,23 @@ const window: React.FC<props> = ({ windowTitle, visible, setVisible }) => {
             visible ? "block" : "hidden"
           }`}
         >
-          <div className="absolute inset-x-0 top-0 h-[2px] bg-white" />
-          <div className="absolute inset-y-0 left-0 w-[2px] bg-white" />
-          <div className="absolute inset-y-0 right-0 w-[2px] bg-black" />
-          <div className="absolute inset-x-0 bottom-0 h-[2px] bg-black" />
-
+          <WhiteBlackBorder />
           <div className="flex flex-row items-center p-[2px] border-2 justify-between bg-blueAccent border-secondary handle select-none">
-            <p className="font-sans font-bold text-white">{windowTitle}</p>
+            <div className="flex flex-row items-center justify-center space-x-2">
+              {icon && <img src={icon} alt={icon} className="w-6 h-6" />}
+              <p className="font-sans font-bold text-white">{windowTitle}</p>
+            </div>
 
             <button
               onClick={() => setVisible(false)}
               className="relative flex items-center justify-center w-6 h-6 bg-secondary active:opacity-60 focus:outline-none focus:ring-0"
             >
-              <div className="absolute inset-x-0 top-0 h-[2px] bg-white" />
-              <div className="absolute inset-y-0 left-0 w-[2px] bg-white" />
-              <div className="absolute inset-y-0 right-0 w-[2px] bg-black" />
-              <div className="absolute inset-x-0 bottom-0 h-[2px] bg-black" />
+              <WhiteBlackBorder />
               <p className="font-mono font-bold">X</p>
             </button>
           </div>
+
+          <div className="flex-1">{children}</div>
         </div>
       </div>
     </Draggable>
