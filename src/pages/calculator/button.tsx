@@ -24,11 +24,39 @@ const button: React.FC<buttonProps> = ({
           const ans = eval(input);
           setInput(`${ans}`);
         } catch (err) {
-          setInput("");
+          setInput("Error");
+          setTimeout(() => {
+            setInput("");
+          }, 1500);
         }
       } else if (item.text === "+/-") {
         if (!!input && input[0] === "-") setInput(input.substring(1));
         else setInput(`-${input}`);
+      } else if (item.text === "sqrt") {
+        try {
+          const sq = Math.sqrt(parseFloat(input));
+          if (!sq) {
+            setInput("Error");
+            setTimeout(() => {
+              setInput(!sq ? "" : `${sq}`);
+            }, 1500);
+          } else {
+            setInput(`${sq}`);
+          }
+        } catch (err) {
+          setInput("");
+        }
+      } else if (item.text === "1/x") {
+        const val = `(1/${input})`;
+        try {
+          const ans = eval(val);
+          setInput(`${ans}`);
+        } catch (err) {
+          setInput("Error");
+          setTimeout(() => {
+            setInput("");
+          }, 1500);
+        }
       }
     }
   };

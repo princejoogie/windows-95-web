@@ -1,6 +1,6 @@
 import React from "react";
 import { binEmptyIcon, calculatorIcon, myComputerIcon } from "./assets";
-import { Window, Footer, DesktopItem } from "./components";
+import { DesktopItem, Window, Footer } from "./components";
 import { Calculator } from "./pages";
 
 const win95: React.FC = () => {
@@ -15,6 +15,7 @@ const win95: React.FC = () => {
                   visible,
                   setVisible,
                   windowTitle: "Recycle Bin",
+                  icon: binEmptyIcon,
                 }}
               />
             );
@@ -29,6 +30,7 @@ const win95: React.FC = () => {
                   visible,
                   setVisible,
                   windowTitle: "My Computer",
+                  icon: myComputerIcon,
                 }}
               />
             );
