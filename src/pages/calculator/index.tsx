@@ -34,7 +34,7 @@ const mainKeys: Array<Array<KeyProp>> = [
   ],
 ];
 
-const index: React.FC = () => {
+const calculator: React.FC = () => {
   const [input, setInput] = useState("");
 
   return (
@@ -78,4 +78,4 @@ const index: React.FC = () => {
   );
 };
 
-export default index;
+export default calculator;

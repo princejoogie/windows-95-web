@@ -1,7 +1,12 @@
 import React from "react";
-import { binEmptyIcon, calculatorIcon, myComputerIcon } from "./assets";
+import {
+  binEmptyIcon,
+  calculatorIcon,
+  gamesIcon,
+  myComputerIcon,
+} from "./assets";
 import { DesktopItem, Window, Footer } from "./components";
-import { Calculator } from "./pages";
+import { Calculator, Games } from "./pages";
 
 const win95: React.FC = () => {
   return (
@@ -49,6 +54,23 @@ const win95: React.FC = () => {
                 }}
               >
                 <Calculator />
+              </Window>
+            );
+          }}
+        </DesktopItem>
+
+        <DesktopItem name="Games" icon={gamesIcon}>
+          {({ visible, setVisible }) => {
+            return (
+              <Window
+                {...{
+                  visible,
+                  setVisible,
+                  windowTitle: "Games",
+                  icon: gamesIcon,
+                }}
+              >
+                <Games />
               </Window>
             );
           }}

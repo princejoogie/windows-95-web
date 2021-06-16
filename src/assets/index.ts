@@ -5,3 +5,4 @@ export { default as folderOpenedIcon } from "./win-icons/folder-opened.ico";
 export { default as binEmptyIcon } from "./win-icons/bin-empty.ico";
 export { default as binFullIcon } from "./win-icons/bin-full.ico";
 export { default as calculatorIcon } from "./win-icons/calculator.ico";
+export { default as gamesIcon } from "./win-icons/games.ico";
