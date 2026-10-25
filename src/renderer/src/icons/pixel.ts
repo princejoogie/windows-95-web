@@ -22,7 +22,10 @@ export const PALETTE = {
  * Turns rows of palette letters into an SVG data URL. `.` is transparent. Runs of one color become one
  * rect, and crisp edges keep the pixels hard at any size.
  */
-export function pixelArt(rows: readonly string[], palette: Readonly<Record<string, string>> = PALETTE): string {
+export function pixelArt(
+  rows: readonly string[],
+  palette: Readonly<Record<string, string>> = PALETTE,
+): string {
   const width = Math.max(...rows.map((row) => row.length))
   const rects: string[] = []
   rows.forEach((row, y) => {
@@ -32,10 +35,20 @@ export function pixelArt(rows: readonly string[], palette: Readonly<Record<strin
       let end = x + 1
       while (end < row.length && row[end] === key) end++
       const fill = palette[key]
-      if (key !== '.' && fill) rects.push(`<rect x="${x}" y="${y}" width="${end - x}" height="1" fill="${fill}"/>`)
+      if (key !== '.' && fill)
+        rects.push(`<rect x="${x}" y="${y}" width="${end - x}" height="1" fill="${fill}"/>`)
       x = end
     }
   })
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${rows.length}" viewBox="0 0 ${width} ${rows.length}" shape-rendering="crispEdges">${rects.join('')}</svg>`
   return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
+
+/** Renders every entry of a named set of pixel art, keeping the names. */
+export function pixelArtSet<K extends string>(
+  set: Readonly<Record<K, readonly string[]>>,
+): Record<K, string> {
+  return Object.fromEntries(
+    Object.entries<readonly string[]>(set).map(([name, rows]) => [name, pixelArt(rows)]),
+  ) as Record<K, string>
 }
