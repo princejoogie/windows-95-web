@@ -40,33 +40,33 @@ const fontIcon = (trueType: boolean) =>
   )
 
 const fonts = [
-  { name: 'Arial', family: 'Arial, sans-serif', file: 'ARIAL.TTF', size: '65,472', trueType: true },
+  { name: 'Arial', family: 'Arial, sans-serif', file: 'ARIAL.TTF', size: '1,045,720', trueType: true },
   {
     name: 'Courier New',
     family: '"Courier New", monospace',
     file: 'COUR.TTF',
-    size: '87,424',
+    size: '817,164',
     trueType: true,
   },
   {
     name: 'Fixedsys',
     family: '"Fixedsys Bitmap", monospace',
     file: 'VGAFIX.FON',
-    size: '5,168',
+    size: '5,360',
     trueType: false,
   },
   {
     name: 'MS Sans Serif',
     family: '"MS Sans Serif Bitmap", sans-serif',
     file: 'SSERIFE.FON',
-    size: '64,560',
+    size: '64,656',
     trueType: false,
   },
   {
     name: 'Times New Roman',
     family: '"Times New Roman", serif',
     file: 'TIMES.TTF',
-    size: '83,584',
+    size: '1,190,736',
     trueType: true,
   },
 ]

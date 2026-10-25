@@ -82,6 +82,11 @@ registerShellFolder({
   parent: { kind: 'computer' },
   Dialog: NetworkDialog,
   properties: { kind: 'dialog', id: 'properties' },
+  fileMutations: false,
+  contextCommands: [
+    { label: '&Explore', action: { kind: 'dialog', id: 'browse' } },
+    { label: '&Find Computer...', action: { kind: 'dialog', id: 'find' } },
+  ],
   fileCommands: [
     { label: '&Explore', action: { kind: 'dialog', id: 'browse' } },
     { label: '&Find Computer...', action: { kind: 'dialog', id: 'find' } },

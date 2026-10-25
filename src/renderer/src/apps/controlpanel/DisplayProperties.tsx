@@ -1,7 +1,13 @@
 import { type ReactNode, useEffect, useId, useState } from 'react'
 import { useFs } from '../../fs/store'
 import { PALETTE } from '../../icons/pixel'
-import { desktopBackground, patternNames, wallpaperNames, wallpaperNode } from '../../settings/backgrounds'
+import {
+  desktopBackground,
+  patternNames,
+  patterns,
+  wallpaperNames,
+  wallpaperNode,
+} from '../../settings/backgrounds'
 import { type Settings, saverNames } from '../../settings/model'
 import { SaverCanvas, ScreenSaverPreview } from '../../settings/ScreenSaverHost'
 import {
@@ -12,11 +18,13 @@ import {
   type ThemeColor,
 } from '../../settings/schemes'
 import { registerDesktopProperties } from '../../shell/Desktop'
+import { FileDialog, MessageBox } from '../../ui'
 import { Button } from '../../ui/Button'
 import { ComboBox } from '../../ui/ComboBox'
 import { Dialog } from '../../ui/Dialog'
 import { GroupBox, Radio, TextBox } from '../../ui/fields'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
+import { SaveScheme, useSavedSchemes } from './Schemes'
 
 function Monitor({ children }: { children: ReactNode }) {
   return (
@@ -230,6 +238,12 @@ export function DisplayProperties({ onClose, initialTab = 0 }: { onClose: () => 
   const [saverSettings, setSaverSettings] = useState(false)
   const [saverDraft, setSaverDraft] = useState(draft.screenSaver)
   const [item, setItem] = useState<ThemeColor>('face')
+  const savedSchemes = useSavedSchemes('appearance')
+  const [scheme, setScheme] = useState<string>(draft.appearance.scheme)
+  const [savingScheme, setSavingScheme] = useState(false)
+  const [browse, setBrowse] = useState(false)
+  const [pattern, setPattern] = useState<number[] | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const colors = appearanceColors(draft.appearance)
   const id = useId()
   return (
@@ -254,10 +268,21 @@ export function DisplayProperties({ onClose, initialTab = 0 }: { onClose: () => 
                       aria-label="Pattern"
                       value={draft.pattern ?? '(None)'}
                       onChange={(value) =>
-                        change({ pattern: patternNames.find((name) => name === value) ?? null })
+                        change({
+                          pattern: patternNames.find((name) => name === value) ?? null,
+                          customPattern: null,
+                        })
                       }
                       options={['(None)', ...patternNames].map((name) => ({ key: name, label: name }))}
                     />
+                    <Button
+                      disabled={!draft.pattern}
+                      onClick={() =>
+                        setPattern([...(draft.customPattern ?? patterns[draft.pattern ?? 'Bricks'])])
+                      }
+                    >
+                      Edit Pattern...
+                    </Button>
                   </div>
                   <div className="flex flex-col gap-1">
                     Wallpaper:
@@ -282,17 +307,10 @@ export function DisplayProperties({ onClose, initialTab = 0 }: { onClose: () => 
                           .map((node) => ({ key: node.id, label: node.name })),
                       ]}
                     />
+                    <Button onClick={() => setBrowse(true)}>Browse...</Button>
                   </div>
                 </div>
                 <div className="mt-[10px] flex items-center justify-between">
-                  <span>
-                    Color:{' '}
-                    <ColorPicker
-                      label="Desktop color"
-                      value={draft.desktopColor}
-                      onChange={(desktopColor) => change({ desktopColor })}
-                    />
-                  </span>
                   <GroupBox label="Display" className="flex gap-3 py-[5px]!">
                     <Radio
                       name="wallpaper-mode"
@@ -388,15 +406,39 @@ export function DisplayProperties({ onClose, initialTab = 0 }: { onClose: () => 
                 <AppearanceSample settings={draft} />
                 <div className="flex flex-col mt-3 gap-1">
                   Scheme:
-                  <ComboBox
-                    aria-label="Scheme"
-                    value={draft.appearance.scheme}
-                    onChange={(value) => {
-                      const scheme = schemeNames.find((name) => name === value) ?? 'Windows Standard'
-                      change({ appearance: { scheme, colors: {} }, desktopColor: schemes[scheme].desktop })
-                    }}
-                    options={schemeNames.map((name) => ({ key: name, label: name }))}
-                  />
+                  <div className="flex gap-2">
+                    <ComboBox
+                      aria-label="Scheme"
+                      className="flex-1"
+                      value={scheme}
+                      onChange={(value) => {
+                        setScheme(value)
+                        const saved = savedSchemes.saved[value]
+                        if (saved) {
+                          change({ appearance: saved.appearance, desktopColor: saved.desktopColor })
+                          return
+                        }
+                        const scheme = schemeNames.find((name) => name === value) ?? 'Windows Standard'
+                        change({ appearance: { scheme, colors: {} }, desktopColor: schemes[scheme].desktop })
+                      }}
+                      options={[...new Set([...schemeNames, ...Object.keys(savedSchemes.saved)])].map(
+                        (name) => ({
+                          key: name,
+                          label: name,
+                        }),
+                      )}
+                    />
+                    <Button onClick={() => setSavingScheme(true)}>Save As...</Button>
+                    <Button
+                      disabled={!savedSchemes.saved[scheme]}
+                      onClick={() => {
+                        savedSchemes.remove(scheme)
+                        setScheme(draft.appearance.scheme)
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </div>
                 <div className="flex items-end gap-3 mt-3">
                   <div className="flex flex-col gap-1 flex-1">
@@ -408,6 +450,18 @@ export function DisplayProperties({ onClose, initialTab = 0 }: { onClose: () => 
                         setItem(appearanceItems.find((option) => option.color === value)?.color ?? 'face')
                       }
                       options={appearanceItems.map((option) => ({ key: option.color, label: option.label }))}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    Size:
+                    <TextBox
+                      aria-label="Item size"
+                      disabled
+                      type="number"
+                      defaultValue={18}
+                      min={8}
+                      max={72}
+                      className="w-[45px]"
                     />
                   </div>
                   <div className="flex flex-col gap-1">
@@ -426,7 +480,47 @@ export function DisplayProperties({ onClose, initialTab = 0 }: { onClose: () => 
                     />
                   </div>
                 </div>
-                <p className="mt-3">Select a scheme, or change an individual item's color.</p>
+                <div className="flex items-end gap-2 mt-3">
+                  <div className="flex flex-col gap-1 flex-1">
+                    Font:
+                    <ComboBox
+                      aria-label="Appearance font"
+                      value="MS Sans Serif"
+                      options={[{ key: 'MS Sans Serif', label: 'MS Sans Serif' }]}
+                      onChange={() => {}}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    Size:
+                    <TextBox
+                      aria-label="Font size"
+                      disabled
+                      type="number"
+                      defaultValue={8}
+                      min={6}
+                      max={72}
+                      className="w-[40px]"
+                    />
+                  </div>
+                  <ColorPicker
+                    label="Font color"
+                    value={colors.text}
+                    onChange={(color) =>
+                      change({
+                        appearance: {
+                          ...draft.appearance,
+                          colors: { ...draft.appearance.colors, text: color },
+                        },
+                      })
+                    }
+                  />
+                  <Button aria-label="Bold font" disabled className="min-w-[23px]! px-1! font-bold">
+                    B
+                  </Button>
+                  <Button aria-label="Italic font" disabled className="min-w-[23px]! px-1! italic">
+                    I
+                  </Button>
+                </div>
               </>
             ),
           },
@@ -438,7 +532,13 @@ export function DisplayProperties({ onClose, initialTab = 0 }: { onClose: () => 
                   <DesktopPreview settings={draft} />
                 </Monitor>
                 <GroupBox label="Color palette" className="mt-4">
-                  <p>True Color ({screen.colorDepth} bit)</p>
+                  <ComboBox
+                    aria-label="Color palette"
+                    value="16 Color"
+                    options={[{ key: '16 Color', label: '16 Color' }]}
+                    onChange={() => {}}
+                    className="w-full"
+                  />
                   <div className="flex mt-2 h-[14px] border border-black">
                     {Object.values(PALETTE).map((color) => (
                       <span key={color} className="flex-1" style={{ backgroundColor: color }} />
@@ -446,16 +546,119 @@ export function DisplayProperties({ onClose, initialTab = 0 }: { onClose: () => 
                   </div>
                 </GroupBox>
                 <GroupBox label="Desktop area" className="mt-4">
+                  <input
+                    aria-label="Desktop area"
+                    type="range"
+                    min={0}
+                    max={0}
+                    value={0}
+                    disabled
+                    className="cp-slider"
+                  />
+                  <div className="flex justify-between">
+                    <span>Less</span>
+                    <span>More</span>
+                  </div>
                   <p>
                     {innerWidth} by {innerHeight} pixels
                   </p>
                 </GroupBox>
-                <p className="mt-3">Display adapter: Windows 95 virtual display</p>
+                <div className="flex items-end gap-2 mt-3">
+                  <div className="flex-1">
+                    Font size:
+                    <ComboBox
+                      aria-label="Display font size"
+                      value="Small Fonts"
+                      options={[{ key: 'Small Fonts', label: 'Small Fonts' }]}
+                      onChange={() => {}}
+                    />
+                  </div>
+                  <Button
+                    onClick={() =>
+                      setNotice(
+                        'Display adapter: Standard Display Adapter (VGA)\nMonitor type: Plug and Play Monitor\n\nNo alternate display drivers are available.',
+                      )
+                    }
+                  >
+                    Change Display Type...
+                  </Button>
+                </div>
               </>
             ),
           },
         ]}
       />
+      {browse && (
+        <FileDialog
+          mode="open"
+          title="Browse"
+          filters={[{ label: 'Bitmap Files (*.bmp)', extensions: ['bmp'] }]}
+          onCancel={() => setBrowse(false)}
+          onSelect={(result) => {
+            const file =
+              result.kind === 'existing' ? wallpaperNode(result.id, Object.values(nodes)) : undefined
+            if (file) change({ wallpaper: file.id })
+            else setNotice('This file is not a valid bitmap.')
+            setBrowse(false)
+          }}
+        />
+      )}
+      {savingScheme && (
+        <SaveScheme
+          onClose={() => setSavingScheme(false)}
+          onSave={(name) => {
+            savedSchemes.save(name, draft)
+            setScheme(name)
+            setSavingScheme(false)
+          }}
+        />
+      )}
+      {notice && (
+        <MessageBox
+          title="Display Properties"
+          message={notice}
+          buttons={['OK']}
+          onClose={() => setNotice(null)}
+        />
+      )}
+      {pattern && (
+        <Dialog title="Pattern Editor" onClose={() => setPattern(null)}>
+          <div className="p-3 w-[300px]">
+            <p className="mb-3">Click a square to change the pattern.</p>
+            <div className="flex gap-6">
+              <div className="grid grid-cols-8 border border-black">
+                {pattern.flatMap((row, y) =>
+                  Array.from({ length: 8 }, (_, x) => (
+                    <button
+                      type="button"
+                      key={`pixel-${x.toString()}-${y.toString()}`}
+                      aria-label={`Pattern pixel ${x + 1},${y + 1}`}
+                      aria-pressed={Boolean(row & (128 >> x))}
+                      className="size-[18px] border border-shadow"
+                      style={{ background: row & (128 >> x) ? '#000000' : '#ffffff' }}
+                      onClick={() =>
+                        setPattern(pattern.map((value, index) => (index === y ? value ^ (128 >> x) : value)))
+                      }
+                    />
+                  )),
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                isDefault
+                onClick={() => {
+                  change({ customPattern: pattern })
+                  setPattern(null)
+                }}
+              >
+                OK
+              </Button>
+              <Button onClick={() => setPattern(null)}>Cancel</Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
       {preview && <ScreenSaverPreview settings={draft.screenSaver} onClose={() => setPreview(false)} />}
       {saverSettings && (
         <Dialog

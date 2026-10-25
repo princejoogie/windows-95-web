@@ -27,6 +27,8 @@ export interface ShellFolder {
   readonly parent: Location
   readonly countNoun?: string
   readonly fileCommands?: readonly (ShellCommand | 'separator')[]
+  readonly contextCommands?: readonly (ShellCommand | 'separator')[]
+  readonly fileMutations?: boolean
   readonly viewCommands?: readonly string[]
   readonly properties?: ShellAction
   readonly Dialog: ComponentType<{ id: string; onClose: () => void }>

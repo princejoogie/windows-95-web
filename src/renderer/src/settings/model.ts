@@ -98,6 +98,7 @@ export interface Settings extends BackgroundSettings {
 export const defaultSettings: Settings = {
   desktopColor: '#008080',
   pattern: null,
+  customPattern: null,
   wallpaper: null,
   wallpaperMode: 'center',
   appearance: { scheme: 'Windows Standard', colors: {} },
@@ -217,6 +218,14 @@ export function parseSettings(value: unknown, nodes: readonly FsNode[] = []): Se
   return {
     desktopColor: hexColor(source.desktopColor, defaults.desktopColor),
     pattern: patternNames.find((name) => name === source.pattern) ?? null,
+    customPattern:
+      Array.isArray(source.customPattern) &&
+      source.customPattern.length === 8 &&
+      source.customPattern.every(
+        (row) => typeof row === 'number' && Number.isInteger(row) && row >= 0 && row <= 255,
+      )
+        ? source.customPattern
+        : null,
     wallpaper:
       wallpaperNames.find((name) => name === source.wallpaper) ??
       wallpaperNode(source.wallpaper, nodes)?.id ??

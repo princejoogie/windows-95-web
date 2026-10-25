@@ -1,110 +1,183 @@
-import { useEffect, useId, useState } from 'react'
+import { useId, useState } from 'react'
 import { locales } from '../../settings/model'
-import type { AppManifest } from '../../shell/types'
+import { apps } from '../../shell/registry'
+import { ListBox, MessageBox } from '../../ui'
 import { Button } from '../../ui/Button'
 import { ComboBox } from '../../ui/ComboBox'
 import { Dialog } from '../../ui/Dialog'
-import { Checkbox, GroupBox, TextBox } from '../../ui/fields'
+import { Checkbox, GroupBox, Radio, TextBox } from '../../ui/fields'
 import { appletIcons } from './icons'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
+import { WorldMap } from './WorldMap'
+
+export function DeviceGeneral({ name, manufacturer }: { name: string; manufacturer: string }) {
+  return (
+    <>
+      <p className="mt-3 mb-5">{name}</p>
+      <p>Manufacturer: {manufacturer}</p>
+      <p className="mt-3">Hardware version: Not available</p>
+      <GroupBox label="Device status" className="mt-5">
+        <p>This device is working properly.</p>
+      </GroupBox>
+      <GroupBox label="Device usage" className="mt-5">
+        <Checkbox label="Original Configuration (current)" defaultChecked />
+      </GroupBox>
+    </>
+  )
+}
 
 export function KeyboardProperties({ onClose }: { onClose: () => void }) {
   const state = useSettingsDraft()
   const keyboard = state.draft.keyboard
   const id = useId()
+  const [notice, setNotice] = useState(false)
+  const [hotkey, setHotkey] = useState('Left Alt+Shift')
   return (
-    <PropertySheet
-      title="Keyboard Properties"
-      state={state}
-      onClose={onClose}
-      tabs={[
-        {
-          label: 'Speed',
-          content: (
-            <>
-              <GroupBox label="Character repeat">
-                <label className="block">
-                  Repeat delay:
-                  <input
-                    aria-label="Repeat delay"
-                    className="cp-slider"
-                    type="range"
-                    min={250}
-                    max={1000}
-                    step={250}
-                    value={1250 - keyboard.repeatDelay}
-                    onChange={(event) =>
-                      state.change({
-                        keyboard: { ...keyboard, repeatDelay: 1250 - event.currentTarget.valueAsNumber },
-                      })
-                    }
-                  />
-                </label>
-                <div className="flex justify-between mb-3">
-                  <span>Long</span>
-                  <span>Short</span>
-                </div>
-                <label className="block">
-                  Repeat rate:
-                  <input
-                    aria-label="Repeat rate"
-                    className="cp-slider"
-                    type="range"
-                    min={2}
-                    max={30}
-                    value={keyboard.repeatRate}
-                    onChange={(event) =>
-                      state.change({
-                        keyboard: { ...keyboard, repeatRate: event.currentTarget.valueAsNumber },
-                      })
-                    }
-                  />
-                </label>
-                <div className="flex justify-between mb-3">
-                  <span>Slow</span>
-                  <span>Fast</span>
-                </div>
-                <label className="flex flex-col gap-2" htmlFor={id}>
-                  Click here and hold down a key to test repeat rate:
-                  <TextBox id={id} aria-label="Keyboard test" />
-                </label>
-              </GroupBox>
-              <GroupBox label="Cursor blink rate" className="mt-4">
-                <div className="flex gap-4 items-center">
-                  <input
-                    aria-label="Cursor blink rate"
-                    className="cp-slider"
-                    type="range"
-                    min={0}
-                    max={1200}
-                    step={100}
-                    value={1200 - keyboard.cursorBlink}
-                    onChange={(event) =>
-                      state.change({
-                        keyboard: { ...keyboard, cursorBlink: 1200 - event.currentTarget.valueAsNumber },
-                      })
-                    }
-                  />
-                  <span className="bg-white p-2 bevel-sunken">
-                    <span
-                      className="cp-cursor block w-px h-[16px] bg-black"
-                      style={{
-                        animationDuration: `${keyboard.cursorBlink * 2}ms`,
-                        animationName: keyboard.cursorBlink === 0 ? 'none' : 'cp-blink',
-                      }}
+    <>
+      <PropertySheet
+        title="Keyboard Properties"
+        state={state}
+        onClose={onClose}
+        tabs={[
+          {
+            label: 'Speed',
+            content: (
+              <>
+                <GroupBox label="Character repeat">
+                  <label className="block">
+                    Repeat delay:
+                    <input
+                      aria-label="Repeat delay"
+                      className="cp-slider"
+                      type="range"
+                      min={250}
+                      max={1000}
+                      step={250}
+                      value={1250 - keyboard.repeatDelay}
+                      onChange={(event) =>
+                        state.change({
+                          keyboard: { ...keyboard, repeatDelay: 1250 - event.currentTarget.valueAsNumber },
+                        })
+                      }
                     />
-                  </span>
+                  </label>
+                  <div className="flex justify-between mb-3">
+                    <span>Long</span>
+                    <span>Short</span>
+                  </div>
+                  <label className="block">
+                    Repeat rate:
+                    <input
+                      aria-label="Repeat rate"
+                      className="cp-slider"
+                      type="range"
+                      min={2}
+                      max={30}
+                      value={keyboard.repeatRate}
+                      onChange={(event) =>
+                        state.change({
+                          keyboard: { ...keyboard, repeatRate: event.currentTarget.valueAsNumber },
+                        })
+                      }
+                    />
+                  </label>
+                  <div className="flex justify-between mb-3">
+                    <span>Slow</span>
+                    <span>Fast</span>
+                  </div>
+                  <label className="flex flex-col gap-2" htmlFor={id}>
+                    Click here and hold down a key to test repeat rate:
+                    <TextBox id={id} aria-label="Keyboard test" />
+                  </label>
+                </GroupBox>
+                <GroupBox label="Cursor blink rate" className="mt-4">
+                  <div className="flex gap-4 items-center">
+                    <input
+                      aria-label="Cursor blink rate"
+                      className="cp-slider"
+                      type="range"
+                      min={0}
+                      max={1200}
+                      step={100}
+                      value={1200 - keyboard.cursorBlink}
+                      onChange={(event) =>
+                        state.change({
+                          keyboard: { ...keyboard, cursorBlink: 1200 - event.currentTarget.valueAsNumber },
+                        })
+                      }
+                    />
+                    <span className="bg-white p-2 bevel-sunken">
+                      <span
+                        className="cp-cursor block w-px h-[16px] bg-black"
+                        style={{
+                          animationDuration: `${keyboard.cursorBlink * 2}ms`,
+                          animationName: keyboard.cursorBlink === 0 ? 'none' : 'cp-blink',
+                        }}
+                      />
+                    </span>
+                  </div>
+                  <div className="flex justify-between mr-12">
+                    <span>None</span>
+                    <span>Fast</span>
+                  </div>
+                </GroupBox>
+              </>
+            ),
+          },
+          {
+            label: 'Language',
+            content: (
+              <>
+                <p className="mb-3">Installed keyboard languages and layouts:</p>
+                <ListBox
+                  label="Keyboard languages"
+                  items={['English (United States)']}
+                  value="English (United States)"
+                  onChange={() => {}}
+                  className="h-[110px]"
+                />
+                <div className="flex justify-end gap-2 mt-3">
+                  <Button onClick={() => setNotice(true)}>Add...</Button>
+                  <Button disabled>Remove</Button>
+                  <Button onClick={() => setNotice(true)}>Properties</Button>
                 </div>
-                <div className="flex justify-between mr-12">
-                  <span>None</span>
-                  <span>Fast</span>
-                </div>
-              </GroupBox>
-            </>
-          ),
-        },
-      ]}
-    />
+                <GroupBox label="Switch languages" className="mt-5">
+                  <div className="flex flex-col gap-3">
+                    {['Left Alt+Shift', 'Ctrl+Shift', 'None'].map((label) => (
+                      <Radio
+                        key={label}
+                        name="language-hotkey"
+                        label={label}
+                        checked={hotkey === label}
+                        onChange={() => setHotkey(label)}
+                      />
+                    ))}
+                  </div>
+                </GroupBox>
+                <Checkbox label="Enable indicator on taskbar" className="mt-4" disabled />
+              </>
+            ),
+          },
+          {
+            label: 'General',
+            content: (
+              <DeviceGeneral
+                name="Standard 101/102-Key or Microsoft Natural Keyboard"
+                manufacturer="(Standard keyboard types)"
+              />
+            ),
+          },
+        ]}
+      />
+      {notice && (
+        <MessageBox
+          title="Keyboard"
+          message="The United States keyboard layout is installed. No additional keyboard layouts are available."
+          buttons={['OK']}
+          onClose={() => setNotice(false)}
+        />
+      )}
+    </>
   )
 }
 
@@ -122,10 +195,8 @@ export function RegionalProperties({ onClose }: { onClose: () => void }) {
           label: 'Regional Settings',
           content: (
             <>
-              <div className="flex gap-4 mt-3 mb-5 items-center">
-                <img src={appletIcons.regional} width={48} height={48} alt="" />
-                <p>Select the language and country whose conventions you want to use.</p>
-              </div>
+              <WorldMap />
+              <p className="my-3">Select the language and country whose conventions you want to use.</p>
               <ComboBox
                 aria-label="Regional language"
                 className="w-full"
@@ -140,12 +211,46 @@ export function RegionalProperties({ onClose }: { onClose: () => void }) {
                 }
                 options={locales.map((name) => ({ key: name, label: name }))}
               />
-              <GroupBox label="Sample" className="mt-6">
+              <GroupBox label="Sample" className="mt-3">
                 <p>{regional.locale}</p>
                 <p className="mt-2">Currency: {regional.currency}1,234.56</p>
                 <p className="mt-2">Short date: {regional.dateFormat}</p>
                 <p className="mt-2">Time: {regional.time24 ? '13:05:00' : '1:05:00 PM'}</p>
               </GroupBox>
+            </>
+          ),
+        },
+        {
+          label: 'Number',
+          content: (
+            <>
+              <GroupBox label="Sample" className="mt-2">
+                <p>Positive: 123,456,789.00</p>
+                <p className="mt-2">Negative: -123,456,789.00</p>
+              </GroupBox>
+              <div className="grid grid-cols-[140px_1fr] gap-3 mt-5">
+                {[
+                  ['Decimal symbol', '.'],
+                  ['No. of digits after decimal', '2'],
+                  ['Digit grouping symbol', ','],
+                  ['No. of digits in group', '3'],
+                  ['Negative sign symbol', '-'],
+                  ['Negative number format', '-1.1'],
+                  ['Display leading zeroes', '0.7'],
+                  ['Measurement system', 'U.S.'],
+                  ['List separator', ','],
+                ].map(([label = '', value = '']) => (
+                  <div key={label} className="contents">
+                    <span>{label}:</span>
+                    <ComboBox
+                      aria-label={label}
+                      value={value}
+                      options={[{ key: value, label: value }]}
+                      onChange={() => {}}
+                    />
+                  </div>
+                ))}
+              </div>
             </>
           ),
         },
@@ -242,92 +347,176 @@ export function RegionalProperties({ onClose }: { onClose: () => void }) {
 export function AccessibilityProperties({ onClose }: { onClose: () => void }) {
   const state = useSettingsDraft()
   const access = state.draft.accessibility
+  const [setting, setSetting] = useState<string | null>(null)
+  const settingsButton = (name: string) => (
+    <Button aria-label={`${name} Settings`} className="float-right" onClick={() => setSetting(name)}>
+      Settings...
+    </Button>
+  )
   const toggle = (key: keyof typeof access, value: boolean) =>
     state.change({ accessibility: { ...access, [key]: value } })
   return (
-    <PropertySheet
-      title="Accessibility Properties"
-      state={state}
-      onClose={onClose}
-      width={422}
-      tabs={[
-        {
-          label: 'Keyboard',
-          content: (
-            <>
-              <GroupBox label="StickyKeys" className="mt-2">
-                <p className="mb-3">
-                  Use StickyKeys if you want to use Shift, Ctrl, or Alt by pressing one key at a time.
-                </p>
+    <>
+      <PropertySheet
+        title="Accessibility Properties"
+        state={state}
+        onClose={onClose}
+        width={422}
+        tabs={[
+          {
+            label: 'Keyboard',
+            content: (
+              <>
+                <GroupBox label="StickyKeys" className="mt-2">
+                  <p className="mb-3">
+                    Use StickyKeys if you want to use Shift, Ctrl, or Alt by pressing one key at a time.
+                  </p>
+                  <Checkbox
+                    label="Use StickyKeys"
+                    checked={access.stickyKeys}
+                    onChange={(event) => toggle('stickyKeys', event.target.checked)}
+                  />
+                  {settingsButton('StickyKeys')}
+                </GroupBox>
+                <GroupBox label="FilterKeys" className="mt-4">
+                  <p className="mb-3">Use FilterKeys to ignore brief or repeated keystrokes.</p>
+                  <Checkbox
+                    label="Use FilterKeys"
+                    checked={access.filterKeys}
+                    onChange={(event) => toggle('filterKeys', event.target.checked)}
+                  />
+                  {settingsButton('FilterKeys')}
+                </GroupBox>
+                <GroupBox label="ToggleKeys" className="mt-4">
+                  <p className="mb-3">Hear a tone when Caps Lock, Num Lock, or Scroll Lock changes.</p>
+                  <Checkbox
+                    label="Use ToggleKeys"
+                    checked={access.toggleKeys}
+                    onChange={(event) => toggle('toggleKeys', event.target.checked)}
+                  />
+                  {settingsButton('ToggleKeys')}
+                </GroupBox>
+              </>
+            ),
+          },
+          {
+            label: 'Sound',
+            content: (
+              <>
+                <GroupBox label="SoundSentry" className="mt-2">
+                  <p className="mb-3">
+                    Use SoundSentry if you want Windows to generate visual warnings when your system makes a
+                    sound.
+                  </p>
+                  <Checkbox label="Use SoundSentry" />
+                  {settingsButton('SoundSentry')}
+                </GroupBox>
+                <GroupBox label="ShowSounds" className="mt-4">
+                  <p className="mb-3">
+                    Tell programs to display captions for the speech and sounds they make.
+                  </p>
+                  <Checkbox
+                    label="Use ShowSounds"
+                    checked={access.showSounds}
+                    onChange={(event) => toggle('showSounds', event.target.checked)}
+                  />
+                  {settingsButton('ShowSounds')}
+                </GroupBox>
+              </>
+            ),
+          },
+          {
+            label: 'Display',
+            content: (
+              <GroupBox label="High Contrast" className="mt-2">
+                <p className="mb-3">Use colors and fonts designed for easy reading.</p>
                 <Checkbox
-                  label="Use StickyKeys"
-                  checked={access.stickyKeys}
-                  onChange={(event) => toggle('stickyKeys', event.target.checked)}
+                  label="Use High Contrast"
+                  checked={access.highContrast}
+                  onChange={(event) => toggle('highContrast', event.target.checked)}
                 />
+                {settingsButton('High Contrast')}
+                <div className="bg-black text-white border border-white mt-4 p-5">
+                  High Contrast Black and White
+                </div>
               </GroupBox>
-              <GroupBox label="FilterKeys" className="mt-4">
-                <p className="mb-3">Use FilterKeys to ignore brief or repeated keystrokes.</p>
+            ),
+          },
+          {
+            label: 'Mouse',
+            content: (
+              <GroupBox label="MouseKeys" className="mt-2">
+                <p className="mb-3">Use the numeric keypad to control the mouse pointer.</p>
                 <Checkbox
-                  label="Use FilterKeys"
-                  checked={access.filterKeys}
-                  onChange={(event) => toggle('filterKeys', event.target.checked)}
+                  label="Use MouseKeys"
+                  checked={access.mouseKeys}
+                  onChange={(event) => toggle('mouseKeys', event.target.checked)}
                 />
+                {settingsButton('MouseKeys')}
               </GroupBox>
-              <GroupBox label="ToggleKeys" className="mt-4">
-                <p className="mb-3">Hear a tone when Caps Lock, Num Lock, or Scroll Lock changes.</p>
-                <Checkbox
-                  label="Use ToggleKeys"
-                  checked={access.toggleKeys}
-                  onChange={(event) => toggle('toggleKeys', event.target.checked)}
-                />
-              </GroupBox>
-            </>
-          ),
-        },
-        {
-          label: 'Sound',
-          content: (
-            <GroupBox label="ShowSounds" className="mt-2">
-              <p className="mb-3">Tell programs to display captions for the speech and sounds they make.</p>
-              <Checkbox
-                label="Use ShowSounds"
-                checked={access.showSounds}
-                onChange={(event) => toggle('showSounds', event.target.checked)}
-              />
+            ),
+          },
+          {
+            label: 'General',
+            content: (
+              <>
+                <GroupBox label="Automatic reset" className="mt-2">
+                  <Checkbox label="Turn off accessibility features after idle for:" />
+                  <ComboBox
+                    aria-label="Accessibility idle time"
+                    value="5 minutes"
+                    options={['5 minutes', '10 minutes', '15 minutes', '20 minutes', '30 minutes'].map(
+                      (label) => ({ key: label, label }),
+                    )}
+                    onChange={() => {}}
+                    className="mt-3 w-[150px]"
+                  />
+                </GroupBox>
+                <GroupBox label="Notification" className="mt-4">
+                  <Checkbox label="Give warning message when turning a feature on" defaultChecked />
+                  <Checkbox
+                    label="Make a sound when turning a feature on or off"
+                    defaultChecked
+                    className="mt-3"
+                  />
+                </GroupBox>
+                <GroupBox label="SerialKeys" className="mt-4">
+                  <p className="mb-3">Use an alternative input device connected to a serial port.</p>
+                  <Checkbox label="Use SerialKeys" />
+                  {settingsButton('SerialKeys')}
+                </GroupBox>
+              </>
+            ),
+          },
+        ]}
+      />
+      {setting && (
+        <Dialog title={`Settings for ${setting}`} onClose={() => setSetting(null)}>
+          <div className="p-3 w-[340px]">
+            <GroupBox label="Keyboard shortcut">
+              <Checkbox label={`Use shortcut for ${setting}`} defaultChecked />
+              <p className="mt-3">
+                {setting === 'StickyKeys'
+                  ? 'Press the SHIFT key five times to turn StickyKeys on or off.'
+                  : setting === 'MouseKeys'
+                    ? 'Press LEFT ALT + LEFT SHIFT + NUM LOCK to turn MouseKeys on or off.'
+                    : 'Use the keyboard shortcut to turn this feature on or off.'}
+              </p>
             </GroupBox>
-          ),
-        },
-        {
-          label: 'Display',
-          content: (
-            <GroupBox label="High Contrast" className="mt-2">
-              <p className="mb-3">Use colors and fonts designed for easy reading.</p>
-              <Checkbox
-                label="Use High Contrast"
-                checked={access.highContrast}
-                onChange={(event) => toggle('highContrast', event.target.checked)}
-              />
-              <div className="bg-black text-white border border-white mt-4 p-5">
-                High Contrast Black and White
-              </div>
+            <GroupBox label="Options" className="mt-4">
+              <Checkbox label="Make sounds when modifier keys are pressed" defaultChecked />
+              <Checkbox label="Display status on screen" defaultChecked className="mt-3" />
             </GroupBox>
-          ),
-        },
-        {
-          label: 'Mouse',
-          content: (
-            <GroupBox label="MouseKeys" className="mt-2">
-              <p className="mb-3">Use the numeric keypad to control the mouse pointer.</p>
-              <Checkbox
-                label="Use MouseKeys"
-                checked={access.mouseKeys}
-                onChange={(event) => toggle('mouseKeys', event.target.checked)}
-              />
-            </GroupBox>
-          ),
-        },
-      ]}
-    />
+            <div className="flex justify-end gap-2 mt-4">
+              <Button isDefault onClick={() => setSetting(null)}>
+                OK
+              </Button>
+              <Button onClick={() => setSetting(null)}>Cancel</Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
+    </>
   )
 }
 
@@ -345,10 +534,7 @@ const devices = [
 export function SystemProperties({ onClose }: { onClose: () => void }) {
   const state = useSettingsDraft()
   const [device, setDevice] = useState<string | null>(null)
-  const memory =
-    'deviceMemory' in navigator && typeof navigator.deviceMemory === 'number'
-      ? `${navigator.deviceMemory * 1024}.0 MB RAM`
-      : '64.0 MB virtual RAM'
+  const [performance, setPerformance] = useState<string | null>(null)
   return (
     <>
       <PropertySheet
@@ -384,13 +570,13 @@ export function SystemProperties({ onClose }: { onClose: () => void }) {
                   <p className="mt-2">
                     Windows 95 User
                     <br />
-                    Offline Desktop
+                    &nbsp;
                   </p>
                   <p className="mt-5">Computer:</p>
                   <p className="mt-2">
-                    Pentium(r) compatible
+                    Pentium(r)
                     <br />
-                    {memory}
+                    16.0MB RAM
                   </p>
                 </div>
               </div>
@@ -426,8 +612,72 @@ export function SystemProperties({ onClose }: { onClose: () => void }) {
               </>
             ),
           },
+          {
+            label: 'Hardware Profiles',
+            content: (
+              <>
+                <p className="mb-4">
+                  You can set up hardware profiles for different hardware configurations.
+                </p>
+                <ListBox
+                  label="Hardware profiles"
+                  items={['Original Configuration (current)']}
+                  value="Original Configuration (current)"
+                  onChange={() => {}}
+                  className="h-[150px]"
+                />
+                <div className="flex justify-end gap-2 mt-3">
+                  <Button onClick={() => setPerformance('Hardware Profiles')}>Copy...</Button>
+                  <Button onClick={() => setPerformance('Hardware Profiles')}>Rename...</Button>
+                  <Button disabled>Delete</Button>
+                </div>
+                <p className="mt-5">When Windows starts, use the original configuration.</p>
+              </>
+            ),
+          },
+          {
+            label: 'Performance',
+            content: (
+              <>
+                <div className="grid grid-cols-[110px_1fr] gap-y-3 mt-3">
+                  <span>Memory:</span>
+                  <span>16.0MB of RAM</span>
+                  <span>System resources:</span>
+                  <span>85% free</span>
+                  <span>File system:</span>
+                  <span>32-bit</span>
+                  <span>Virtual memory:</span>
+                  <span>32-bit</span>
+                  <span>Disk compression:</span>
+                  <span>Not installed</span>
+                  <span>PC Cards:</span>
+                  <span>No PC Card sockets are installed</span>
+                </div>
+                <GroupBox label="Performance status" className="mt-5">
+                  Your system is configured for optimal performance.
+                </GroupBox>
+                <GroupBox label="Advanced settings" className="mt-4">
+                  <div className="flex justify-between">
+                    {['File System...', 'Graphics...', 'Virtual Memory...'].map((label) => (
+                      <Button key={label} onClick={() => setPerformance(label.slice(0, -3))}>
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                </GroupBox>
+              </>
+            ),
+          },
         ]}
       />
+      {performance && (
+        <MessageBox
+          title={performance}
+          message="These settings are managed by Windows. No alternate hardware configuration is available."
+          buttons={['OK']}
+          onClose={() => setPerformance(null)}
+        />
+      )}
       {device && (
         <Dialog title={`${device} Properties`} onClose={() => setDevice(null)} className="cp-dialog">
           <div className="w-[330px] p-3">
@@ -449,49 +699,125 @@ export function SystemProperties({ onClose }: { onClose: () => void }) {
 
 export function AddRemovePrograms({ onClose }: { onClose: () => void }) {
   const state = useSettingsDraft()
-  const [apps, setApps] = useState<readonly AppManifest[]>([])
-  const [selected, setSelected] = useState('')
-  useEffect(() => {
-    let active = true
-    void import('../../shell/registry').then((registry) => {
-      if (!active) return
-      setApps(registry.apps)
-      setSelected(registry.apps[0]?.id ?? '')
-    })
-    return () => {
-      active = false
-    }
-  }, [])
+  const [selected, setSelected] = useState(apps[0]?.id ?? '')
+  const [notice, setNotice] = useState<string | null>(null)
+  const [component, setComponent] = useState('Accessories')
   const selectedApp = apps.find((app) => app.id === selected)
   return (
-    <PropertySheet
-      title="Add/Remove Programs Properties"
-      state={state}
-      onClose={onClose}
-      width={420}
-      tabs={[
-        {
-          label: 'Install/Uninstall',
-          content: (
-            <>
-              <p className="mb-3 mt-2">The following software is installed on your computer.</p>
-              <ComboBox
-                aria-label="Installed programs"
-                className="w-full"
-                value={selected}
-                onChange={(value) => setSelected(value)}
-                options={apps.map((app) => ({ key: app.id, label: app.title }))}
-              />
-              <GroupBox label="Program information" className="mt-3">
-                <p>{selectedApp?.title}</p>
-                <p className="mt-2">{selectedApp?.exe}</p>
-                <p className="mt-2">Windows component</p>
-              </GroupBox>
-              <p className="mt-3">Windows components are included with this desktop.</p>
-            </>
-          ),
-        },
-      ]}
-    />
+    <>
+      <PropertySheet
+        title="Add/Remove Programs Properties"
+        state={state}
+        onClose={onClose}
+        width={420}
+        tabs={[
+          {
+            label: 'Install/Uninstall',
+            content: (
+              <>
+                <div className="flex gap-4 items-center mb-3 mt-2">
+                  <p>To install a new program from a floppy disk or CD-ROM drive, click Install.</p>
+                  <Button
+                    onClick={() =>
+                      setNotice('No setup program was found. Insert the installation disk and try again.')
+                    }
+                  >
+                    Install...
+                  </Button>
+                </div>
+                <p className="mb-2">The following software is installed on your computer.</p>
+                <ListBox
+                  label="Installed programs"
+                  className="w-full h-[110px]"
+                  value={selected}
+                  onChange={(value) => setSelected(value)}
+                  items={apps.map((app) => app.id)}
+                  render={(id) => apps.find((app) => app.id === id)?.title ?? id}
+                />
+                <div className="text-right mt-3">
+                  <Button
+                    disabled={!selectedApp}
+                    onClick={() =>
+                      setNotice(
+                        `${selectedApp?.title ?? 'This program'} is a Windows component. Use the Windows Setup tab to view Windows components.`,
+                      )
+                    }
+                  >
+                    Add/Remove...
+                  </Button>
+                </div>
+              </>
+            ),
+          },
+          {
+            label: 'Windows Setup',
+            content: (
+              <>
+                <p className="mb-3 mt-2">To add or remove a component, select it and click Details.</p>
+                <ListBox
+                  label="Windows components"
+                  items={[
+                    'Accessories',
+                    'Accessibility Options',
+                    'Communications',
+                    'Disk Tools',
+                    'Games',
+                    'Multimedia',
+                    'Screen Savers',
+                  ]}
+                  value={component}
+                  onChange={setComponent}
+                  render={(name) => (
+                    <span className="flex gap-2">
+                      <span>☑</span>
+                      <span>{name}</span>
+                    </span>
+                  )}
+                  className="h-[150px]"
+                />
+                <div className="flex justify-between mt-3">
+                  <span>Space required: 0.0MB</span>
+                  <Button
+                    onClick={() =>
+                      setNotice(
+                        `${component} is installed. No Windows Setup disks are available to change components.`,
+                      )
+                    }
+                  >
+                    Details...
+                  </Button>
+                </div>
+                <p className="mt-4">Space available on disk: 511.0MB</p>
+              </>
+            ),
+          },
+          {
+            label: 'Startup Disk',
+            content: (
+              <>
+                <div className="flex gap-4 items-center mt-5">
+                  <img src={appletIcons.programs} width={48} height={48} alt="" />
+                  <p>A startup disk can be used to start your computer if Windows does not start.</p>
+                </div>
+                <p className="my-5">Insert a disk into drive A:, and then click Create Disk.</p>
+                <Button
+                  onClick={() => setNotice('The device is not ready. No floppy disk drive is available.')}
+                >
+                  Create Disk...
+                </Button>
+              </>
+            ),
+          },
+        ]}
+      />
+      {notice && (
+        <MessageBox
+          title="Add/Remove Programs"
+          message={notice}
+          buttons={['OK']}
+          onClose={() => setNotice(null)}
+        />
+      )}
+    </>
   )
 }

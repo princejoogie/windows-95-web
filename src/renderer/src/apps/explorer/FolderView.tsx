@@ -669,8 +669,12 @@ export function FolderView({
     ...shellCommands(virtual?.fileCommands),
     'separator',
     { label: 'Create &Shortcut', disabled: true },
-    { label: '&Delete', disabled: true },
-    { label: 'Rena&me', disabled: true },
+    ...(virtual?.fileMutations === false
+      ? []
+      : [
+          { label: '&Delete', disabled: true },
+          { label: 'Rena&me', disabled: true },
+        ]),
     'separator',
     { label: 'P&roperties', disabled: !singleShell && !virtual?.properties, onSelect: shellProperties },
     'separator',
@@ -1228,7 +1232,7 @@ export function FolderView({
                     bold: true,
                     onSelect: () => shellItems.find((item) => item.key === shellMenu.key)?.open(),
                   },
-                  ...shellCommands(virtual.fileCommands),
+                  ...shellCommands(virtual.contextCommands ?? virtual.fileCommands),
                   'separator',
                   { label: 'Create &Shortcut', disabled: true },
                   { label: 'P&roperties', onSelect: shellProperties },
