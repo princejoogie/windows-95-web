@@ -1,8 +1,7 @@
 import { type CSSProperties, type ReactNode, useId, useState } from 'react'
-import { Button, Checkbox, Dialog, GroupBox, Radio, Separator, TextBox } from '../../ui'
+import { Button, Checkbox, Dialog, GroupBox, Radio, TextBox } from '../../ui'
 import { FONT_SIZES, FONTS, scriptsFor } from './fonts'
 import { runCss } from './html'
-import { wordpadIcon } from './icons'
 import type { Alignment, ParagraphStyle, RunStyle } from './model'
 import {
   DOCUMENT_TYPES,
@@ -1127,39 +1126,6 @@ export function PrintDialog({ onPrint, onClose }: { onPrint: () => void; onClose
           <Button onClick={onClose}>Cancel</Button>
         </div>
       </form>
-    </Dialog>
-  )
-}
-
-export function AboutWordPad({ onClose }: { onClose: () => void }) {
-  return (
-    <Dialog title="About WordPad" onClose={onClose} className="w-[375px]">
-      <div className="flex gap-[18px] p-[14px]">
-        <img src={wordpadIcon} alt="" className="size-8" />
-        <div className="flex flex-1 flex-col gap-[10px]">
-          <div>
-            <p>Microsoft Windows 95</p>
-            <p>WordPad</p>
-            <p>Copyright © 1981-1995 Microsoft Corp.</p>
-          </div>
-          <Separator />
-          <div>
-            <p>This product is licensed to:</p>
-            <p className="pl-[12px]">Windows 95 User</p>
-            <p className="pl-[12px]">Personal Computer</p>
-          </div>
-          <Separator />
-          <div>
-            <p>Physical memory available to Windows: 32,000 KB</p>
-            <p>System resources: 85% free</p>
-          </div>
-          <div className="flex justify-end">
-            <Button isDefault autoFocus onClick={onClose}>
-              OK
-            </Button>
-          </div>
-        </div>
-      </div>
     </Dialog>
   )
 }

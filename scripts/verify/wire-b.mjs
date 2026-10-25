@@ -277,7 +277,66 @@ async function dialogs() {
   await closeWindows()
 }
 
-const phases = { fileDialog, dialogs }
+const ABOUT = [
+  ['notepad', 'About Notepad', 'Microsoft Notepad'],
+  ['calc', 'About Calculator', 'Microsoft Calculator'],
+  ['mspaint', 'About Paint', 'Microsoft Paint'],
+  ['wordpad', 'About WordPad', 'Microsoft WordPad'],
+  ['winmine', 'About Minesweeper', 'Microsoft Minesweeper', 'by Robert Donner and Curt Johnson'],
+  ['sol', 'About Solitaire', 'Microsoft Solitaire', 'by Wes Cherry'],
+  ['freecell', 'About FreeCell...', 'Microsoft FreeCell', 'by Jim Horne'],
+  ['explorer', 'About Windows 95', 'Microsoft Windows 95'],
+  ['nethood', 'About Windows 95', 'Microsoft Windows 95'],
+  ['find', 'About Windows', 'Microsoft Windows 95'],
+  ['winhlp32', 'About Windows Help', 'Microsoft Windows Help'],
+  ['command', 'About MS-DOS Prompt', 'Microsoft MS-DOS Prompt'],
+]
+
+const treeItem = (index) => `[...${topWindow}.querySelectorAll('[role="treeitem"]')][${index}]`
+const openAbout = {
+  async winhlp32() {
+    await clickExpr(treeItem(0), { count: 2 })
+    await app.waitFor(`${topWindow}.querySelectorAll('[role="treeitem"]').length > 4`)
+    await clickExpr(treeItem(1), { count: 2 })
+    await clickExpr(`[...${topWindow}.querySelectorAll('button')].find(b => b.textContent.trim() === 'Options')`)
+    await pickMenu('About Windows Help')
+  },
+  async command() {
+    const [x, y] = await centerOf(topWindow)
+    await app.click(x, y + 40, { button: 'right' })
+    await pickMenu('About MS-DOS Prompt')
+  },
+}
+
+async function about() {
+  await closeWindows()
+  for (const [exe, item, product, credit] of ABOUT) {
+    await run(exe)
+    await app.waitFor(`!!document.querySelector('[data-window]')`)
+    await sleep(300)
+    await (openAbout[exe] ?? (() => openMenu('Help', item)))()
+    const title = item.replace('...', '')
+    await app.waitFor(`!!${dialog(title)}`)
+    const lines = await app.eval(`[...${dialog(title)}.querySelectorAll('p')].map(p => p.textContent.trim())`)
+    const focused = await app.eval(`document.activeElement.textContent.trim()`)
+    check(
+      lines[0] === product &&
+        lines[1] === 'Windows 95' &&
+        lines[2] === 'Copyright © 1981-1995 Microsoft Corp.' &&
+        (credit ? lines[3] === credit : lines[3] === 'This product is licensed to:') &&
+        focused === 'OK',
+      '3a',
+      `${exe}: ${title} is the shared About box with OK focused`,
+      lines.slice(0, credit ? 4 : 3),
+    )
+    if (exe === 'mspaint' || exe === 'winmine') await shot(`3a-about-${exe}`, await dialogBox(title))
+    await app.key('Enter')
+    await app.waitFor(`!${dialog(title)}`)
+    await closeWindows()
+  }
+}
+
+const phases = { fileDialog, dialogs, about }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {

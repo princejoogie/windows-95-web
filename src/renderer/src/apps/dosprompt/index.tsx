@@ -5,7 +5,7 @@ import { WINDOWS_DIR } from '../../fs/types'
 import { useKeyDown } from '../../shell/context'
 import { launch, openNode, windowsStore } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { MessageBox } from '../../ui'
+import { AboutDialog, MessageBox } from '../../ui'
 import { ConsoleMenu, type ConsoleMenuItem } from './ConsoleMenu'
 import { dosIcon, dosSmallIcon, toolbarIcons } from './icons'
 import { BANNER, execute, newSession, prompt } from './interpreter'
@@ -446,15 +446,16 @@ function DosPrompt({ window: api, args }: AppProps) {
           onClose={() => setDialog('none')}
         />
       )}
-      {(dialog === 'help' || dialog === 'about') && (
+      {dialog === 'about' && (
+        <AboutDialog app="MS-DOS Prompt" icon={dosIcon} onClose={() => setDialog('none')} />
+      )}
+      {dialog === 'help' && (
         <MessageBox
-          title={dialog === 'help' ? 'MS-DOS Prompt Help' : 'About MS-DOS Prompt'}
+          title="MS-DOS Prompt Help"
           buttons={['OK']}
           icon="info"
           message={
-            dialog === 'about'
-              ? 'Microsoft(R) Windows 95\nMS-DOS Prompt\nVersion 4.00.950\n\n(C)Copyright Microsoft Corp 1981-1995.'
-              : 'Type HELP for a list of commands, or HELP followed by a command name.\n\nUp and Down recall commands. F3 repeats the last command. Esc clears the line. Ctrl+C cancels a command.\n\nAlt+Enter switches between a window and full screen. Right-click or press Shift+F10 for the menu and toolbar setting.\n\nMark selects a rectangle of text. Enter copies it. Shift+Insert pastes.\n\nType EXIT to close this window.'
+            'Type HELP for a list of commands, or HELP followed by a command name.\n\nUp and Down recall commands. F3 repeats the last command. Esc clears the line. Ctrl+C cancels a command.\n\nAlt+Enter switches between a window and full screen. Right-click or press Shift+F10 for the menu and toolbar setting.\n\nMark selects a rectangle of text. Enter copies it. Shift+Insert pastes.\n\nType EXIT to close this window.'
           }
           onClose={() => setDialog('none')}
         />

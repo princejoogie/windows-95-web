@@ -1,3 +1,4 @@
+export { AboutDialog } from './AboutDialog'
 export { Button } from './Button'
 export { ComboBox, type ComboOption } from './ComboBox'
 export { Dialog } from './Dialog'

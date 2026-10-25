@@ -1,9 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { icons } from '../../icons'
 import { useKeyDown } from '../../shell/context'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { Button, Dialog, MenuBar, TextBox } from '../../ui'
+import { AboutDialog, Button, Dialog, MenuBar, TextBox } from '../../ui'
 import { artwork, largeMineIcon, mineIcon } from './art'
 import {
   advanceTime,
@@ -446,21 +445,12 @@ function Minesweeper({ window: appWindow }: AppProps) {
         </Dialog>
       )}
       {dialog.kind === 'about' && (
-        <Dialog title="About Minesweeper" onClose={closeDialog}>
-          <div className="mine-about">
-            <img src={icons.windowsLogo} alt="" width="32" height="32" />
-            <div className="mine-about-product">
-              <p>Microsoft Windows 95</p>
-              <p>Minesweeper</p>
-              <p>Version 4.0</p>
-              <p>Copyright © 1981-1995 Microsoft Corp.</p>
-            </div>
-            <div className="mine-about-rule" />
-            <Button isDefault autoFocus onClick={closeDialog}>
-              OK
-            </Button>
-          </div>
-        </Dialog>
+        <AboutDialog
+          app="Minesweeper"
+          icon={largeMineIcon}
+          credit="by Robert Donner and Curt Johnson"
+          onClose={closeDialog}
+        />
       )}
     </div>
   )

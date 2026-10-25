@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { children, fileSize, isInside, isProtected, pathOf, resolvePath, uniqueName } from '../../fs/fs'
 import { createNode, fs, fsStore, newNodeId, useFs } from '../../fs/store'
 import { DESKTOP_DIR, DOCUMENTS_DIR, type FsNode, type NodeId, RECYCLED_DIR } from '../../fs/types'
+import { icons } from '../../icons'
 import { useStore } from '../../lib/store'
 import { CreateShortcut } from '../../shell/CreateShortcut'
 import { type Clip, clipboard, type Plan, planPaste, planShortcuts } from '../../shell/clipboard'
@@ -11,6 +12,7 @@ import { apps, getApp } from '../../shell/registry'
 import { launch, openNode, useWindows, windowsStore } from '../../shell/system'
 import type { WindowApi } from '../../shell/types'
 import {
+  AboutDialog,
   Button,
   ComboBox,
   ContextMenu,
@@ -25,7 +27,7 @@ import {
 import type { MenuEntry } from '../../ui/Menu'
 import { formatSize, isHidden } from '../../ui/properties'
 import { fileIcon, floppyIcon, printerIcon, radioDot } from './art'
-import { AboutExplorer, DeleteConfirmation, FolderOptions, RecycleProperties } from './dialogs'
+import { DeleteConfirmation, FolderOptions, RecycleProperties } from './dialogs'
 import { FolderTree, treeIcon } from './FolderTree'
 import { DragGhost, useFileDrag } from './fileDrag'
 import { history, planUndo, remember } from './history'
@@ -1259,7 +1261,9 @@ export function FolderView({
           }}
         />
       )}
-      {prompt?.kind === 'help' && <AboutExplorer onClose={() => setPrompt(null)} />}
+      {prompt?.kind === 'help' && (
+        <AboutDialog app="Windows 95" icon={icons.windowsLogo} onClose={() => setPrompt(null)} />
+      )}
       {prompt?.kind === 'options' && <FolderOptions onClose={() => setPrompt(null)} />}
       {prompt?.kind === 'bin-properties' && <RecycleProperties onClose={() => setPrompt(null)} />}
       {prompt?.kind === 'floppy' && (

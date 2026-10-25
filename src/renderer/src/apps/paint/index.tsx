@@ -7,6 +7,7 @@ import { useKeyDown } from '../../shell/context'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
 import {
+  AboutDialog,
   FileDialog,
   type FileDialogResult,
   type FileTypeFilter,
@@ -40,7 +41,6 @@ import { decodeBitmap, drawBitmap, encodeBitmap, PaintCanvas } from './Canvas'
 import { clipboardPiece, copyPiece, useClipboard } from './clipboard'
 import { formatPalette, parsePalette } from './colors'
 import {
-  AboutDialog,
   AttributesDialog,
   CustomZoomDialog,
   EditColorsDialog,
@@ -867,7 +867,9 @@ function Paint({ window: windowApi, args }: AppProps) {
       {dialog?.kind === 'message' && (
         <MessageBox title={dialog.title} message={dialog.message} buttons={['OK']} onClose={cancelClose} />
       )}
-      {dialog?.kind === 'about' && <AboutDialog onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'about' && (
+        <AboutDialog app="Paint" icon={paintIcon} onClose={() => setDialog(null)} />
+      )}
       {dialog?.kind === 'attributes' && (
         <AttributesDialog
           width={image.width}

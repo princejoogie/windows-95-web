@@ -1,37 +1,8 @@
 import { useState } from 'react'
 import type { FsNode } from '../../fs/types'
 import { icons } from '../../icons'
-import { Button, Checkbox, Dialog, GroupBox, Radio, Separator } from '../../ui'
+import { Button, Checkbox, Dialog, GroupBox, Radio } from '../../ui'
 import { type Options, options } from './preferences'
-
-export function AboutExplorer({ onClose }: { onClose: () => void }) {
-  return (
-    <Dialog title="About Windows 95" onClose={onClose} className="w-[400px]">
-      <div className="flex gap-5 p-4">
-        <img src={icons.windowsLogo} alt="" className="size-8 shrink-0" />
-        <div className="flex-1 flex flex-col gap-2">
-          <div>Microsoft Windows 95</div>
-          <div>Copyright © 1981-1995 Microsoft Corp.</div>
-          <Separator />
-          <div>This product is licensed to:</div>
-          <div className="pl-3">
-            Windows 95 User
-            <br />
-            Personal Computer
-          </div>
-          <Separator />
-          <div>Physical memory available to Windows: 32,000 KB</div>
-          <div>System resources: 85% free</div>
-        </div>
-      </div>
-      <div className="px-3 pb-3 text-right">
-        <Button isDefault onClick={onClose}>
-          OK
-        </Button>
-      </div>
-    </Dialog>
-  )
-}
 
 export function FolderOptions({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState('General')

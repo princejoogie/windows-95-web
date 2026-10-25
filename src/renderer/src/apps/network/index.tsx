@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
+import { icons } from '../../icons'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { MenuBar, MessageBox, StatusBar, StatusPane } from '../../ui'
+import { AboutDialog, MenuBar, StatusBar, StatusPane } from '../../ui'
 import '../explorer/explorer.css'
 import { entireNetworkIcon, networkIcon, networkSmallIcon } from './art'
 
@@ -96,15 +97,7 @@ function NetworkNeighborhood({ window }: AppProps) {
           <StatusPane className="flex-1">{items.length} object(s)</StatusPane>
         </StatusBar>
       )}
-      {about && (
-        <MessageBox
-          title="About Windows 95"
-          icon="info"
-          message={'Microsoft Windows 95\nNetwork Neighborhood'}
-          buttons={['OK']}
-          onClose={() => setAbout(false)}
-        />
-      )}
+      {about && <AboutDialog app="Windows 95" icon={icons.windowsLogo} onClose={() => setAbout(false)} />}
     </div>
   )
 }

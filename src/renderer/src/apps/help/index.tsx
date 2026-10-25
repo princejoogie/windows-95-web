@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useKeyDown } from '../../shell/context'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { Accel, Button, Dialog, MessageBox, TextBox } from '../../ui'
+import { AboutDialog, Accel, Button, Dialog, MessageBox, TextBox } from '../../ui'
 import { type HelpBook, type HelpTopic, indexOf, parseParagraph, searchTopics, topicsOf } from './books'
 import { CommandMenu, Tabs } from './controls'
 import { help } from './help'
@@ -476,24 +476,7 @@ function Help({ args, window: appWindow }: AppProps) {
         </Dialog>
       )}
       {dialog === 'about' && (
-        <Dialog title="About Windows Help" onClose={() => setDialog(null)} className="w-[320px]">
-          <div className="flex gap-4 p-5">
-            <img src={helpIcon} alt="" className="size-8" />
-            <div>
-              Microsoft Windows
-              <br />
-              Windows Help
-              <br />
-              Version 4.0
-              <br />
-              <br />
-              Windows 95 desktop rebuild
-            </div>
-          </div>
-          <Button className="m-3 self-end" isDefault onClick={() => setDialog(null)}>
-            OK
-          </Button>
-        </Dialog>
+        <AboutDialog app="Windows Help" icon={helpIcon} onClose={() => setDialog(null)} />
       )}
       {message && (
         <MessageBox

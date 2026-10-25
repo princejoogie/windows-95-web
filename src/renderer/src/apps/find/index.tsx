@@ -6,7 +6,18 @@ import { icons } from '../../icons'
 import { useKeyDown } from '../../shell/context'
 import { launch, openNode, windowsStore } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { Accel, Button, Checkbox, Dialog, MessageBox, Radio, StatusBar, StatusPane, TextBox } from '../../ui'
+import {
+  AboutDialog,
+  Accel,
+  Button,
+  Checkbox,
+  Dialog,
+  MessageBox,
+  Radio,
+  StatusBar,
+  StatusPane,
+  TextBox,
+} from '../../ui'
 import { CommandMenu, Tabs } from '../help/controls'
 import '../help/help.css'
 import { findIcon } from './icons'
@@ -725,24 +736,12 @@ function Find({ window: appWindow, args }: AppProps) {
         </Dialog>
       )}
       {about && (
-        <Dialog title="About Windows" onClose={() => setAbout(false)} className="w-[320px]">
-          <div className="flex gap-4 p-5">
-            <img src={findIcon} alt="" className="size-8" />
-            <div>
-              Microsoft Windows
-              <br />
-              Windows 95
-              <br />
-              Version 4.0
-              <br />
-              <br />
-              Find: All Files
-            </div>
-          </div>
-          <Button className="m-3 self-end" isDefault onClick={() => setAbout(false)}>
-            OK
-          </Button>
-        </Dialog>
+        <AboutDialog
+          app="Windows 95"
+          title="About Windows"
+          icon={icons.windowsLogo}
+          onClose={() => setAbout(false)}
+        />
       )}
       {message && (
         <MessageBox
