@@ -1,8 +1,9 @@
 import { useId, useState } from 'react'
 import { defaultSettings } from '../../settings/model'
-import { Button, Checkbox, ComboBox, Dialog, GroupBox, Radio, TextBox } from '../../ui'
+import { Button, ComboBox, Dialog, GroupBox, Radio, TextBox } from '../../ui'
 import { ListBox } from '../../ui/ListBox'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
+import { NetworkComponentProperties, TcpipProperties } from './TcpipProperties'
 
 export function NetworkProperties({ onClose }: { onClose: () => void }) {
   const id = useId()
@@ -11,7 +12,6 @@ export function NetworkProperties({ onClose }: { onClose: () => void }) {
   const [selected, setSelected] = useState(network.components[0] ?? '')
   const [dialog, setDialog] = useState<string | null>(null)
   const [addition, setAddition] = useState(defaultSettings.network.components[0] ?? '')
-  const [binding, setBinding] = useState(true)
   return (
     <>
       <PropertySheet
@@ -152,13 +152,37 @@ export function NetworkProperties({ onClose }: { onClose: () => void }) {
           },
         ]}
       />
-      {dialog && (
+      {dialog === 'properties' &&
+        (selected === 'TCP/IP' ? (
+          <TcpipProperties
+            value={network.tcpip}
+            onOK={(tcpip) => state.change({ network: { ...network, tcpip } })}
+            onClose={() => setDialog(null)}
+          />
+        ) : (
+          <NetworkComponentProperties
+            name={selected}
+            binding={selected === 'Dial-Up Adapter' ? network.adapterBinding : network.clientLogon}
+            onOK={(binding) =>
+              state.change({
+                network: {
+                  ...network,
+                  ...(selected === 'Dial-Up Adapter'
+                    ? { adapterBinding: binding }
+                    : { clientLogon: binding }),
+                },
+              })
+            }
+            onClose={() => setDialog(null)}
+          />
+        ))}
+      {dialog === 'add' && (
         <Dialog
           title={dialog === 'add' ? 'Select Network Component Type' : `${selected} Properties`}
           onClose={() => setDialog(null)}
         >
           <div className="p-3 w-[340px]">
-            {dialog === 'add' ? (
+            {
               <>
                 <p className="mb-3">Select the network component you want to install.</p>
                 <ListBox
@@ -171,20 +195,7 @@ export function NetworkProperties({ onClose }: { onClose: () => void }) {
                   className="h-[105px]"
                 />
               </>
-            ) : (
-              <>
-                <GroupBox label="Bindings">
-                  <Checkbox
-                    label="Client for Microsoft Networks"
-                    checked={binding}
-                    onChange={(e) => setBinding(e.target.checked)}
-                  />
-                </GroupBox>
-                <p className="mt-3">
-                  This component is installed. No physical network connection is available.
-                </p>
-              </>
-            )}
+            }
             <div className="flex justify-end gap-2 mt-4">
               <Button
                 isDefault
