@@ -597,7 +597,30 @@ async function shared() {
   await app.key('Escape')
 }
 
-const phases = { panes, explorer, sizes, deletion, bin, shared }
+async function tree() {
+  await fresh()
+  await run('explorer')
+  await app.waitFor(`!!${windowNamed('Exploring - C:\\')}`)
+  const ex = `[...document.querySelectorAll('[data-window]')].find(w => w.getAttribute('aria-label').startsWith('Exploring'))`
+  for (const folder of ['Control Panel', 'Printers']) {
+    await clickExpr(
+      `[...${ex}.querySelectorAll('[role="treeitem"]')].find(r => r.textContent.trim() === ${q(folder)})`,
+    )
+    await app.waitFor(`${ex}.getAttribute('aria-label') === ${q(`Exploring - ${folder}`)}`)
+    const view = await app.eval(
+      `({ windows: document.querySelectorAll('[data-window]').length, heading: [...${ex}.querySelectorAll('.explorer-pane-heading')].map(h => h.textContent), items: [...${ex}.querySelectorAll('[role="listbox"] [role="option"]')].map(o => o.textContent.trim()) })`,
+    )
+    check(
+      view.windows === 1 && view.heading[1] === `Contents of '${folder}'` && view.items.length > 0,
+      '8',
+      `the tree's ${folder} opens in the Exploring window's right pane`,
+      view,
+    )
+    await shot(`08-tree-${folder.toLowerCase().replace(' ', '-')}`, await boxOf(ex))
+  }
+}
+
+const phases = { panes, explorer, sizes, deletion, bin, shared, tree }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {
