@@ -1,0 +1,28 @@
+.bg-desktop {
+  background-image: var(--desktop-image, none);
+  background-repeat: var(--desktop-repeat, repeat);
+  background-position: var(--desktop-position, left top);
+  background-size: var(--desktop-size, auto);
+  image-rendering: pixelated;
+}
+
+body {
+  color: var(--color-text, #000000);
+}
+
+.bg-white {
+  background-color: var(--color-window, #ffffff);
+  color: var(--color-window-text, #000000);
+}
+
+.bg-title {
+  color: var(--color-title-text, #ffffff);
+}
+
+.bg-title-inactive {
+  color: var(--color-inactive-text, #c0c0c0);
+}
+
+.bg-select {
+  color: var(--color-select-text, #ffffff);
+}
