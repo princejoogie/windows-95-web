@@ -10,6 +10,11 @@ body {
   color: var(--color-text, #000000);
 }
 
+.bg-white {
+  background-color: var(--color-window, #ffffff);
+  color: var(--color-window-text, #000000);
+}
+
 .bg-title {
   color: var(--color-title-text, #ffffff);
 }

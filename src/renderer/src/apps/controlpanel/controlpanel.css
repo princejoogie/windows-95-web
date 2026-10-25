@@ -1,0 +1,260 @@
+.cp-folder {
+  color: var(--color-text);
+}
+
+.cp-icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 92px);
+  align-content: start;
+  gap: 8px 2px;
+  padding: 12px 5px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--color-window, #ffffff);
+  color: var(--color-window-text, #000000);
+}
+
+.cp-icon {
+  width: 92px;
+  min-height: 67px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  outline: none;
+}
+
+.cp-icon img {
+  width: 32px;
+  height: 32px;
+}
+
+.cp-icon span {
+  padding: 1px 2px;
+  max-width: 86px;
+  text-align: center;
+  line-height: 13px;
+}
+
+.cp-icon[aria-selected="true"] span {
+  background: var(--color-select);
+  color: var(--color-select-text);
+  outline: 1px dotted var(--color-select-text);
+  outline-offset: -1px;
+}
+
+.cp-icon[aria-selected="true"] img {
+  filter: brightness(0.7);
+}
+
+.cp-sheet {
+  max-width: calc(100vw - 24px);
+  padding: 9px 6px 7px;
+}
+
+.cp-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  max-height: calc(100vh - 32px);
+}
+
+.cp-tabs {
+  display: flex;
+  align-items: end;
+  padding-left: 2px;
+  min-height: 22px;
+}
+
+.cp-tabs button {
+  position: relative;
+  height: 20px;
+  padding: 2px 8px;
+  background: var(--color-face);
+  border-radius: 3px 3px 0 0;
+  box-shadow:
+    inset 1px 1px var(--color-hilight),
+    inset -1px 0 var(--color-dark),
+    inset -2px 1px var(--color-shadow);
+}
+
+.cp-tabs button[aria-selected="true"] {
+  height: 23px;
+  margin: 0 -2px -1px;
+  padding: 3px 10px 4px;
+  z-index: 1;
+}
+
+.cp-tabs button:focus-visible {
+  outline: 1px dotted var(--color-text);
+  outline-offset: -5px;
+}
+
+.cp-page {
+  min-height: 326px;
+  padding: 12px;
+  box-shadow:
+    inset 1px 1px var(--color-hilight),
+    inset -1px -1px var(--color-dark),
+    inset -2px -2px var(--color-shadow);
+}
+
+.cp-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding-top: 9px;
+}
+
+.cp-sheet select {
+  height: 21px;
+  background-color: var(--color-window, #ffffff);
+  color: var(--color-window-text, #000000);
+  border: 1px solid var(--color-shadow);
+  box-shadow:
+    inset 1px 1px var(--color-dark),
+    1px 1px var(--color-hilight);
+  padding: 0 2px;
+}
+
+.cp-sheet select[size] {
+  height: auto;
+  padding: 2px;
+}
+
+.cp-sheet option:checked {
+  background: var(--color-select);
+  color: var(--color-select-text);
+}
+
+.cp-monitor {
+  width: 184px;
+  margin: 0 auto 10px;
+}
+
+.cp-monitor-case {
+  padding: 9px 9px 12px;
+  background: #c0c0c0;
+  border: 1px solid #000000;
+  box-shadow:
+    inset 2px 2px #ffffff,
+    inset -2px -2px #808080;
+  position: relative;
+}
+
+.cp-monitor-case::after {
+  content: "";
+  position: absolute;
+  width: 4px;
+  height: 2px;
+  background: #00ff00;
+  bottom: 4px;
+  right: 12px;
+}
+
+.cp-monitor-screen {
+  height: 100px;
+  border: 2px solid #000000;
+  overflow: hidden;
+  position: relative;
+  background: #000000;
+}
+
+.cp-monitor-neck {
+  height: 9px;
+  width: 42px;
+  margin: 0 auto;
+  background: #808080;
+  border: 1px solid #000000;
+}
+
+.cp-monitor-foot {
+  height: 6px;
+  width: 82px;
+  margin: 0 auto;
+  background: #c0c0c0;
+  border: 1px solid #000000;
+  box-shadow: inset 1px 1px #ffffff;
+}
+
+.cp-sample {
+  height: 155px;
+  padding: 10px 14px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #000000;
+}
+
+.cp-sample-window {
+  padding: 3px;
+  box-shadow:
+    inset 1px 1px #ffffff,
+    inset -1px -1px #000000,
+    inset -2px -2px #808080;
+}
+
+.cp-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: var(--color-window);
+  color: var(--color-window-text);
+  padding: 3px;
+  margin-top: 6px;
+  text-align: center;
+}
+
+.cp-calendar button {
+  height: 20px;
+}
+
+.cp-calendar button[aria-pressed="true"] {
+  background: var(--color-select);
+  color: var(--color-select-text);
+}
+
+.cp-slider {
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  margin: 13px 0;
+  background: var(--color-face);
+  border: 1px solid var(--color-shadow);
+  box-shadow:
+    1px 1px var(--color-hilight),
+    inset 1px 1px var(--color-dark);
+}
+
+.cp-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 11px;
+  height: 21px;
+  background: var(--color-face);
+  box-shadow:
+    inset 1px 1px var(--color-hilight),
+    inset -1px -1px var(--color-dark),
+    inset -2px -2px var(--color-shadow);
+}
+
+.cp-fonts {
+  height: 270px;
+  overflow: auto;
+  padding: 5px;
+  background: var(--color-window);
+}
+
+@keyframes cp-blink {
+  0%,
+  49% {
+    visibility: visible;
+  }
+  50%,
+  100% {
+    visibility: hidden;
+  }
+}
+
+.cp-cursor {
+  animation: cp-blink 1s steps(1) infinite;
+}

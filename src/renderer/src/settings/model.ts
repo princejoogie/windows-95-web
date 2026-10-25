@@ -160,6 +160,9 @@ export function parseSettings(value: unknown): Settings {
   const regional = object(source.regional)
   const accessibility = object(source.accessibility)
   const defaults = defaultSettings
+  const soundScheme = { ...defaults.soundScheme }
+  for (const event of soundEvents)
+    soundScheme[event] = choice(sounds[event], soundNames, defaults.soundScheme[event])
   return {
     desktopColor: hexColor(source.desktopColor, defaults.desktopColor),
     pattern: patternNames.find((name) => name === source.pattern) ?? null,
@@ -187,9 +190,7 @@ export function parseSettings(value: unknown): Settings {
       trails: bool(mouse.trails, false),
       motion: number(mouse.motion, 5, 1, 10),
     },
-    soundScheme: Object.fromEntries(
-      soundEvents.map((event) => [event, choice(sounds[event], soundNames, defaults.soundScheme[event])]),
-    ) as Record<SoundEvent, SoundName>,
+    soundScheme,
     clockOffset: number(source.clockOffset, 0, -3155760000000, 3155760000000),
     timeZone: choice(source.timeZone, timeZones, defaults.timeZone),
     keyboard: {
