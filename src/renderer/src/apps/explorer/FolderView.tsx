@@ -211,7 +211,7 @@ export function FolderView({
   const selectedShell = shellItems.filter((item) => selection.ids.has(item.key))
   const singleShell = selectedShell.length === 1 ? selectedShell[0] : undefined
   const shellProperties = () => {
-    const action = virtual?.items.find((item) => item.key === singleShell?.key)?.action ?? virtual?.properties
+    const action = virtual?.properties ?? virtual?.items.find((item) => item.key === singleShell?.key)?.action
     if (action) performShell(action)
   }
   const selectedCount = selected.length + selectedShell.length

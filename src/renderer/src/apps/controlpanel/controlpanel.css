@@ -54,6 +54,19 @@
   padding: 9px 6px 7px;
 }
 
+.cp-form-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.cp-form-row > input {
+  margin-left: auto;
+  width: 190px;
+  min-width: 0;
+}
+
 .cp-dialog {
   position: fixed;
   top: 50%;

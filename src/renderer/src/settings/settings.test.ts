@@ -17,6 +17,16 @@ describe('persistent settings', () => {
         appearance: { scheme: 'Eggplant', colors: { title: '#123456' } },
         keyboard: { repeatDelay: 250, repeatRate: 30, cursorBlink: 0 },
         accessibility: { ...defaultSettings.accessibility, stickyKeys: true },
+        network: {
+          ...defaultSettings.network,
+          computer: 'PENTIUM',
+          workgroup: 'HOME',
+          components: ['TCP/IP'],
+        },
+        passwords: { ...defaultSettings.passwords, separateProfiles: true },
+        multimedia: { ...defaultSettings.multimedia, playbackVolume: 25 },
+        dialing: { ...defaultSettings.dialing, areaCode: '02', tone: false },
+        joystick: { type: 'Gamepad' },
       },
     })
     expect(parseSettings(JSON.parse(JSON.stringify(settings)))).toEqual(settings)
@@ -29,11 +39,17 @@ describe('persistent settings', () => {
       mouse: { doubleClickMs: 0 },
       clockOffset: Number.NaN,
       appearance: { scheme: 'missing', colors: { title: 'red' } },
+      network: { components: ['TCP/IP', 'Unknown protocol', 42], workgroup: false },
+      multimedia: { playbackVolume: 200, videoSize: 'invalid' },
     })
     expect(result.desktopColor).toBe('#008080')
     expect(result.mouse.doubleClickMs).toBe(100)
     expect(result.appearance).toEqual(defaultSettings.appearance)
     expect(result.clockOffset).toBe(0)
+    expect(result.network.components).toEqual(['TCP/IP'])
+    expect(result.network.workgroup).toBe('WORKGROUP')
+    expect(result.multimedia.playbackVolume).toBe(100)
+    expect(result.multimedia.videoSize).toBe('Original size')
   })
 
   it('applies only changed fields so two open property sheets do not overwrite each other', () => {

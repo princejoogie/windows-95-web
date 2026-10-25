@@ -1,10 +1,66 @@
+import { useId, useState } from 'react'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { MessageBox } from '../../ui'
+import { Button, Checkbox, ComboBox, Dialog, MessageBox, TextBox } from '../../ui'
+import { NetworkProperties } from '../controlpanel/NetworkProperties'
 import { FolderView } from '../explorer/FolderView'
 import { registerShellFolder } from '../explorer/shellFolders'
 import { entireNetworkIcon, networkIcon, networkSmallIcon } from './art'
 
 function NetworkDialog({ id, onClose }: { id: string; onClose: () => void }) {
+  const field = useId()
+  const [failed, setFailed] = useState(false)
+  if (id === 'properties') return <NetworkProperties onClose={onClose} />
+  if (id === 'find' || id === 'map')
+    return (
+      <>
+        <Dialog title={id === 'find' ? 'Find: Computer' : 'Map Network Drive'} onClose={onClose}>
+          <form
+            className="p-3 w-[350px]"
+            onSubmit={(event) => {
+              event.preventDefault()
+              setFailed(true)
+            }}
+          >
+            {id === 'map' && (
+              <label htmlFor={`${field}-drive`} className="flex gap-3 items-center mb-3">
+                Drive:
+                <ComboBox
+                  aria-label="Network drive"
+                  id={`${field}-drive`}
+                  value="Z:"
+                  onChange={() => {}}
+                  options={[{ key: 'Z:', label: 'Z:' }]}
+                />
+              </label>
+            )}
+            <label htmlFor={`${field}-name`} className="flex gap-3 items-center">
+              {id === 'find' ? 'Named:' : 'Path:'}
+              <TextBox
+                id={`${field}-name`}
+                aria-label={id === 'find' ? 'Computer name' : 'Network path'}
+                className="flex-1"
+              />
+            </label>
+            {id === 'map' && <Checkbox label="Reconnect at logon" className="mt-4" defaultChecked />}
+            <div className="flex justify-end gap-2 mt-4">
+              <Button type="submit" isDefault>
+                {id === 'find' ? 'Find Now' : 'OK'}
+              </Button>
+              <Button onClick={onClose}>Cancel</Button>
+            </div>
+          </form>
+        </Dialog>
+        {failed && (
+          <MessageBox
+            title={id === 'find' ? 'Find: Computer' : 'Map Network Drive'}
+            icon="error"
+            message="The network is not accessible."
+            buttons={['OK']}
+            onClose={() => setFailed(false)}
+          />
+        )}
+      </>
+    )
   return (
     <MessageBox
       title="Network Neighborhood"

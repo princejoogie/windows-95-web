@@ -62,6 +62,98 @@ try {
     await c.shot(join(proof, 'before-time-zone.png'))
     console.log(baseline)
   }
+  if (group === 'applets') {
+    await run('control')
+    await check(
+      '7: all seven missing Control Panel applets are present',
+      `['hardware','joystick','modems','multimedia','network','passwords','printers'].every(id=>document.querySelector('[data-shell-item="'+id+'"]')) && document.querySelectorAll('.explorer-items [role="option"]').length === 17`,
+      '07-all-applets',
+    )
+    for (const [id, tabs] of [
+      ['network', ['Configuration', 'Identification', 'Access Control']],
+      ['passwords', ['Change Passwords', 'Remote Administration', 'User Profiles']],
+      ['multimedia', ['Audio', 'Video', 'MIDI', 'CD Music', 'Advanced']],
+      ['modems', ['General', 'Diagnostics']],
+      ['joystick', ['Joystick', 'Advanced']],
+    ]) {
+      await c.clickOn(`[data-shell-item="${id}"]`, { count: 2 })
+      await check(
+        `7: ${id} has its property-sheet tabs`,
+        `${text(tabs)}.every(t=>[...document.querySelectorAll('[role="tab"]')].some(e=>e.textContent === t))`,
+      )
+      for (const tab of tabs) {
+        await click(tab, '[role="tab"]')
+        await check(
+          `7: ${id} ${tab} opens`,
+          `[...document.querySelectorAll('[role="tab"][aria-selected="true"]')].some(e=>e.textContent===${text(tab)})`,
+          `07-${id}-${tab.toLowerCase().replaceAll(' ', '-')}`,
+        )
+      }
+      if (id === 'network') {
+        await click('Identification', '[role="tab"]')
+        await c.clickOn('input[aria-label="Workgroup"]')
+        await c.key('a', ['Control'])
+        await c.type('HOME')
+        await click('Apply')
+        await check(
+          '7: Network Apply persists the workgroup',
+          `JSON.parse(localStorage.getItem('win95.settings.v1')).network.workgroup === 'HOME'`,
+          '07-network-applied',
+        )
+        await c.clickOn('input[aria-label="Workgroup"]')
+        await c.key('a', ['Control'])
+        await c.type('UNSAVED')
+      }
+      if (id === 'modems') {
+        await click('General', '[role="tab"]')
+        await click('Add...')
+        await click('Next >')
+        await check(
+          '7: modem detection reports no hardware',
+          `document.body.textContent.includes('Windows did not find any modems')`,
+          '07-no-modems',
+        )
+        await click('Finish')
+        await click('Dialing Properties...')
+        await check(
+          '7: Dialing Properties opens',
+          `!!document.querySelector('input[aria-label="Area code"]')`,
+          '07-dialing-properties',
+        )
+        await click('OK')
+      }
+      await click('Cancel')
+    }
+    await check(
+      '7: Network Cancel discards the later draft',
+      `JSON.parse(localStorage.getItem('win95.settings.v1')).network.workgroup === 'HOME'`,
+    )
+    await c.clickOn('[data-shell-item="hardware"]', { count: 2 })
+    await check(
+      '7: Add New Hardware starts its wizard',
+      `document.body.textContent.includes('This wizard searches for new hardware')`,
+      '07-hardware-welcome',
+    )
+    await click('Next >')
+    await click('Next >')
+    await check(
+      '7: hardware wizard ends without creating devices',
+      `document.body.textContent.includes('Windows did not find any new hardware')`,
+      '07-hardware-result',
+    )
+    await click('Finish')
+    await c.send('Page.reload', { ignoreCache: true })
+    await sleep(100)
+    await c.waitFor('!!document.querySelector("[data-start-button]")', 8000)
+    await run('control')
+    await c.clickOn('[data-shell-item="network"]', { count: 2 })
+    await click('Identification', '[role="tab"]')
+    await check(
+      '7: Network identity survives renderer restart',
+      `document.querySelector('input[aria-label="Workgroup"]').value === 'HOME'`,
+      '07-network-restarted',
+    )
+  }
   if (group === 'folders') {
     await run('control')
     await check(

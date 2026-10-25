@@ -3,8 +3,17 @@ import type { AppManifest, AppProps } from '../../shell/types'
 import { printerIcon } from '../explorer/art'
 import { FolderView } from '../explorer/FolderView'
 import { registerShellFolder, type ShellItem } from '../explorer/shellFolders'
+import { networkIcon } from '../network/art'
+import {
+  HardwareWizard,
+  JoystickProperties,
+  ModemsProperties,
+  MultimediaProperties,
+  PasswordsProperties,
+} from './AdditionalApplets'
 import { DateTimeProperties } from './DateTimeProperties'
 import { DisplayProperties } from './DisplayProperties'
+import { NetworkProperties } from './NetworkProperties'
 import './Fonts'
 import { appletIcons } from './icons'
 import { MouseProperties } from './MouseProperties'
@@ -25,6 +34,48 @@ export { DisplayProperties } from './DisplayProperties'
 export { MouseProperties } from './MouseProperties'
 
 const applets = [
+  {
+    id: 'hardware',
+    label: 'Add New Hardware',
+    icon: appletIcons.hardware,
+    help: 'Installs new hardware on your computer.',
+    component: HardwareWizard,
+  },
+  {
+    id: 'joystick',
+    label: 'Joystick',
+    icon: appletIcons.joystick,
+    help: 'Changes settings for your joystick.',
+    component: JoystickProperties,
+  },
+  {
+    id: 'modems',
+    label: 'Modems',
+    icon: appletIcons.modems,
+    help: 'Sets up and changes settings for modems.',
+    component: ModemsProperties,
+  },
+  {
+    id: 'multimedia',
+    label: 'Multimedia',
+    icon: appletIcons.multimedia,
+    help: 'Changes settings for audio, video, MIDI, and CD music.',
+    component: MultimediaProperties,
+  },
+  {
+    id: 'network',
+    label: 'Network',
+    icon: networkIcon,
+    help: 'Sets up network components and identifies your computer.',
+    component: NetworkProperties,
+  },
+  {
+    id: 'passwords',
+    label: 'Passwords',
+    icon: appletIcons.passwords,
+    help: 'Changes passwords and manages user profiles.',
+    component: PasswordsProperties,
+  },
   {
     id: 'accessibility',
     label: 'Accessibility Options',

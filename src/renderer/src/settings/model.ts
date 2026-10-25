@@ -85,6 +85,24 @@ export interface Settings extends BackgroundSettings {
     mouseKeys: boolean
     showSounds: boolean
   }
+  network: {
+    computer: string
+    workgroup: string
+    description: string
+    userAccess: boolean
+    components: string[]
+  }
+  passwords: { remoteAdmin: boolean; separateProfiles: boolean; desktop: boolean; startMenu: boolean }
+  multimedia: {
+    playbackVolume: number
+    recordingVolume: number
+    preferredOnly: boolean
+    videoSize: string
+    midi: string
+    cdVolume: number
+  }
+  dialing: { location: string; country: string; areaCode: string; outside: string; tone: boolean }
+  joystick: { type: string }
 }
 
 export const defaultSettings: Settings = {
@@ -124,6 +142,30 @@ export const defaultSettings: Settings = {
     mouseKeys: false,
     showSounds: false,
   },
+  network: {
+    computer: 'WINDOWS95',
+    workgroup: 'WORKGROUP',
+    description: '',
+    userAccess: false,
+    components: ['Client for Microsoft Networks', 'Dial-Up Adapter', 'TCP/IP'],
+  },
+  passwords: { remoteAdmin: false, separateProfiles: false, desktop: true, startMenu: true },
+  multimedia: {
+    playbackVolume: 75,
+    recordingVolume: 75,
+    preferredOnly: false,
+    videoSize: 'Original size',
+    midi: 'MIDI Mapper',
+    cdVolume: 75,
+  },
+  dialing: {
+    location: 'My Location',
+    country: 'United States of America (1)',
+    areaCode: '',
+    outside: '',
+    tone: true,
+  },
+  joystick: { type: '(None)' },
 }
 
 export type SettingsAction = { type: 'apply'; patch: Partial<Settings> } | { type: 'reset' }
@@ -172,6 +214,11 @@ export function parseSettings(value: unknown, nodes: readonly FsNode[] = []): Se
   const keyboard = object(source.keyboard)
   const regional = object(source.regional)
   const accessibility = object(source.accessibility)
+  const network = object(source.network)
+  const passwords = object(source.passwords)
+  const multimedia = object(source.multimedia)
+  const dialing = object(source.dialing)
+  const joystick = object(source.joystick)
   const defaults = defaultSettings
   const soundScheme = { ...defaults.soundScheme }
   for (const event of soundEvents)
@@ -231,6 +278,53 @@ export function parseSettings(value: unknown, nodes: readonly FsNode[] = []): Se
       highContrast: bool(accessibility.highContrast, false),
       mouseKeys: bool(accessibility.mouseKeys, false),
       showSounds: bool(accessibility.showSounds, false),
+    },
+    network: {
+      computer: text(network.computer, defaults.network.computer, 15),
+      workgroup: text(network.workgroup, defaults.network.workgroup, 15),
+      description: text(network.description, '', 48),
+      userAccess: bool(network.userAccess, false),
+      components: Array.isArray(network.components)
+        ? defaults.network.components.filter(
+            (name) => Array.isArray(network.components) && network.components.includes(name),
+          )
+        : [...defaults.network.components],
+    },
+    passwords: {
+      remoteAdmin: bool(passwords.remoteAdmin, false),
+      separateProfiles: bool(passwords.separateProfiles, false),
+      desktop: bool(passwords.desktop, true),
+      startMenu: bool(passwords.startMenu, true),
+    },
+    multimedia: {
+      playbackVolume: number(multimedia.playbackVolume, 75, 0, 100),
+      recordingVolume: number(multimedia.recordingVolume, 75, 0, 100),
+      preferredOnly: bool(multimedia.preferredOnly, false),
+      videoSize: choice(
+        multimedia.videoSize,
+        ['Original size', 'Double size', 'Full screen'],
+        'Original size',
+      ),
+      midi: choice(multimedia.midi, ['MIDI Mapper'], 'MIDI Mapper'),
+      cdVolume: number(multimedia.cdVolume, 75, 0, 100),
+    },
+    dialing: {
+      location: text(dialing.location, 'My Location', 48),
+      country: choice(
+        dialing.country,
+        ['United States of America (1)', 'United Kingdom (44)', 'Philippines (63)'],
+        'United States of America (1)',
+      ),
+      areaCode: text(dialing.areaCode, '', 8),
+      outside: text(dialing.outside, '', 8),
+      tone: bool(dialing.tone, true),
+    },
+    joystick: {
+      type: choice(
+        joystick.type,
+        ['(None)', '2-axis, 2-button joystick', '2-axis, 4-button joystick', 'Flight yoke', 'Gamepad'],
+        '(None)',
+      ),
     },
   }
 }
