@@ -1,0 +1,19 @@
+@import "../assets/system/assets.css";
+@import "./cursors.css";
+
+@font-face {
+  font-family: "MS Sans Serif Fallback";
+  src: url("../assets/fonts/micross.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+}
+
+body {
+  font-kerning: none;
+  -webkit-font-smoothing: none;
+}
+
+.font-mono {
+  font-size: var(--system-fixedsys-size, 13px);
+  line-height: var(--system-fixedsys-height, 16px);
+}

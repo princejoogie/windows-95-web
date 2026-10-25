@@ -1,0 +1,65 @@
+body,
+.cursor-default,
+.cursor-pointer,
+button,
+[role="button"],
+input[type="checkbox"],
+input[type="radio"] {
+  cursor: var(--cursor-default, default);
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.cursor-text {
+  cursor: var(--cursor-text, text);
+}
+
+.system-cursor-busy,
+.cursor-progress {
+  cursor: var(--cursor-progress, progress);
+}
+
+.system-cursor-wait,
+.cursor-wait {
+  cursor: var(--cursor-wait, wait);
+}
+
+.system-cursor-move,
+.cursor-move {
+  cursor: var(--cursor-move, move);
+}
+
+.system-cursor-help,
+.cursor-help {
+  cursor: var(--cursor-help, help);
+}
+
+.system-cursor-no,
+.cursor-not-allowed {
+  cursor: var(--cursor-not-allowed, not-allowed);
+}
+
+.system-cursor-ns,
+.cursor-ns-resize,
+[style*="cursor: ns-resize"] {
+  cursor: var(--cursor-ns-resize, ns-resize) !important;
+}
+
+.system-cursor-ew,
+.cursor-ew-resize,
+[style*="cursor: ew-resize"] {
+  cursor: var(--cursor-ew-resize, ew-resize) !important;
+}
+
+.system-cursor-nwse,
+.cursor-nwse-resize,
+[style*="cursor: nwse-resize"] {
+  cursor: var(--cursor-nwse-resize, nwse-resize) !important;
+}
+
+.system-cursor-nesw,
+.cursor-nesw-resize,
+[style*="cursor: nesw-resize"] {
+  cursor: var(--cursor-nesw-resize, nesw-resize) !important;
+}
