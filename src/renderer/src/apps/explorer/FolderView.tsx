@@ -59,7 +59,7 @@ import {
 import { folderPreferences, saveFolderPreferences } from './preferences'
 import { useRubberBand } from './rubberBand'
 import { Splitter } from './Splitter'
-import { type ShellAction, shellFolder } from './shellFolders'
+import { type ShellAction, useShellFolder } from './shellFolders'
 import { toolbarIcons } from './toolbar'
 import { folderTree, TREE_DESKTOP, treeRows } from './tree'
 import './explorer.css'
@@ -134,7 +134,7 @@ export function FolderView({
   const list = useRef<HTMLDivElement>(null)
   const typed = useRef({ text: '', at: 0 })
   const [location, setLocation] = useState(initial)
-  const virtual = location.kind === 'shell' ? shellFolder(location.id) : undefined
+  const virtual = useShellFolder(location.kind === 'shell' ? location.id : undefined)
   const [shellDialog, setShellDialog] = useState<string | null>(null)
   const [shellViewOptions, setShellViewOptions] = useState<ReadonlySet<string>>(new Set())
   const ShellDialog = virtual?.Dialog
