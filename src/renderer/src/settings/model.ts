@@ -1,6 +1,17 @@
 import type { FsNode } from '../fs/types'
 import type { SoundName as SystemSoundName } from '../system/sound'
 import { type BackgroundSettings, patternNames, wallpaperNames, wallpaperNode } from './backgrounds'
+import {
+  type AccessibilityFeatures,
+  accessibilityFeatures,
+  type NumberSettings,
+  numberDefaults,
+  parseFeatures,
+  parseNumberSettings,
+  parseTcpip,
+  type TcpipSettings,
+  tcpipDefaults,
+} from './featureSettings'
 import { type AppearanceSettings, schemeNames, themeColorNames } from './schemes'
 import { windowsTimeZones } from './timeZones'
 
@@ -64,8 +75,9 @@ export interface Settings extends BackgroundSettings {
   regional: {
     locale: (typeof locales)[number]
     currency: string
-    dateFormat: 'M/d/yyyy' | 'dd/MM/yyyy' | 'yyyy-MM-dd'
+    dateFormat: 'M/d/yy' | 'M/d/yyyy' | 'dd/MM/yyyy' | 'yyyy-MM-dd'
     time24: boolean
+    number: NumberSettings
   }
   accessibility: {
     stickyKeys: boolean
@@ -74,6 +86,13 @@ export interface Settings extends BackgroundSettings {
     highContrast: boolean
     mouseKeys: boolean
     showSounds: boolean
+    soundSentry: boolean
+    serialKeys: boolean
+    resetIdle: boolean
+    idleMinutes: number
+    warning: boolean
+    activationSound: boolean
+    features: AccessibilityFeatures
   }
   network: {
     computer: string
@@ -81,6 +100,9 @@ export interface Settings extends BackgroundSettings {
     description: string
     userAccess: boolean
     components: string[]
+    tcpip: TcpipSettings
+    adapterBinding: boolean
+    clientLogon: boolean
   }
   passwords: { remoteAdmin: boolean; separateProfiles: boolean; desktop: boolean; startMenu: boolean }
   multimedia: {
@@ -125,7 +147,13 @@ export const defaultSettings: Settings = {
   timeZone: 'Asia/Manila',
   adjustForDaylightSaving: true,
   keyboard: { repeatDelay: 500, repeatRate: 20, cursorBlink: 530 },
-  regional: { locale: 'English (United States)', currency: '$', dateFormat: 'M/d/yyyy', time24: false },
+  regional: {
+    locale: 'English (United States)',
+    currency: '$',
+    dateFormat: 'M/d/yy',
+    time24: false,
+    number: numberDefaults,
+  },
   accessibility: {
     stickyKeys: false,
     filterKeys: false,
@@ -133,6 +161,13 @@ export const defaultSettings: Settings = {
     highContrast: false,
     mouseKeys: false,
     showSounds: false,
+    soundSentry: false,
+    serialKeys: false,
+    resetIdle: false,
+    idleMinutes: 5,
+    warning: true,
+    activationSound: true,
+    features: accessibilityFeatures,
   },
   network: {
     computer: 'WINDOWS95',
@@ -140,6 +175,9 @@ export const defaultSettings: Settings = {
     description: '',
     userAccess: false,
     components: ['Client for Microsoft Networks', 'Dial-Up Adapter', 'TCP/IP'],
+    tcpip: tcpipDefaults,
+    adapterBinding: true,
+    clientLogon: true,
   },
   passwords: { remoteAdmin: false, separateProfiles: false, desktop: true, startMenu: true },
   multimedia: {
@@ -267,10 +305,11 @@ export function parseSettings(value: unknown, nodes: readonly FsNode[] = []): Se
       currency: text(regional.currency, '$', 8),
       dateFormat: choice(
         regional.dateFormat,
-        ['M/d/yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd'],
+        ['M/d/yy', 'M/d/yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd'],
         defaults.regional.dateFormat,
       ),
       time24: bool(regional.time24, false),
+      number: parseNumberSettings(regional.number),
     },
     accessibility: {
       stickyKeys: bool(accessibility.stickyKeys, false),
@@ -279,12 +318,22 @@ export function parseSettings(value: unknown, nodes: readonly FsNode[] = []): Se
       highContrast: bool(accessibility.highContrast, false),
       mouseKeys: bool(accessibility.mouseKeys, false),
       showSounds: bool(accessibility.showSounds, false),
+      soundSentry: bool(accessibility.soundSentry, false),
+      serialKeys: bool(accessibility.serialKeys, false),
+      resetIdle: bool(accessibility.resetIdle, false),
+      idleMinutes: number(accessibility.idleMinutes, 5, 5, 30),
+      warning: bool(accessibility.warning, true),
+      activationSound: bool(accessibility.activationSound, true),
+      features: parseFeatures(accessibility.features),
     },
     network: {
       computer: text(network.computer, defaults.network.computer, 15),
       workgroup: text(network.workgroup, defaults.network.workgroup, 15),
       description: text(network.description, '', 48),
       userAccess: bool(network.userAccess, false),
+      tcpip: parseTcpip(network.tcpip),
+      adapterBinding: bool(network.adapterBinding, true),
+      clientLogon: bool(network.clientLogon, true),
       components: Array.isArray(network.components)
         ? defaults.network.components.filter(
             (name) => Array.isArray(network.components) && network.components.includes(name),
