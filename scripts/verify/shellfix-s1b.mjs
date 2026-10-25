@@ -945,6 +945,62 @@ try {
     } finally {
       main.close()
     }
+  } else if (phase === 'freecell-close') {
+    const lostBefore = await evaluate(
+      `JSON.parse(localStorage.getItem('w95.freecell.preferences') ?? 'null')?.statistics.lost ?? 0`,
+    )
+    await run('freecell')
+    await wait(`document.querySelector('[data-column="0"] [data-card]')`)
+    await click('[data-column="0"] [data-card]:last-child')
+    await click('[data-cell="0"]')
+    await check(
+      `!document.querySelector('[data-cell="0"]').getAttribute('aria-label').includes('empty') || [...document.querySelectorAll('[data-home]')].some(e=>Number(e.dataset.count)>0)`,
+      'FreeCell makes a real move before close confirmation checks',
+    )
+    await key('F4', 1)
+    await wait(`document.querySelector('[role="dialog"][aria-label="FreeCell"]')`)
+    await shot('freecell-alt-f4')
+    await named('button', 'No')
+    await check(
+      `document.querySelector('[data-window]') !== null && !document.querySelector('[role="dialog"]')`,
+      'FreeCell No cancels Alt+F4 and keeps the unfinished game',
+    )
+    await key('F4')
+    await wait(`document.querySelector('[aria-label="FreeCell Statistics"]')`)
+    await shot('freecell-f4-statistics')
+    await named('button', 'OK')
+    await check(
+      `(JSON.parse(localStorage.getItem('w95.freecell.preferences') ?? 'null')?.statistics.lost ?? 0) === ${lostBefore}`,
+      'FreeCell No preserves statistics and its plain F4 shortcut still opens Statistics',
+    )
+    await shutdown()
+    await wait(`document.querySelector('[role="dialog"][aria-label="FreeCell"]')`)
+    await named('button', 'No')
+    await check(
+      `document.querySelector('[data-window]') !== null && !document.querySelector('[role="status"]')`,
+      'FreeCell No resolves false and aborts shutdown',
+    )
+    await shutdown(true)
+    await wait(`document.querySelector('[role="dialog"][aria-label="FreeCell"]')`)
+    await shot('freecell-restart-confirm')
+    await named('button', 'Yes')
+    await wait(`document.querySelector('[role="status"]')`)
+    await wait(`document.querySelector('[data-start-button]')`)
+    await check(
+      `document.querySelectorAll('[data-window]').length===0`,
+      'FreeCell Yes resolves true and permits Restart after recording the game result',
+    )
+    await check(
+      `JSON.parse(localStorage.getItem('w95.freecell.preferences')).statistics.lost === ${lostBefore + 1}`,
+      'FreeCell confirmed exit records exactly one loss',
+    )
+    await run('hearts')
+    await key('F4', 1)
+    await wait(`!document.querySelector('[data-window]')`)
+    await check(
+      `!document.querySelector('[data-window]')`,
+      'Hearts uses shell Alt+F4 without a per-app override',
+    )
   } else if (phase === 'integration') {
     await mouse('mousePressed', 850, 300, 'right')
     await mouse('mouseReleased', 850, 300, 'right')
