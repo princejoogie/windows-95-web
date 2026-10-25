@@ -25,6 +25,12 @@ const newFile = (id: string, name: string, parent: NodeId = DOCUMENTS_DIR): FsAc
 const names = (state: FsState, parent: NodeId) => children(state, parent).map((n) => n.name)
 
 describe('file system', () => {
+  it('labels C: in uppercase, clears an empty label, and refuses an invalid one', () => {
+    const labeled = run(fresh(), { type: 'setLabel', id: ROOT, label: 'Work disk' })
+    expect(labeled.nodes[ROOT]).toMatchObject({ label: 'WORK DISK' })
+    expect(run(labeled, { type: 'setLabel', id: ROOT, label: 'too.long.label' })).toBe(labeled)
+    expect(run(labeled, { type: 'setLabel', id: ROOT, label: '' }).nodes[ROOT]).not.toHaveProperty('label')
+  })
   it('seeds a C: drive with installed programs and desktop shortcuts', () => {
     const state = fresh()
     expect(resolvePath(state, 'c:\\windows\\calc.exe')).toMatchObject({ kind: 'program', app: 'calc' })

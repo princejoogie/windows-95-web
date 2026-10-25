@@ -73,6 +73,7 @@ export const fs = {
   restore: (id: NodeId) => fsStore.dispatch({ type: 'restore', id, at: Date.now() }),
   purge: (id: NodeId) => fsStore.dispatch({ type: 'purge', id }),
   emptyRecycleBin: () => fsStore.dispatch({ type: 'emptyRecycleBin' }),
+  setLabel: (id: NodeId, label: string) => fsStore.dispatch({ type: 'setLabel', id, label }),
   setAttributes: (id: NodeId, attributes: Attributes) =>
     fsStore.dispatch({ type: 'setAttributes', id, attributes }),
 }

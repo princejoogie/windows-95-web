@@ -20,7 +20,8 @@ interface NodeBase {
 }
 
 export type FsNode =
-  | (NodeBase & { readonly kind: 'drive' })
+  /** `label` is the volume label, stored uppercase as FAT keeps it. */
+  | (NodeBase & { readonly kind: 'drive'; readonly label?: string })
   | (NodeBase & { readonly kind: 'folder' })
   | (NodeBase & { readonly kind: 'file'; readonly content: string })
   /** An installed app's executable, such as `C:\WINDOWS\CALC.EXE`. */

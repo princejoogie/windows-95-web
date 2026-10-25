@@ -21,6 +21,7 @@ export type FsAction =
   | { type: 'purge'; id: NodeId }
   | { type: 'emptyRecycleBin' }
   | { type: 'setAttributes'; id: NodeId; attributes: Attributes }
+  | { type: 'setLabel'; id: NodeId; label: string }
   /** `shortcuts` also puts desktop shortcuts down. The shell passes it only on first boot. */
   | { type: 'installPrograms'; programs: readonly ProgramSpec[]; shortcuts: boolean; at: number }
 
@@ -127,6 +128,13 @@ export function uniqueName(state: FsState, parent: NodeId, base: string): string
     const name = ext ? `${stem} (${n}).${base.slice(-ext.length)}` : `${stem} (${n})`
     if (!findChild(state, parent, name)) return name
   }
+}
+
+/** Why a volume label is not allowed, or null: FAT labels are at most 11 characters, without punctuation. */
+export function volumeLabelError(label: string): string | null {
+  return label.trim().length > 11 || /[*?/\\|.,;:+=[\]<>"]/.test(label)
+    ? 'The volume label is not valid. A label can have up to 11 characters and cannot contain any of the following characters: * ? / \\ | . , ; : + = [ ] < > "'
+    : null
 }
 
 /** C: is a 512 MB disk. */
@@ -281,6 +289,13 @@ export function fsReducer(state: FsState, action: FsAction): FsState {
       return children(state, RECYCLED_DIR).reduce((next, node) => remove(next, node.id), state)
     case 'installPrograms':
       return installPrograms(state, action.programs, action.shortcuts, action.at)
+    case 'setLabel': {
+      const node = state.nodes[action.id]
+      if (node?.kind !== 'drive' || volumeLabelError(action.label)) return state
+      const { label: _, ...rest } = node
+      const label = action.label.trim().toUpperCase()
+      return put(state, label ? { ...rest, label } : rest)
+    }
     case 'setAttributes': {
       const node = state.nodes[action.id]
       return node ? put(state, { ...node, attributes: { ...node.attributes, ...action.attributes } }) : state

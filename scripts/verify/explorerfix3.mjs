@@ -20,7 +20,6 @@ function check(condition, item, name, detail) {
 }
 const q = (value) => JSON.stringify(value)
 const shot = (name, clip) => app.shot(join(proof, `${name}.png`), clip)
-const exists = (selector) => app.eval(`!!document.querySelector(${q(selector)})`)
 const dialog = (title) => `document.querySelector('[role="dialog"][aria-label=${q(title)}]')`
 const anyDialog = `[...document.querySelectorAll('[role="dialog"]')].at(-1)`
 const boxOf = (expression, pad = 4) =>
@@ -39,8 +38,6 @@ const menuLabels = () =>
 const topWindow = `[...document.querySelectorAll('[data-window]')].filter(w => !w.classList.contains('hidden')).sort((a, b) => (Number(b.style.zIndex) || 0) - (Number(a.style.zIndex) || 0))[0]`
 const windowNamed = (title) =>
   `[...document.querySelectorAll('[data-window]')].find(w => w.getAttribute('aria-label') === ${q(title)})`
-const windowTitles = () =>
-  app.eval(`[...document.querySelectorAll('[data-window]')].map(w => w.getAttribute('aria-label'))`)
 const centerOf = (expression) =>
   app.eval(`(()=>{const b=(${expression}).getBoundingClientRect();return [b.x+b.width/2,b.y+b.height/2]})()`)
 async function clickExpr(expression, options) {

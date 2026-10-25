@@ -1,5 +1,6 @@
 import { children } from '../fs/fs'
 import { DESKTOP_DIR, type FsNode, type FsState, type NodeId, ROOT } from '../fs/types'
+import { driveName } from '../shell/naming'
 import { DOCUMENTS, type FileTypeFilter, isPickable, matchesFileType, type Pickable } from './fileChoice'
 import { isHidden } from './properties'
 
@@ -45,7 +46,7 @@ export function folderOf(place: Place): NodeId {
 }
 
 /** A drive shows as `(C:)`, the way Windows labels a drive without a volume name. */
-export const placeLabel = (node: FsNode): string => (node.kind === 'drive' ? `(${node.name})` : node.name)
+export const placeLabel = (node: FsNode): string => (node.kind === 'drive' ? driveName(node) : node.name)
 
 export function parentPlace(state: FsState, place: Place): Place | null {
   if (place.kind === 'desktop') return null
