@@ -380,6 +380,8 @@ export function MenuBar({
     }
     let alt = false
     const keyDown = (event: KeyboardEvent) => {
+      // Alt arms the bar only as a tap. Any other key in between, such as Space for the system menu, cancels it.
+      if (event.key !== 'Alt') alt = false
       if (menuIsActive() || (event.target instanceof Element && event.target.closest('[role="dialog"]')))
         return
       if (event.key === 'Alt') {
@@ -387,7 +389,6 @@ export function MenuBar({
         return
       }
       if (event.altKey) {
-        alt = false
         const title = latest.current.findIndex((menu) => accelKey(menu.label) === event.key.toLowerCase())
         if (title >= 0) {
           event.preventDefault()
@@ -401,7 +402,7 @@ export function MenuBar({
       }
     }
     const keyUp = (event: KeyboardEvent) => {
-      if (event.key === 'Alt' && alt) {
+      if (event.key === 'Alt' && alt && !menuIsActive()) {
         alt = false
         event.preventDefault()
         setState({ kind: 'bar-armed', title: 0 })

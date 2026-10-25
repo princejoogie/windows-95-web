@@ -298,7 +298,9 @@ const openAbout = {
     await clickExpr(treeItem(0), { count: 2 })
     await app.waitFor(`${topWindow}.querySelectorAll('[role="treeitem"]').length > 4`)
     await clickExpr(treeItem(1), { count: 2 })
-    await clickExpr(`[...${topWindow}.querySelectorAll('button')].find(b => b.textContent.trim() === 'Options')`)
+    await clickExpr(
+      `[...${topWindow}.querySelectorAll('button')].find(b => b.textContent.trim() === 'Options')`,
+    )
     await pickMenu('About Windows Help')
   },
   async command() {
@@ -339,14 +341,20 @@ async function about() {
 const selectedTab = (title) =>
   app.eval(`${dialog(title)}.querySelector('[role="tab"][aria-selected="true"]')?.textContent.trim()`)
 const statusText = () =>
-  app.eval(`[...${topWindow}.querySelectorAll('*')].filter(e => e.children.length === 0 && /For Help|Opens|Creates|Saves/.test(e.textContent)).map(e => e.textContent.trim())[0] ?? null`)
+  app.eval(
+    `[...${topWindow}.querySelectorAll('*')].filter(e => e.children.length === 0 && /For Help|Opens|Creates|Saves/.test(e.textContent)).map(e => e.textContent.trim())[0] ?? null`,
+  )
 
 async function kit() {
   await closeWindows()
   await app.click(600, 755, { button: 'right' })
   await pickMenu('Properties')
   await app.waitFor(`!!${dialog('Taskbar Properties')}`)
-  check((await selectedTab('Taskbar Properties')) === 'Taskbar Options', '3b', 'Taskbar Properties opens on its first tab')
+  check(
+    (await selectedTab('Taskbar Properties')) === 'Taskbar Options',
+    '3b',
+    'Taskbar Properties opens on its first tab',
+  )
   await clickExpr(`${dialog('Taskbar Properties')}.querySelector('input[type="checkbox"]')`)
   await app.key('Tab', ['Control'])
   check(
@@ -358,15 +366,34 @@ async function kit() {
   await clickExpr(`${dialog('Taskbar Properties')}.querySelector('[role="tab"][aria-selected="true"]')`)
   await app.key('ArrowLeft')
   const back = await selectedTab('Taskbar Properties')
-  const focusedTab = await app.eval(`document.activeElement.getAttribute('role') + ':' + document.activeElement.textContent.trim()`)
-  check(back === 'Taskbar Options' && focusedTab === 'tab:Taskbar Options', '3b', 'Left Arrow on a tab selects and focuses the previous tab', focusedTab)
+  const focusedTab = await app.eval(
+    `document.activeElement.getAttribute('role') + ':' + document.activeElement.textContent.trim()`,
+  )
+  check(
+    back === 'Taskbar Options' && focusedTab === 'tab:Taskbar Options',
+    '3b',
+    'Left Arrow on a tab selects and focuses the previous tab',
+    focusedTab,
+  )
   await app.key('Escape')
 
   await run('find')
   await app.waitFor(`!!${topWindow}.querySelector('[role="tab"]')`)
-  const findTabs = await app.eval(`[...${topWindow}.querySelectorAll('[role="tab"]')].map(t => t.textContent.trim() + (t.getAttribute('aria-selected') === 'true' ? '*' : ''))`)
-  check(findTabs.join('|') === 'Name & Location*|Date Modified|Advanced', '3b', 'Find uses the shared property-sheet tabs', findTabs)
-  await shot('3b-find-tabs', await app.eval(`(()=>{const b=(${topWindow}).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:Math.min(b.height,260)}})()`))
+  const findTabs = await app.eval(
+    `[...${topWindow}.querySelectorAll('[role="tab"]')].map(t => t.textContent.trim() + (t.getAttribute('aria-selected') === 'true' ? '*' : ''))`,
+  )
+  check(
+    findTabs.join('|') === 'Name & Location*|Date Modified|Advanced',
+    '3b',
+    'Find uses the shared property-sheet tabs',
+    findTabs,
+  )
+  await shot(
+    '3b-find-tabs',
+    await app.eval(
+      `(()=>{const b=(${topWindow}).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:Math.min(b.height,260)}})()`,
+    ),
+  )
   await closeWindows()
 
   await run('mspaint')
@@ -377,7 +404,12 @@ async function kit() {
   const onNew = await statusText()
   await app.key('ArrowDown')
   const onOpen = await statusText()
-  await shot('3c-paint-menu-help', await app.eval(`(()=>{const b=(${topWindow}).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height}})()`))
+  await shot(
+    '3c-paint-menu-help',
+    await app.eval(
+      `(()=>{const b=(${topWindow}).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height}})()`,
+    ),
+  )
   await app.key('Escape')
   await app.key('Escape')
   await sleep(100)
@@ -394,7 +426,63 @@ async function kit() {
   await closeWindows()
 }
 
-const phases = { fileDialog, dialogs, about, kit }
+async function systemMenu() {
+  await closeWindows()
+  await run('winmine')
+  await app.waitFor(`!!document.querySelector('[data-window] [aria-label*="minefield"]')`)
+  await clickExpr(`document.querySelector('[data-window] [aria-label^="Row 5, column 5"]')`)
+  const opened = await app.eval(
+    `[...document.querySelectorAll('[data-window] [aria-label^="Row "]')].filter(c => !c.getAttribute('aria-label').endsWith('hidden')).length`,
+  )
+  await app.key(' ', ['Alt'])
+  await app.waitFor(`!!document.querySelector('[role="menu"]')`)
+  const entries = await app.eval(
+    `[...document.querySelector('[role="menu"]').querySelectorAll('[role="menuitem"]')].map(m => m.textContent.replace('Alt+F4','').trim() + (m.getAttribute('aria-disabled') === 'true' ? '~' : ''))`,
+  )
+  check(
+    entries.join('|') === 'Restore~|Move|Size~|Minimize|Maximize~|Close',
+    'G1',
+    'Alt+Space opens the system menu with Size and Maximize disabled on the fixed window',
+    entries,
+  )
+  await shot(
+    'g1-system-menu-open',
+    await app.eval(
+      `(()=>{const b=(${topWindow}).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width+60,height:b.height}})()`,
+    ),
+  )
+  await app.key('Escape')
+  await sleep(150)
+  const after = await app.eval(
+    `({ menus: document.querySelectorAll('[role="menu"]').length, armed: [...document.querySelectorAll('[role="menubar"] button')].some(b => /bg-select|bevel-shallow/.test(b.className)) })`,
+  )
+  check(
+    after.menus === 0 && !after.armed,
+    'G1',
+    'Escape closes the system menu and leaves no menu bar armed',
+    after,
+  )
+  await shot(
+    'g1-system-menu-after-escape',
+    await app.eval(
+      `(()=>{const b=(${topWindow}).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width+60,height:b.height}})()`,
+    ),
+  )
+  await app.key('F2')
+  await sleep(150)
+  const reset = await app.eval(
+    `[...document.querySelectorAll('[data-window] [aria-label^="Row "]')].filter(c => !c.getAttribute('aria-label').endsWith('hidden')).length`,
+  )
+  check(
+    opened > 0 && reset === 0,
+    'G1',
+    'after Escape the window owns the keyboard, so F2 starts a new field',
+    { opened, reset },
+  )
+  await closeWindows()
+}
+
+const phases = { fileDialog, dialogs, about, kit, systemMenu }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {
