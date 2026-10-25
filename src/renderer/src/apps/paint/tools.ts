@@ -1,4 +1,5 @@
 import { pixelArt } from '../../icons/pixel'
+import type { Brush, FillMode } from './bitmap'
 
 export type Tool =
   | 'freeSelect'
@@ -12,9 +13,45 @@ export type Tool =
   | 'spray'
   | 'text'
   | 'line'
+  | 'curve'
   | 'rectangle'
+  | 'polygon'
   | 'ellipse'
   | 'rounded'
+
+/** What the box under the tools offers for each tool. */
+export type OptionKind = 'none' | 'opaque' | 'eraser' | 'zoom' | 'brush' | 'spray' | 'width' | 'fill'
+
+export interface Options {
+  /** Line, Curve, and shape borders. */
+  width: number
+  eraser: number
+  brush: Brush
+  brushSize: number
+  spray: number
+  fill: FillMode
+  /** Select tools and Text draw the background color too, unless transparent. */
+  opaque: boolean
+}
+
+export const defaultOptions: Options = {
+  width: 1,
+  eraser: 8,
+  brush: 'round',
+  brushSize: 4,
+  spray: 4,
+  fill: 'outline',
+  opaque: true,
+}
+
+export const widths = [1, 2, 3, 4, 5] as const
+export const eraserSizes = [4, 6, 8, 10] as const
+export const zoomLevels = [1, 2, 6, 8] as const
+export const sprayRadii = [4, 8, 12] as const
+export const brushes: readonly { brush: Brush; size: number }[] = (
+  ['round', 'square', 'slash', 'backslash'] as const
+).flatMap((brush) => (brush === 'round' ? [7, 4, 1] : [8, 5, 2]).map((size) => ({ brush, size })))
+
 const art: Record<Tool, string[]> = {
   freeSelect: ['...k.k.k', '.k......k', 'k...kk....k', '.k..k...k', '..k...k'],
   select: ['k.k.k.k.k.k', '', 'k.........k', '', 'k.........k', '', 'k.........k', '', 'k.k.k.k.k.k'],
@@ -86,6 +123,16 @@ const art: Record<Tool, string[]> = {
     '.k',
     'k',
   ],
+  curve: [
+    '..kk',
+    '.k..k',
+    'k....k',
+    'k.....k',
+    '.......k',
+    '........k....k',
+    '.........k..k',
+    '..........kk',
+  ],
   rectangle: [
     'kkkkkkkkkkk',
     'k.........k',
@@ -96,6 +143,16 @@ const art: Record<Tool, string[]> = {
     'k.........k',
     'k.........k',
     'kkkkkkkkkkk',
+  ],
+  polygon: [
+    '...kkkkkk',
+    '..k.....k',
+    '.k......k',
+    'k.......kkkk',
+    'k..........k',
+    '.k.........k',
+    '..k........k',
+    '...kkkkkkkkk',
   ],
   ellipse: ['...kkkkk', '.kk.....kk', 'k.........k', 'k.........k', 'k.........k', '.kk.....kk', '...kkkkk'],
   rounded: [
@@ -109,26 +166,51 @@ const art: Record<Tool, string[]> = {
     '..kkkkkkk',
   ],
 }
-export const tools: readonly { id: Tool; label: string; icon: string }[] = (
+
+export interface ToolInfo {
+  readonly id: Tool
+  readonly label: string
+  /** The status bar text while the pointer is over the tool. */
+  readonly help: string
+  readonly options: OptionKind
+  readonly icon: string
+}
+
+/** The Windows 95 tool box, two columns of eight, in reading order. */
+export const tools: readonly ToolInfo[] = (
   [
-    ['freeSelect', 'Free-Form Select'],
-    ['select', 'Select'],
-    ['eraser', 'Eraser'],
-    ['fill', 'Fill With Color'],
-    ['picker', 'Pick Color'],
-    ['zoom', 'Magnifier'],
-    ['pencil', 'Pencil'],
-    ['brush', 'Brush'],
-    ['spray', 'Airbrush'],
-    ['text', 'Text'],
-    ['line', 'Line'],
-    ['rectangle', 'Rectangle'],
-    ['ellipse', 'Ellipse'],
-    ['rounded', 'Rounded Rectangle'],
-  ] satisfies [Tool, string][]
-).map(([id, label]) => ({
+    [
+      'freeSelect',
+      'Free-Form Select',
+      'Selects a free-form part of the picture to move, copy, or edit.',
+      'opaque',
+    ],
+    ['select', 'Select', 'Selects a rectangular part of the picture to move, copy, or edit.', 'opaque'],
+    [
+      'eraser',
+      'Eraser/Color Eraser',
+      'Erases a portion of the picture, using the selected eraser shape.',
+      'eraser',
+    ],
+    ['fill', 'Fill With Color', 'Fills an area with the current drawing color.', 'none'],
+    ['picker', 'Pick Color', 'Picks up a color from the picture for drawing.', 'none'],
+    ['zoom', 'Magnifier', 'Changes the magnification.', 'zoom'],
+    ['pencil', 'Pencil', 'Draws a free-form line one pixel wide.', 'none'],
+    ['brush', 'Brush', 'Draws using a brush with the selected shape and size.', 'brush'],
+    ['spray', 'Airbrush', 'Draws using an airbrush of the selected size.', 'spray'],
+    ['text', 'Text', 'Inserts text into the picture.', 'opaque'],
+    ['line', 'Line', 'Draws a straight line with the selected line width.', 'width'],
+    ['curve', 'Curve', 'Draws a curved line with the selected line width.', 'width'],
+    ['rectangle', 'Rectangle', 'Draws a rectangle with the selected fill style.', 'fill'],
+    ['polygon', 'Polygon', 'Draws a polygon with the selected fill style.', 'fill'],
+    ['ellipse', 'Ellipse', 'Draws an ellipse with the selected fill style.', 'fill'],
+    ['rounded', 'Rounded Rectangle', 'Draws a rounded rectangle with the selected fill style.', 'fill'],
+  ] satisfies [Tool, string, string, OptionKind][]
+).map(([id, label, help, options]) => ({
   id,
   label,
+  help,
+  options,
   icon: pixelArt(Array.from({ length: 16 }, (_, y) => `..${art[id][y - 2] ?? ''}`.padEnd(16, '.'))),
 }))
 

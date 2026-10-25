@@ -16,14 +16,19 @@ export interface Rect {
 export interface Selection extends Rect {
   readonly mask: Uint8Array
 }
-export type Brush = 'square' | 'round' | 'diagonal'
+/** Pixels lifted off the canvas or pasted. Alpha 0 marks pixels outside the shape they were cut in. */
+export type Piece = Bitmap
+export type Brush = 'round' | 'square' | 'slash' | 'backslash'
 export type Shape = 'line' | 'rectangle' | 'ellipse' | 'rounded'
 export type FillMode = 'outline' | 'both' | 'solid'
+export type Transform = 'horizontal' | 'vertical' | '90' | '180' | '270' | 'invert'
+/** Bits per pixel of the four Save As types. */
+export type Depth = 1 | 4 | 8 | 24
 export interface Ink {
   foreground: string
   background: string
+  /** Line, Curve, and shape borders, 1 to 5 pixels. */
   width: number
-  brush: Brush
   fill: FillMode
 }
 export interface History {
@@ -39,11 +44,20 @@ export function rgb(color: string): readonly [number, number, number] {
     Number.parseInt(color.slice(5, 7), 16),
   ]
 }
+export function hex(channels: readonly number[]): string {
+  return `#${channels
+    .slice(0, 3)
+    .map((channel) => Math.round(channel).toString(16).padStart(2, '0'))
+    .join('')}`
+}
 export function bitmap(width: number, height: number, color = '#ffffff'): Bitmap {
   const result = { width, height, pixels: new Uint8ClampedArray(width * height * 4) }
   const channels = rgb(color)
   for (let i = 0; i < result.pixels.length; i += 4) result.pixels.set([...channels, 255], i)
   return result
+}
+function blank(width: number, height: number): Bitmap {
+  return { width, height, pixels: new Uint8ClampedArray(width * height * 4) }
 }
 export function clone(image: Bitmap): Bitmap {
   return { ...image, pixels: image.pixels.slice() }
@@ -57,7 +71,7 @@ export function colorAt(image: Bitmap, point: Point): string {
     (Math.max(0, Math.min(image.height - 1, point.y)) * image.width +
       Math.max(0, Math.min(image.width - 1, point.x))) *
     4
-  return `#${Array.from(image.pixels.slice(offset, offset + 3), (channel) => channel.toString(16).padStart(2, '0')).join('')}`
+  return hex(Array.from(image.pixels.slice(offset, offset + 3)))
 }
 export function bounds(a: Point, b: Point): Rect {
   return {
@@ -67,26 +81,23 @@ export function bounds(a: Point, b: Point): Rect {
     height: Math.abs(a.y - b.y) + 1,
   }
 }
+export function boundsOf(points: readonly Point[]): Rect {
+  const xs = points.map((p) => p.x),
+    ys = points.map((p) => p.y)
+  return bounds({ x: Math.min(...xs), y: Math.min(...ys) }, { x: Math.max(...xs), y: Math.max(...ys) })
+}
 function stamp(image: Bitmap, point: Point, color: readonly number[], width: number, brush: Brush) {
   const low = -Math.floor(width / 2)
   for (let y = 0; y < width; y++)
     for (let x = 0; x < width; x++) {
       if (brush === 'round' && (x - (width - 1) / 2) ** 2 + (y - (width - 1) / 2) ** 2 > (width / 2) ** 2)
         continue
-      if (brush === 'diagonal' && x + y !== width - 1) continue
+      if (brush === 'slash' && x + y !== width - 1) continue
+      if (brush === 'backslash' && x !== y) continue
       pixel(image, point.x + low + x, point.y + low + y, color)
     }
 }
-export function stroke(
-  image: Bitmap,
-  from: Point,
-  to: Point,
-  color: string,
-  width = 1,
-  brush: Brush = 'square',
-): Bitmap {
-  const next = clone(image)
-  const channels = rgb(color)
+function line(target: Bitmap, from: Point, to: Point, color: readonly number[], width: number, brush: Brush) {
   let { x, y } = from
   const dx = Math.abs(to.x - x),
     dy = -Math.abs(to.y - y)
@@ -94,7 +105,7 @@ export function stroke(
     sy = y < to.y ? 1 : -1
   let error = dx + dy
   while (true) {
-    stamp(next, { x, y }, channels, width, brush)
+    stamp(target, { x, y }, color, width, brush)
     if (x === to.x && y === to.y) break
     const twice = 2 * error
     if (twice >= dy) {
@@ -106,7 +117,117 @@ export function stroke(
       y += sy
     }
   }
+}
+export function stroke(
+  image: Bitmap,
+  from: Point,
+  to: Point,
+  color: string,
+  width = 1,
+  brush: Brush = 'square',
+): Bitmap {
+  const next = clone(image)
+  line(next, from, to, rgb(color), width, brush)
   return next
+}
+/** The Color Eraser: along the stroke, only pixels of the `target` color change to `replacement`. */
+export function recolor(
+  image: Bitmap,
+  from: Point,
+  to: Point,
+  size: number,
+  target: string,
+  replacement: string,
+): Bitmap {
+  const marks = blank(image.width, image.height)
+  line(marks, from, to, [0, 0, 0], size, 'square')
+  const next = clone(image),
+    match = rgb(target),
+    channels = rgb(replacement)
+  for (let i = 0; i < next.pixels.length; i += 4)
+    if (
+      marks.pixels[i + 3] &&
+      next.pixels[i] === match[0] &&
+      next.pixels[i + 1] === match[1] &&
+      next.pixels[i + 2] === match[2]
+    )
+      next.pixels.set(channels, i)
+  return next
+}
+export function polyline(
+  image: Bitmap,
+  points: readonly Point[],
+  color: string,
+  width = 1,
+  closed = false,
+): Bitmap {
+  const next = clone(image),
+    channels = rgb(color)
+  const path = closed ? [...points, points[0]] : points
+  for (let i = 1; i < path.length; i++) {
+    const from = path[i - 1],
+      to = path[i]
+    if (from && to) line(next, from, to, channels, width, 'square')
+  }
+  if (path.length === 1 && path[0]) stamp(next, path[0], channels, width, 'square')
+  return next
+}
+/** The pixels along a cubic Bezier from `start` to `end`. One control point bends it like two equal ones. */
+export function bezier(start: Point, end: Point, controls: readonly Point[]): Point[] {
+  const c1 = controls[0] ?? start,
+    c2 = controls[1] ?? controls[0] ?? end
+  const span = [start, c1, c2, end].reduce((total, point, index, all) => {
+    const previous = all[index - 1]
+    return previous ? total + Math.hypot(point.x - previous.x, point.y - previous.y) : total
+  }, 0)
+  const steps = Math.max(1, Math.ceil(span))
+  const points: Point[] = []
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps,
+      u = 1 - t
+    const a = u * u * u,
+      b = 3 * u * u * t,
+      c = 3 * u * t * t,
+      d = t * t * t
+    const point = {
+      x: Math.round(a * start.x + b * c1.x + c * c2.x + d * end.x),
+      y: Math.round(a * start.y + b * c1.y + c * c2.y + d * end.y),
+    }
+    const last = points.at(-1)
+    if (!last || last.x !== point.x || last.y !== point.y) points.push(point)
+  }
+  return points
+}
+export function curve(
+  image: Bitmap,
+  start: Point,
+  end: Point,
+  controls: readonly Point[],
+  color: string,
+  width = 1,
+): Bitmap {
+  return polyline(image, bezier(start, end, controls), color, width)
+}
+function insidePolygon(polygon: readonly Point[], px: number, py: number): boolean {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i],
+      b = polygon[j]
+    if (a && b && a.y > py !== b.y > py && px < ((b.x - a.x) * (py - a.y)) / (b.y - a.y) + a.x)
+      inside = !inside
+  }
+  return inside
+}
+export function polygon(image: Bitmap, vertices: readonly Point[], ink: Ink): Bitmap {
+  const filled = ink.fill === 'outline' ? image : clone(image)
+  if (ink.fill !== 'outline') {
+    const channels = rgb(ink.fill === 'solid' ? ink.foreground : ink.background)
+    const box = boundsOf(vertices)
+    for (let y = box.y; y < box.y + box.height; y++)
+      for (let x = box.x; x < box.x + box.width; x++)
+        if (insidePolygon(vertices, x + 0.5, y + 0.5)) pixel(filled, x, y, channels)
+  }
+  return polyline(filled, vertices, ink.foreground, ink.fill === 'solid' ? 1 : ink.width, true)
 }
 export function shape(image: Bitmap, kind: Shape, from: Point, to: Point, ink: Ink): Bitmap {
   if (kind === 'line') return stroke(image, from, to, ink.foreground, ink.width)
@@ -209,42 +330,61 @@ export function spray(
   }
   return next
 }
-export function select(image: Bitmap, from: Point, to: Point, polygon?: readonly Point[]): Selection {
+export function select(image: Bitmap, from: Point, to: Point, outline?: readonly Point[]): Selection {
   const rect = bounds(from, to),
     mask = new Uint8Array(rect.width * rect.height)
   for (let y = 0; y < rect.height; y++)
     for (let x = 0; x < rect.width; x++) {
       const px = rect.x + x,
         py = rect.y + y
-      let inside = !polygon
-      if (polygon)
-        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-          const a = polygon[i],
-            b = polygon[j]
-          if (a && b && a.y > py !== b.y > py && px < ((b.x - a.x) * (py - a.y)) / (b.y - a.y) + a.x)
-            inside = !inside
-        }
+      const inside = outline ? insidePolygon(outline, px, py) : true
       if (inside && px >= 0 && py >= 0 && px < image.width && py < image.height) mask[y * rect.width + x] = 1
     }
   return { ...rect, mask }
 }
-export function moveSelection(
-  image: Bitmap,
-  selection: Selection,
-  destination: Point,
-  background: string,
-): Bitmap {
-  const next = clone(image),
-    channels = rgb(background)
-  for (let y = 0; y < selection.height; y++)
-    for (let x = 0; x < selection.width; x++) {
-      if (selection.mask[y * selection.width + x]) pixel(next, selection.x + x, selection.y + y, channels)
-    }
+export function selectAll(image: Bitmap): Selection {
+  return {
+    x: 0,
+    y: 0,
+    width: image.width,
+    height: image.height,
+    mask: new Uint8Array(image.width * image.height).fill(1),
+  }
+}
+/** Copies the selected pixels into a piece the size of the selection. */
+export function cut(image: Bitmap, selection: Selection): Piece {
+  const piece = blank(selection.width, selection.height)
   for (let y = 0; y < selection.height; y++)
     for (let x = 0; x < selection.width; x++) {
       if (!selection.mask[y * selection.width + x]) continue
-      const offset = ((selection.y + y) * image.width + selection.x + x) * 4
-      pixel(next, destination.x + x, destination.y + y, image.pixels.subarray(offset, offset + 3))
+      const from = ((selection.y + y) * image.width + selection.x + x) * 4
+      piece.pixels.set(image.pixels.subarray(from, from + 4), (y * selection.width + x) * 4)
+    }
+  return piece
+}
+/** Fills the selected pixels with the background, as Clear Selection and a lifted selection leave them. */
+export function erase(image: Bitmap, selection: Selection, color: string): Bitmap {
+  const next = clone(image),
+    channels = rgb(color)
+  for (let y = 0; y < selection.height; y++)
+    for (let x = 0; x < selection.width; x++)
+      if (selection.mask[y * selection.width + x]) pixel(next, selection.x + x, selection.y + y, channels)
+  return next
+}
+/**
+ * Draws a piece onto a copy of `base` with its top left at `at`. With `transparent` set, pixels of that
+ * color are skipped, which is how Paint draws a selection in transparent mode.
+ */
+export function place(base: Bitmap, piece: Piece, at: Point, transparent?: string): Bitmap {
+  const next = clone(base)
+  const skip = transparent ? rgb(transparent) : null
+  for (let y = 0; y < piece.height; y++)
+    for (let x = 0; x < piece.width; x++) {
+      const from = (y * piece.width + x) * 4
+      if (!piece.pixels[from + 3]) continue
+      const p = piece.pixels
+      if (skip && p[from] === skip[0] && p[from + 1] === skip[1] && p[from + 2] === skip[2]) continue
+      pixel(next, at.x + x, at.y + y, p.subarray(from, from + 3))
     }
   return next
 }
@@ -257,12 +397,9 @@ export function resize(image: Bitmap, width: number, height: number, background:
     )
   return next
 }
-export function transform(
-  image: Bitmap,
-  kind: 'horizontal' | 'vertical' | '90' | '180' | '270' | 'invert',
-): Bitmap {
+export function transform(image: Bitmap, kind: Transform): Bitmap {
   const quarter = kind === '90' || kind === '270'
-  const next = bitmap(quarter ? image.height : image.width, quarter ? image.width : image.height)
+  const next = blank(quarter ? image.height : image.width, quarter ? image.width : image.height)
   for (let y = 0; y < image.height; y++)
     for (let x = 0; x < image.width; x++) {
       const offset = (y * image.width + x) * 4
@@ -278,10 +415,125 @@ export function transform(
         tx = y
         ty = image.width - 1 - x
       }
-      const channels = image.pixels.slice(offset, offset + 3)
-      pixel(next, tx, ty, kind === 'invert' ? channels.map((channel) => 255 - channel) : channels)
+      const channels = image.pixels.slice(offset, offset + 4)
+      if (kind === 'invert') for (let c = 0; c < 3; c++) channels[c] = 255 - (channels[c] ?? 0)
+      next.pixels.set(channels, (ty * next.width + tx) * 4)
     }
   return next
+}
+/** Scales by percentages, nearest neighbour, as Stretch does. */
+export function stretch(image: Bitmap, horizontal: number, vertical: number): Bitmap {
+  const width = Math.max(1, Math.round((image.width * horizontal) / 100)),
+    height = Math.max(1, Math.round((image.height * vertical) / 100))
+  const next = blank(width, height)
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const from =
+        (Math.floor((y * image.height) / height) * image.width + Math.floor((x * image.width) / width)) * 4
+      next.pixels.set(image.pixels.subarray(from, from + 4), (y * width + x) * 4)
+    }
+  return next
+}
+export function skewSize(width: number, height: number, horizontal: number, vertical: number) {
+  const h = Math.tan((horizontal * Math.PI) / 180),
+    v = Math.tan((vertical * Math.PI) / 180)
+  const skewedWidth = width + Math.round((height - 1) * Math.abs(h))
+  return { width: skewedWidth, height: height + Math.round((skewedWidth - 1) * Math.abs(v)) }
+}
+/**
+ * Slants rows by `horizontal` degrees, then columns by `vertical` degrees. The picture grows to hold the
+ * slant, and the new corners take `fill`, or stay transparent for a piece.
+ */
+export function skew(image: Bitmap, horizontal: number, vertical: number, fill?: string): Bitmap {
+  const pass = (source: Bitmap, degrees: number, rows: boolean): Bitmap => {
+    if (!degrees) return source
+    const slope = Math.tan((degrees * Math.PI) / 180)
+    const along = rows ? source.width : source.height,
+      across = rows ? source.height : source.width
+    const extra = Math.round((across - 1) * Math.abs(slope))
+    const width = rows ? source.width + extra : source.width,
+      height = rows ? source.height : source.height + extra
+    const next = fill ? bitmap(width, height, fill) : blank(width, height)
+    for (let a = 0; a < across; a++) {
+      const shift = slope >= 0 ? Math.round(a * slope) : Math.round((across - 1 - a) * -slope)
+      for (let i = 0; i < along; i++) {
+        const sx = rows ? i : a,
+          sy = rows ? a : i
+        const tx = rows ? i + shift : a,
+          ty = rows ? a : i + shift
+        const from = (sy * source.width + sx) * 4
+        next.pixels.set(source.pixels.subarray(from, from + 4), (ty * width + tx) * 4)
+      }
+    }
+    return next
+  }
+  return pass(pass(image, horizontal, true), vertical, false)
+}
+const VGA = [
+  '#000000',
+  '#800000',
+  '#008000',
+  '#808000',
+  '#000080',
+  '#800080',
+  '#008080',
+  '#c0c0c0',
+  '#808080',
+  '#ff0000',
+  '#00ff00',
+  '#ffff00',
+  '#0000ff',
+  '#ff00ff',
+  '#00ffff',
+  '#ffffff',
+].map(rgb)
+const CUBE = Array.from({ length: 216 }, (_, i) => [
+  Math.floor(i / 36) * 51,
+  (Math.floor(i / 6) % 6) * 51,
+  (i % 6) * 51,
+])
+export const palettes: Record<Exclude<Depth, 24>, readonly (readonly number[])[]> = {
+  1: [
+    [0, 0, 0],
+    [255, 255, 255],
+  ],
+  4: VGA,
+  8: [...VGA, ...CUBE],
+}
+/** Reduces the picture to the colors a bitmap of `depth` bits per pixel can hold. */
+export function quantize(image: Bitmap, depth: Depth): Bitmap {
+  if (depth === 24) return image
+  const next = clone(image),
+    colors = palettes[depth],
+    cache = new Map<number, readonly number[]>()
+  for (let i = 0; i < next.pixels.length; i += 4) {
+    const r = next.pixels[i] ?? 0,
+      g = next.pixels[i + 1] ?? 0,
+      b = next.pixels[i + 2] ?? 0
+    const key = (r << 16) | (g << 8) | b
+    let best = cache.get(key)
+    if (!best) {
+      if (depth === 1) best = colors[r * 0.299 + g * 0.587 + b * 0.114 >= 128 ? 1 : 0]
+      else {
+        let distance = Number.POSITIVE_INFINITY
+        for (const color of colors) {
+          const d = ((color[0] ?? 0) - r) ** 2 + ((color[1] ?? 0) - g) ** 2 + ((color[2] ?? 0) - b) ** 2
+          if (d < distance) {
+            distance = d
+            best = color
+          }
+        }
+      }
+      cache.set(key, best ?? [0, 0, 0])
+    }
+    next.pixels.set(best ?? [0, 0, 0], i)
+  }
+  return next
+}
+/** The size of a Windows .bmp file of this picture: headers, color table, and rows padded to 4 bytes. */
+export function bmpBytes(width: number, height: number, depth: Depth): number {
+  const table = depth === 24 ? 0 : 4 * 2 ** depth
+  return 14 + 40 + table + Math.ceil((width * depth) / 32) * 4 * height
 }
 export function remember(history: History, image: Bitmap): History {
   if (image === history.present) return history
