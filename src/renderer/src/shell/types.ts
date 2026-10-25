@@ -15,6 +15,7 @@ export interface Size {
 export interface LaunchArgs {
   readonly file?: NodeId
   readonly folder?: NodeId
+  /** A help book id, for Windows Help. */
   readonly book?: string
 }
 
