@@ -1,0 +1,172 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "MS Sans Serif";
+  src: url("./assets/fonts/micross.ttf") format("truetype");
+}
+
+@theme {
+  --font-sans: "MS Sans Serif", "Microsoft Sans Serif", Tahoma, sans-serif;
+  --font-mono: "Fixedsys", "Courier New", monospace;
+  --color-desktop: #008080;
+  --color-face: #c0c0c0;
+  --color-shadow: #808080;
+  --color-dark: #000000;
+  --color-light: #dfdfdf;
+  --color-hilight: #ffffff;
+  --color-title: #000080;
+  --color-title-inactive: #808080;
+  --color-select: #000080;
+  --color-tooltip: #ffffe1;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    line-height: 1.25;
+    color: #000;
+    background: #000;
+    cursor: default;
+    user-select: none;
+    -webkit-font-smoothing: none;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  img {
+    image-rendering: pixelated;
+  }
+
+  ::-webkit-scrollbar {
+    width: 16px;
+    height: 16px;
+    background: repeating-conic-gradient(var(--color-face) 0 25%, var(--color-hilight) 0 50%) 0 0 / 2px 2px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-face);
+    box-shadow:
+      inset -1px -1px var(--color-dark),
+      inset 1px 1px var(--color-light),
+      inset -2px -2px var(--color-shadow),
+      inset 2px 2px var(--color-hilight);
+  }
+
+  ::-webkit-scrollbar-button:single-button {
+    display: block;
+    width: 16px;
+    height: 16px;
+    background-color: var(--color-face);
+    background-repeat: no-repeat;
+    background-position: center;
+    box-shadow:
+      inset -1px -1px var(--color-dark),
+      inset 1px 1px var(--color-light),
+      inset -2px -2px var(--color-shadow),
+      inset 2px 2px var(--color-hilight);
+  }
+
+  ::-webkit-scrollbar-button:single-button:active {
+    box-shadow:
+      inset 1px 1px var(--color-shadow),
+      inset -1px -1px var(--color-shadow);
+  }
+
+  ::-webkit-scrollbar-button:single-button:vertical:decrement {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='4' shape-rendering='crispEdges'%3E%3Cpath d='M3 0h1v1h1v1h1v1h1v1H0V3h1V2h1V1h1z'/%3E%3C/svg%3E");
+  }
+
+  ::-webkit-scrollbar-button:single-button:vertical:increment {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='4' shape-rendering='crispEdges'%3E%3Cpath d='M0 0h7v1H6v1H5v1H4v1H3V3H2V2H1V1H0z'/%3E%3C/svg%3E");
+  }
+
+  ::-webkit-scrollbar-button:single-button:horizontal:decrement {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='7' shape-rendering='crispEdges'%3E%3Cpath d='M3 0h1v7H3V6H2V5H1V4H0V3h1V2h1V1h1z'/%3E%3C/svg%3E");
+  }
+
+  ::-webkit-scrollbar-button:single-button:horizontal:increment {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='7' shape-rendering='crispEdges'%3E%3Cpath d='M0 0h1v1h1v1h1v1h1v1H3v1H2v1H1v1H0z'/%3E%3C/svg%3E");
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: var(--color-face);
+  }
+}
+
+/*
+ * The four bevels every Windows 95 control is made of. Each is two 1px rings: an outer ring and an
+ * inner ring, lit from the top left.
+ */
+@utility bevel-window {
+  box-shadow:
+    inset -1px -1px var(--color-dark),
+    inset 1px 1px var(--color-light),
+    inset -2px -2px var(--color-shadow),
+    inset 2px 2px var(--color-hilight);
+}
+
+@utility bevel-raised {
+  box-shadow:
+    inset -1px -1px var(--color-dark),
+    inset 1px 1px var(--color-hilight),
+    inset -2px -2px var(--color-shadow),
+    inset 2px 2px var(--color-light);
+}
+
+@utility bevel-pressed {
+  box-shadow:
+    inset -1px -1px var(--color-hilight),
+    inset 1px 1px var(--color-dark),
+    inset -2px -2px var(--color-light),
+    inset 2px 2px var(--color-shadow);
+}
+
+@utility bevel-sunken {
+  box-shadow:
+    inset -1px -1px var(--color-hilight),
+    inset 1px 1px var(--color-shadow),
+    inset -2px -2px var(--color-light),
+    inset 2px 2px var(--color-dark);
+}
+
+/* One ring, for status bar panes and the taskbar tray. */
+@utility bevel-shallow {
+  box-shadow:
+    inset -1px -1px var(--color-hilight),
+    inset 1px 1px var(--color-shadow);
+}
+
+/* The 50% gray dither Windows uses for pressed toggle buttons and the move outline. */
+@utility dither {
+  background: repeating-conic-gradient(var(--color-face) 0 25%, var(--color-hilight) 0 50%) 0 0 / 2px 2px;
+}
+
+/* The dotted focus ring drawn inside buttons and around selected labels. */
+@utility focus-dots {
+  outline: 1px dotted #000;
+  outline-offset: -4px;
+}
+
+@utility pixelated {
+  image-rendering: pixelated;
+}
+
+@utility text-embossed {
+  color: var(--color-shadow);
+  text-shadow: 1px 1px var(--color-hilight);
+}

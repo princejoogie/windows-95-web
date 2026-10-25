@@ -1,6 +1,8 @@
 node_modules
-windows_icons
-.DS_Store
+out
 dist
-dist-ssr
+release
+*.log
+.DS_Store
+*.tsbuildinfo
 *.local
