@@ -2,8 +2,13 @@ import { icons } from '../../icons'
 import type { AppManifest, AppProps } from '../../shell/types'
 import { FolderView } from '../explorer/FolderView'
 
-function MyComputer({ window }: AppProps) {
-  return <FolderView initial={{ kind: 'computer' }} window={window} />
+function MyComputer({ args, window }: AppProps) {
+  return (
+    <FolderView
+      initial={args.folder ? { kind: 'folder', id: args.folder } : { kind: 'computer' }}
+      window={window}
+    />
+  )
 }
 
 export const app: AppManifest = {
