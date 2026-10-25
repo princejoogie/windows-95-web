@@ -5,12 +5,10 @@ import {
   flood,
   type History,
   type Ink,
-  moveSelection,
   remember,
   repeat,
   resize,
   seededRandom,
-  select,
   shape,
   spray,
   stroke,
@@ -18,7 +16,7 @@ import {
   undo,
 } from './bitmap'
 
-const ink: Ink = { foreground: '#000000', background: '#ff0000', width: 1, brush: 'square', fill: 'outline' }
+const ink: Ink = { foreground: '#000000', background: '#ff0000', width: 1, fill: 'outline' }
 describe('Paint bitmap', () => {
   it('draws a continuous pencil line without changing the source', () => {
     const source = bitmap(20, 20)
@@ -48,24 +46,6 @@ describe('Paint bitmap', () => {
     expect(colorAt(filled, { x: 3, y: 3 })).toBe('#000000')
     expect(colorAt(filled, { x: 0, y: 0 })).toBe('#ffffff')
     expect(flood(filled, { x: 5, y: 5 }, '#00ff00')).toBe(filled)
-  })
-  it('moves rectangle selections and leaves the background in their old location', () => {
-    const source = stroke(bitmap(20, 20), { x: 2, y: 2 }, { x: 5, y: 2 }, '#000000')
-    const selected = select(source, { x: 1, y: 1 }, { x: 6, y: 6 })
-    const moved = moveSelection(source, selected, { x: 10, y: 10 }, '#ff0000')
-    expect(colorAt(moved, { x: 2, y: 2 })).toBe('#ff0000')
-    expect(colorAt(moved, { x: 11, y: 11 })).toBe('#000000')
-  })
-  it('free-form selections move only pixels inside the polygon', () => {
-    const source = bitmap(10, 10, '#000000')
-    const selected = select(source, { x: 0, y: 0 }, { x: 4, y: 4 }, [
-      { x: 0, y: 0 },
-      { x: 4, y: 0 },
-      { x: 0, y: 4 },
-    ])
-    const moved = moveSelection(source, selected, { x: 5, y: 5 }, '#ffffff')
-    expect(colorAt(moved, { x: 1, y: 1 })).toBe('#ffffff')
-    expect(colorAt(moved, { x: 3, y: 3 })).toBe('#000000')
   })
   it('flips, rotates, inverts and resizes pixels', () => {
     const source = stroke(bitmap(3, 2), { x: 0, y: 0 }, { x: 0, y: 0 }, '#ff0000')
