@@ -57,6 +57,18 @@ function createWindow(): BrowserWindow {
       event.preventDefault()
       win.webContents.send(CHANNELS.hostEvent, message)
     }
+    const windowsKey =
+      input.key === 'Meta' || input.key === 'OS' || input.code === 'MetaLeft' || input.code === 'MetaRight'
+    if (windowsKey || input.meta) {
+      forward({
+        type: 'windows-key',
+        key: windowsKey ? 'Meta' : input.key,
+        down: input.type === 'keyDown',
+        shift: input.shift,
+        repeat: input.isAutoRepeat,
+      })
+      return
+    }
     if (input.type === 'keyUp' && input.key === 'Alt')
       win.webContents.send(CHANNELS.hostEvent, { type: 'alt-release' } satisfies HostEvent)
     if (input.type === 'keyDown') {

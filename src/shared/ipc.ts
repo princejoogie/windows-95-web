@@ -11,6 +11,7 @@ export type HostEvent =
   | { type: 'alt-release' }
   | { type: 'start' }
   | { type: 'host-close' }
+  | { type: 'windows-key'; key: string; down: boolean; shift: boolean; repeat: boolean }
 
 /** What the preload exposes as `window.win95`. Absent in the plain web build. */
 export interface Win95Host {

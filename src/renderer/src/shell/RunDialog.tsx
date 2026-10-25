@@ -9,8 +9,10 @@ import { FileDialog, type FileTypeFilter } from '../ui/FileDialog'
 import { TextBox } from '../ui/fields'
 import { MenuList } from '../ui/Menu'
 import { MessageBox } from '../ui/MessageBox'
+import { Accel } from '../ui/text'
 import { findAppByExe } from './registry'
-import { launch, openNode } from './system'
+import { parseCommand } from './runCommand'
+import { launch, opener, openNode } from './system'
 
 const HISTORY_KEY = 'w95.run.v1'
 const BROWSE_FILTERS: readonly FileTypeFilter[] = [
@@ -47,9 +49,26 @@ export function RunDialog({ onClose }: { onClose: () => void }) {
   const run = () => {
     const command = value.trim()
     if (!command) return
-    const node = resolvePath(fs.get(), command)
-    const app = node ? undefined : findAppByExe(command.split('\\').pop() ?? command)
-    const ok = node ? openNode(node.id) : app ? launch(app.id) !== null : false
+    const parsed = parseCommand(command)
+    const node = resolvePath(fs.get(), command.replace(/^"([^"]*)"$/, '$1'))
+    const executable = parsed && resolvePath(fs.get(), parsed.target)
+    const target = executable ? opener(executable) : null
+    const app = parsed && !executable ? findAppByExe(parsed.target.split('\\').pop() ?? parsed.target) : null
+    const argument = parsed?.arguments.length ? resolvePath(fs.get(), parsed.arguments.join(' ')) : null
+    const args = argument
+      ? argument.kind === 'folder' || argument.kind === 'drive'
+        ? { folder: argument.id }
+        : { file: argument.id }
+      : {}
+    const ok = node
+      ? openNode(node.id)
+      : parsed && (!parsed.arguments.length || argument)
+        ? target
+          ? launch(target.appId, { ...target.args, ...args }) !== null
+          : app
+            ? launch(app.id, args) !== null
+            : false
+        : false
     if (!ok) {
       setError(
         `Cannot find the file '${command}' (or one of its components). Make sure the path and filename are correct and that all required libraries are available.`,
@@ -128,7 +147,9 @@ export function RunDialog({ onClose }: { onClose: () => void }) {
             OK
           </Button>
           <Button onClick={onClose}>Cancel</Button>
-          <Button onClick={() => setBrowse(true)}>Browse...</Button>
+          <Button onClick={() => setBrowse(true)}>
+            <Accel label="&Browse..." />
+          </Button>
         </div>
       </form>
       {browse && (

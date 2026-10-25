@@ -712,7 +712,7 @@ export const app: AppManifest = {
   smallIcon,
   exe: 'SOL.EXE',
   startMenu: ['Accessories', 'Games'],
-  desktopShortcut: true,
+  desktopShortcut: false,
   window: { kind: 'resizable', width: 620, height: 440, minWidth: 560, minHeight: 360 },
   component: Solitaire,
 }

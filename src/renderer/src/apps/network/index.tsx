@@ -116,7 +116,7 @@ export const app: AppManifest = {
   smallIcon: networkSmallIcon,
   exe: 'NETHOOD.EXE',
   installDir: 'C:\\WINDOWS',
-  desktop: { order: 1 },
+  desktop: { order: 1, Properties: NetworkProperties },
   window: { kind: 'resizable', width: 420, height: 300, minWidth: 240, minHeight: 180 },
   component: NetworkNeighborhood,
 }

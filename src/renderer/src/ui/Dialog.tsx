@@ -175,11 +175,6 @@ export function Dialog({
           first?.focus()
         }
       }
-      if ((event.key === 'Escape' || (event.key === 'F4' && event.altKey)) && latestClose.current) {
-        event.preventDefault()
-        event.stopImmediatePropagation()
-        latestClose.current()
-      }
     }
     document.addEventListener('keydown', key, true)
     return () => {
@@ -210,7 +205,7 @@ export function Dialog({
   }
   return createPortal(
     <div
-      className={`absolute inset-0 z-40 flex items-center justify-center ${owner || dim ? 'pointer-events-auto' : 'pointer-events-none'}`}
+      className={`absolute inset-0 z-40 flex items-center justify-center ${owned || dim ? 'pointer-events-auto' : 'pointer-events-none'}`}
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) feedback()
       }}
@@ -225,12 +220,39 @@ export function Dialog({
         ref={dialogRef}
         role="dialog"
         aria-label={title}
-        aria-modal={owner || dim ? true : undefined}
+        aria-modal={owned || dim ? true : undefined}
         onPointerDownCapture={() => {
           if (!owner) windowsStore.dispatch({ type: 'blur' })
         }}
         onKeyDown={(event) => {
           event.stopPropagation()
+          if (!active || event.defaultPrevented || menuIsActive()) return
+          if ((event.key === 'Escape' || (event.key === 'F4' && event.altKey)) && onClose) {
+            event.preventDefault()
+            onClose()
+            return
+          }
+          if (event.altKey && !event.ctrlKey && !event.metaKey && event.key.length === 1) {
+            const dialog = event.currentTarget
+            const mnemonic = [...dialog.querySelectorAll<HTMLElement>('label, button')].find(
+              (element) =>
+                element.closest('[role="dialog"]') === dialog &&
+                element.getClientRects().length > 0 &&
+                element.querySelector('.underline')?.textContent?.toLowerCase() === event.key.toLowerCase(),
+            )
+            const control =
+              mnemonic instanceof HTMLLabelElement
+                ? (mnemonic.control ??
+                  document.getElementById(mnemonic.htmlFor) ??
+                  mnemonic.querySelector<HTMLElement>('input, button, select, textarea'))
+                : mnemonic
+            if (control instanceof HTMLElement && !control.matches(':disabled')) {
+              event.preventDefault()
+              control.focus()
+              if (mnemonic instanceof HTMLButtonElement) mnemonic.click()
+              return
+            }
+          }
           if (
             event.defaultPrevented ||
             event.key !== 'Enter' ||

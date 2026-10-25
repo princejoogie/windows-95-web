@@ -463,7 +463,7 @@ export const app: AppManifest = {
   smallIcon: mineIcon,
   exe: 'WINMINE.EXE',
   startMenu: ['Accessories', 'Games'],
-  desktopShortcut: true,
+  desktopShortcut: false,
   window: { kind: 'fixed' },
   component: Minesweeper,
 }

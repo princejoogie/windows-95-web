@@ -3,6 +3,7 @@ import { children, isInside } from '../fs/fs'
 import { useFs } from '../fs/store'
 import { type FsState, type NodeId, RECYCLED_DIR } from '../fs/types'
 import { icons } from '../icons'
+import { pixelArt } from '../icons/pixel'
 import { type MenuEntry, MenuList } from '../ui/Menu'
 import { isHidden } from '../ui/properties'
 import { nodeIcon } from './nodeIcon'
@@ -10,6 +11,25 @@ import { useRecentDocuments } from './recent'
 import { getApp, smallIcon } from './registry'
 import { startMenuFolder } from './startup'
 import { openNode } from './system'
+
+const taskbarIcon = pixelArt([
+  '................',
+  '.kkkkkkkkkkkkkk.',
+  '.kwwwwwwwwwwwwk.',
+  '.kwBBBBBBBBBBwk.',
+  '.kwsssssssssswk.',
+  '.kwsssssssssswk.',
+  '.kwsssssssssswk.',
+  '.kwsssssssssswk.',
+  '.kwsssssssssswk.',
+  '.kwsssssssssswk.',
+  '.kwwwwwwwwwwwwk.',
+  '.kskwwkgwwwwkwk.',
+  '.kskllkgsssskgk.',
+  '.kssssssssssssk.',
+  '.kkkkkkkkkkkkkk.',
+  '................',
+])
 
 export function programsMenu(state: FsState, folder: NodeId): MenuEntry[] {
   const entries = children(state, folder)
@@ -64,6 +84,10 @@ export function StartMenu({
     [state, recent],
   )
   const programs = useMemo(() => startMenuFolder(['Start Menu', 'Programs']), [])
+  const iconFor = (id: string) => {
+    const app = getApp(id)
+    return app ? smallIcon(app) : icons.small.program
+  }
   const top: MenuEntry[] = [
     {
       label: '&Programs',
@@ -85,18 +109,22 @@ export function StartMenu({
       label: '&Settings',
       icon: icons.start.settings,
       items: [
-        { label: '&Control Panel', onSelect: () => onApp('controlpanel') },
-        { label: '&Printers', onSelect: () => onApp('printers') },
-        { label: '&Taskbar...', onSelect: onProperties },
+        { label: '&Control Panel', icon: iconFor('controlpanel'), onSelect: () => onApp('controlpanel') },
+        { label: '&Printers', icon: iconFor('printers'), onSelect: () => onApp('printers') },
+        { label: '&Taskbar...', icon: taskbarIcon, onSelect: onProperties },
       ],
     },
     {
       label: '&Find',
       icon: icons.start.find,
       items: [
-        { label: '&Files or Folders...', onSelect: () => onApp('find') },
-        { label: '&Computer...', onSelect: () => onApp('findcomputer') },
-        { label: '&On The Microsoft Network...', onSelect: () => onApp('msn') },
+        { label: '&Files or Folders...', icon: iconFor('find'), onSelect: () => onApp('find') },
+        { label: '&Computer...', icon: iconFor('network'), onSelect: () => onApp('findcomputer') },
+        {
+          label: '&On The Microsoft Network...',
+          icon: icons.small.windowsLogo,
+          onSelect: () => onApp('msn'),
+        },
       ],
     },
     { label: '&Help', icon: icons.start.help, onSelect: () => onApp('help') },

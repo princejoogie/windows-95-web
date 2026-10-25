@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { icons } from '../icons'
 import { formatClock } from '../settings/clock'
 import { useSettings } from '../settings/store'
-import { cursors } from '../system/cursors'
+import { cursorClassNames } from '../system/cursors'
 import { beginMenuTracking, ContextMenu, type MenuEntry } from '../ui/Menu'
 import { Outline, type Rect } from './Outline'
 import { getApp, smallIcon } from './registry'
@@ -178,7 +178,7 @@ export function Taskbar({
       >
         <div
           data-taskbar-resize
-          className="absolute z-10"
+          className={`absolute z-10 ${vertical ? cursorClassNames.ew : cursorClassNames.ns}`}
           style={
             vertical
               ? {
@@ -186,14 +186,12 @@ export function Taskbar({
                   bottom: 0,
                   width: 3,
                   [settings.edge === 'left' ? 'right' : 'left']: 0,
-                  cursor: cursors.ew,
                 }
               : {
                   left: 0,
                   right: 0,
                   height: 3,
                   [settings.edge === 'top' ? 'bottom' : 'top']: 0,
-                  cursor: cursors.ns,
                 }
           }
           onPointerDown={(event) => {
