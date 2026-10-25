@@ -153,7 +153,6 @@ function serialize(doc: Document, type: DocumentType): string {
 
 export function WordPad({ window: windowApi, args }: AppProps) {
   const editor = useRef<HTMLDivElement>(null)
-  const closeResult = useRef<((closed: boolean) => void) | null>(null)
   const keeper = useMemo(() => new SelectionKeeper(() => editor.current), [])
   const [file, setFile] = useState<NodeId | null>(null)
   const [docType, setDocType] = useState<DocumentType>('word6')
