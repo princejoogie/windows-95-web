@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { icons } from '../../icons'
 import { type FolderOptions as Options, folderOptions as options } from '../../shell/folderOptions'
 import { Button, Checkbox, Dialog, GroupBox, Radio, Tabs } from '../../ui'
 
@@ -64,56 +63,6 @@ export function FolderOptions({ onClose }: { onClose: () => void }) {
           </Button>
           <Button onClick={onClose}>Cancel</Button>
           <Button disabled={!changed} onClick={apply}>
-            Apply
-          </Button>
-        </div>
-      </form>
-    </Dialog>
-  )
-}
-
-export function RecycleProperties({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState<'Global' | '(C:)'>('Global')
-  const [draft, setDraft] = useState(options.get())
-  return (
-    <Dialog title="Recycle Bin Properties" onClose={onClose} className="w-[350px]">
-      <form
-        className="p-[6px]"
-        onSubmit={(event) => {
-          event.preventDefault()
-          options.dispatch(draft)
-          onClose()
-        }}
-      >
-        <Tabs
-          tabs={['Global', '(C:)']}
-          active={tab}
-          onChange={setTab}
-          pageClassName="p-4 flex flex-col gap-5 min-h-[180px]"
-        >
-          <div className="flex items-center gap-4">
-            <img src={icons.binEmpty} className="size-8" alt="" />
-            <span>
-              {tab === 'Global' ? 'Settings for the Recycle Bin' : 'Local Disk (C:)'}
-              <br />
-              {tab === '(C:)' && 'Capacity: 512 MB'}
-            </span>
-          </div>
-          <Checkbox
-            label="Display delete confirmation dialog"
-            checked={draft.confirmDelete}
-            onChange={(event) => setDraft({ ...draft, confirmDelete: event.target.checked })}
-          />
-        </Tabs>
-        <div className="flex justify-end gap-[6px] pt-2">
-          <Button type="submit" isDefault>
-            OK
-          </Button>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button
-            disabled={draft.confirmDelete === options.get().confirmDelete}
-            onClick={() => options.dispatch(draft)}
-          >
             Apply
           </Button>
         </div>

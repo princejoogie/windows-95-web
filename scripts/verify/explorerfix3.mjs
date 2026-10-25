@@ -34,7 +34,7 @@ const menuItem = (label) =>
   `[...document.querySelectorAll('[role="menuitem"]')].find(e => e.innerText.replace(/\\s+/g,' ').trim().startsWith(${q(label)}))`
 const menuLabels = () =>
   app.eval(
-    `[...document.querySelectorAll('[role="menu"]')].at(-1) ? [...[...document.querySelectorAll('[role="menu"]')].at(-1).querySelectorAll('[role="menuitem"], [role="separator"]')].map(e => e.getAttribute('role') === 'separator' ? '-' : e.innerText.replace(/\\s+/g,' ').trim() + (e.disabled || e.getAttribute('aria-disabled') === 'true' ? ' (disabled)' : '')) : []`,
+    `[...document.querySelectorAll('[role="menu"]')].at(-1) ? [...[...document.querySelectorAll('[role="menu"]')].at(-1).querySelectorAll('[role="menuitem"], hr')].map(e => e.tagName === 'HR' ? '-' : e.innerText.replace(/\\s+/g,' ').trim() + (e.disabled || e.getAttribute('aria-disabled') === 'true' ? ' (disabled)' : '')) : []`,
   )
 const topWindow = `[...document.querySelectorAll('[data-window]')].filter(w => !w.classList.contains('hidden')).sort((a, b) => (Number(b.style.zIndex) || 0) - (Number(a.style.zIndex) || 0))[0]`
 const windowNamed = (title) =>
@@ -294,7 +294,233 @@ async function sizes() {
   await app.key('Escape')
 }
 
-const phases = { panes, explorer, sizes }
+const confirmation = () =>
+  app.eval(
+    `(() => { const d = [...document.querySelectorAll('[role="dialog"]')].find(d => d.querySelector('[role="img"]')); return d && { title: d.getAttribute('aria-label'), picture: d.querySelector('[role="img"]').getAttribute('aria-label'), message: d.querySelector('p').textContent } })()`,
+  )
+const savedNodes = async () => {
+  await sleep(400)
+  return fsNodes()
+}
+async function openDocuments() {
+  await openOnDesktop('My Computer')
+  await openIn(windowNamed('My Computer'), '(C:)', '(C:)')
+  await openIn(windowNamed('(C:)'), 'My Documents', 'My Documents')
+  return windowNamed('My Documents')
+}
+async function newTextDocument(scope) {
+  const [x, y] = await centerOf(`${scope}.querySelector('[role="listbox"]')`)
+  await app.click(x + 60, y + 40, { button: 'right' })
+  await pickMenu('New')
+  await pickMenu('Text Document')
+  await app.waitFor(`!!${scope}.querySelector('input[aria-label="Rename"]')`)
+  await app.key('Enter')
+  await sleep(200)
+}
+
+async function minimizeAll() {
+  await app.click(900, 754, { button: 'right' })
+  await pickMenu('Minimize All Windows')
+  await sleep(300)
+}
+const taskButton = (title) =>
+  `[...document.querySelectorAll('[data-task]')].find(b => b.textContent.trim() === ${q(title)})`
+
+async function deletion() {
+  await fresh()
+  const docs = await openDocuments()
+  await clickExpr(itemIn(docs, 'Readme.txt'))
+  await app.key('Delete', ['Shift'])
+  await app.waitFor(`!!${anyDialog}`)
+  const shift = await confirmation()
+  check(
+    shift.title === 'Confirm File Delete' &&
+      shift.message === "Are you sure you want to delete 'Readme'?" &&
+      shift.picture === 'Delete file',
+    '12',
+    'Shift+Delete asks to delete for good, not to recycle',
+    shift,
+  )
+  await shot('12-shift-delete', await boxOf(anyDialog))
+  await app.key('y')
+  const after = await savedNodes()
+  check(
+    !after.some((node) => node.name === 'Readme.txt'),
+    '12',
+    'Yes removes the file without putting it in the Recycle Bin',
+    after.filter((node) => node.parent === 'recycled').map((node) => node.name),
+  )
+
+  await newTextDocument(docs)
+  await clickExpr(itemIn(docs, 'New Text Document.txt'))
+  await openMenu('File', null, docs)
+  await clickExpr(menuItem('Delete'), { mods: ['Shift'] })
+  await app.waitFor(`!!${anyDialog}`)
+  const menuShift = await confirmation()
+  check(
+    menuShift.message === "Are you sure you want to delete 'New Text Document'?",
+    '12',
+    'File > Delete clicked with Shift held also deletes for good',
+    menuShift,
+  )
+  await app.key('n')
+
+  await clickExpr(itemIn(docs, 'New Text Document.txt'))
+  await app.key('c', ['Control'])
+  await app.key('v', ['Control'])
+  await app.waitFor(`!!${itemIn(docs, 'Copy of New Text Document.txt')}`)
+  await openMenu('Edit', null, docs)
+  const edit = await menuLabels()
+  check(edit[0] === 'Undo Copy Ctrl+Z', '20', 'after a copy, Edit offers Undo Copy', edit)
+  await shot('20-undo-copy-menu', await boxOf(docs, 40))
+  await app.key('Escape')
+  await app.key('Escape')
+  await clickExpr(`${docs}.querySelector('[role="listbox"]')`)
+  await app.key('z', ['Control'])
+  await sleep(300)
+  const undone = await app.eval(
+    `[...${docs}.querySelectorAll('[role="option"]')].map(o => o.getAttribute('aria-label'))`,
+  )
+  check(
+    !undone.includes('Copy of New Text Document.txt') && undone.includes('New Text Document.txt'),
+    '20',
+    'Ctrl+Z removes the copy and keeps the original',
+    undone,
+  )
+  await shot('20-after-undo-copy', await boxOf(docs))
+}
+
+async function bin() {
+  await fresh()
+  const docs = await openDocuments()
+  await clickExpr(itemIn(docs, 'Readme.txt'))
+  await app.key('Delete')
+  await app.key('y')
+  await sleep(200)
+  await run('recycle')
+  await app.waitFor(`!!${windowNamed('Recycle Bin')}`)
+  const rb = windowNamed('Recycle Bin')
+  await clickExpr(itemIn(rb, 'Readme.txt'), { button: 'right' })
+  const menu = await menuLabels()
+  check(
+    menu.join('|') === 'Restore|-|Cut|-|Delete|-|Properties',
+    '28',
+    'a recycled item offers Restore, Cut, Delete, and Properties',
+    menu,
+  )
+  await shot('28-recycled-context-menu', await boxOf(rb, 60))
+  await pickMenu('Properties')
+  await app.waitFor(`!!${dialog('Readme Properties')}`)
+  const rows = await app.eval(
+    `[...${dialog('Readme Properties')}.querySelectorAll('span')].filter(s => /^[A-Z][A-Za-z -]+:$/.test(s.textContent)).map(s => s.textContent)`,
+  )
+  check(
+    rows.includes('Origin:') &&
+      rows.includes('Deleted:') &&
+      !rows.includes('Location:') &&
+      !rows.includes('Accessed:'),
+    '28',
+    'recycled Properties shows Origin and Deleted instead of Location and Accessed',
+    rows,
+  )
+  await shot('28-recycled-properties', await dialogBox('Readme Properties'))
+  await app.key('Escape')
+  await clickExpr(itemIn(rb, 'Readme.txt'), { button: 'right' })
+  await pickMenu('Cut')
+  await clickExpr(taskButton('My Documents'))
+  await sleep(500)
+  await clickExpr(`${docs}.querySelector('[role="listbox"]')`)
+  await app.key('v', ['Control'])
+  await sleep(300)
+  const nodes = await savedNodes()
+  const readme = nodes.find((node) => node.name === 'Readme.txt')
+  const record = await app.eval(`JSON.parse(localStorage.getItem('w95.fs.v1')).recycled`)
+  check(
+    readme?.parent === 'documents' && Object.keys(record).length === 0,
+    '28',
+    'Cut in the bin and Paste in My Documents brings the file back there',
+    { parent: readme?.parent, record },
+  )
+
+  await minimizeAll()
+  await clickExpr(desktopItem('Recycle Bin'), { button: 'right' })
+  const desk = await menuLabels()
+  check(desk.at(-1) === 'Properties', '29', "the desktop Recycle Bin's Properties is enabled", desk)
+  await pickMenu('Properties')
+  await app.waitFor(`!!${dialog('Recycle Bin Properties')}`)
+  const sheet = dialog('Recycle Bin Properties')
+  const global = await app.eval(
+    `({ tabs: [...${sheet}.querySelectorAll('[role="tab"]')].map(t => t.textContent), radios: [...${sheet}.querySelectorAll('input[type=radio]')].map(r => r.parentElement.parentElement.textContent + (r.checked ? ' *' : '')), slider: ${sheet}.querySelector('[role="slider"]').getAttribute('aria-valuenow'), confirm: [...${sheet}.querySelectorAll('label')].find(l => l.textContent === 'Display delete confirmation dialog').querySelector('input').checked })`,
+  )
+  check(
+    global.tabs.join('|') === 'Global|(C:)' &&
+      global.radios[1].endsWith(' *') &&
+      global.slider === '10' &&
+      global.confirm,
+    '29',
+    'Recycle Bin Properties has Global and (C:) pages, one setting for all drives, 10%, and the confirmation box',
+    global,
+  )
+  await shot('29-bin-properties-global', await dialogBox('Recycle Bin Properties'))
+  await clickExpr(`[...${sheet}.querySelectorAll('[role="tab"]')][1]`)
+  const drive = await app.eval(`${sheet}.querySelector('[role="tabpanel"]').innerText`)
+  check(
+    drive.includes('Size of drive:') && drive.includes('512MB') && drive.includes('51.2MB'),
+    '29',
+    'the (C:) page shows the drive size and the space reserved',
+    drive,
+  )
+  await shot('29-bin-properties-drive', await dialogBox('Recycle Bin Properties'))
+  await clickExpr(`[...${sheet}.querySelectorAll('[role="tab"]')][0]`)
+  const [sx, sy] = await centerOf(`${sheet}.querySelector('[role="slider"]')`)
+  await app.click(sx + 40, sy)
+  const moved = await app.eval(`${sheet}.querySelector('[role="slider"]').getAttribute('aria-valuenow')`)
+  check(moved === '20', '29', 'clicking the channel right of the pointer pages it up by 10', moved)
+  await clickExpr(
+    `[...${sheet}.querySelectorAll('label')].find(l => l.textContent.startsWith('Do not move files'))`,
+  )
+  await clickExpr(buttonIn(sheet, 'OK'))
+  await clickExpr(taskButton('My Documents'))
+  await sleep(500)
+  await clickExpr(itemIn(docs, 'Readme.txt'))
+  await app.key('Delete')
+  await app.waitFor(`!!${anyDialog}`)
+  const nuke = await confirmation()
+  check(
+    nuke.message === "Are you sure you want to delete 'Readme'?",
+    '29',
+    'with Do not move files to the Recycle Bin, Delete deletes for good',
+    nuke,
+  )
+  await app.key('n')
+  await minimizeAll()
+  await clickExpr(desktopItem('Recycle Bin'), { button: 'right' })
+  await pickMenu('Properties')
+  await app.waitFor(`!!${dialog('Recycle Bin Properties')}`)
+  await clickExpr(
+    `[...${sheet}.querySelectorAll('label')].find(l => l.textContent.startsWith('Do not move files'))`,
+  )
+  await clickExpr(
+    `[...${sheet}.querySelectorAll('label')].find(l => l.textContent === 'Display delete confirmation dialog')`,
+  )
+  await clickExpr(buttonIn(sheet, 'OK'))
+  await clickExpr(taskButton('My Documents'))
+  await sleep(500)
+  await clickExpr(itemIn(docs, 'Readme.txt'))
+  await app.key('Delete')
+  await sleep(400)
+  const quiet = await app.eval(
+    `({ dialog: !!${anyDialog}, recycled: JSON.parse(localStorage.getItem('w95.fs.v1')).recycled })`,
+  )
+  check(
+    !quiet.dialog && Object.keys(quiet.recycled).includes('readme'),
+    '29',
+    'with the confirmation unchecked, Delete recycles without asking',
+    quiet,
+  )
+}
+
+const phases = { panes, explorer, sizes, deletion, bin }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {

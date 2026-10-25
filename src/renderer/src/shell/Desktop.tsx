@@ -1,4 +1,11 @@
-import { type PointerEvent as ReactPointerEvent, useCallback, useMemo, useRef, useState } from 'react'
+import {
+  type ComponentType,
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { children, isInside, isProtected, uniqueName } from '../fs/fs'
 import { createNode, fs, fsStore, newNodeId, useFs } from '../fs/store'
 import {
@@ -51,7 +58,7 @@ import {
   touched,
   typeAhead,
 } from './desktopModel'
-import { folderOptions, useNaming } from './folderOptions'
+import { deletesForGood, folderOptions, useNaming } from './folderOptions'
 import { nodeIcon } from './nodeIcon'
 import { apps, getApp } from './registry'
 import { launch, openNode, useWindows, windowsStore } from './system'
@@ -94,6 +101,7 @@ type Prompt =
   | { kind: 'empty' }
   | { kind: 'error'; title: string; message: string }
   | { kind: 'properties'; id: NodeId }
+  | { kind: 'shellProperties'; Sheet: ComponentType<{ onClose: () => void }> }
   | { kind: 'shortcut'; at: Point | null }
 
 interface Drag {
@@ -393,14 +401,18 @@ export function Desktop({ size }: { size: Size }) {
   const askDelete = (keyList: Iterable<string>, permanent: boolean) => {
     const nodes = nodesOf(keyList).filter((node) => !isProtected(node.id))
     if (!nodes.length) return
-    if (folderOptions.get().confirmDelete) setPrompt({ kind: permanent ? 'purge' : 'recycle', nodes })
-    else answerDelete(nodes, permanent)
+    const forGood = permanent || deletesForGood()
+    if (forGood || folderOptions.get().confirmDelete)
+      setPrompt({ kind: forGood ? 'purge' : 'recycle', nodes })
+    else answerDelete(nodes, false)
   }
 
   const openProperties = (key: string | null) => {
     const item = key ? byKey.get(key) : undefined
     if (!item) desktopProperties?.()
     else if (item.kind === 'node') setPrompt({ kind: 'properties', id: item.node.id })
+    else if (item.app.desktop?.Properties)
+      setPrompt({ kind: 'shellProperties', Sheet: item.app.desktop.Properties })
   }
 
   const putOnClipboard = (op: 'cut' | 'copy', keyList: Iterable<string>) => {
@@ -485,7 +497,8 @@ export function Desktop({ size }: { size: Size }) {
       canFind: Boolean(getApp('find')),
       single: scope.length <= 1,
       mutable: item?.kind === 'node' && !isProtected(item.node.id),
-      hasProperties: item?.kind === 'node',
+      hasProperties:
+        item?.kind === 'node' || (item?.kind === 'shell' && Boolean(item.app.desktop?.Properties)),
       undo: undoStack.length ? undoLabel(undoStack) : null,
     }
   }
@@ -826,6 +839,7 @@ export function Desktop({ size }: { size: Size }) {
         />
       )}
       {prompt?.kind === 'properties' && <PropertiesSheet id={prompt.id} onClose={() => setPrompt(null)} />}
+      {prompt?.kind === 'shellProperties' && <prompt.Sheet onClose={() => setPrompt(null)} />}
       {prompt?.kind === 'shortcut' && (
         <CreateShortcut
           onClose={() => setPrompt(null)}

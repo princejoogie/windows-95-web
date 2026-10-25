@@ -42,6 +42,8 @@ export interface DesktopIcon {
   readonly icon?: (fs: FsState) => string
   /** Files dragged from the desktop and dropped on this icon. Recycle Bin recycles them. */
   readonly onDrop?: (ids: readonly NodeId[]) => void
+  /** The sheet the icon's Properties command opens, such as Recycle Bin Properties. */
+  readonly Properties?: ComponentType<{ onClose: () => void }>
 }
 
 /** One app. Each `apps/<id>/index.tsx` exports `app: AppManifest`, and the registry picks it up. */

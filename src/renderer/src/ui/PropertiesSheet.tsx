@@ -187,7 +187,7 @@ export function PropertiesSheet({ id, onClose }: { id: NodeId; onClose: () => vo
         {recycled && <Row label="Deleted:">{formatStamp(recycled.at)}</Row>}
         <Row label="Created:">{formatStamp(created)}</Row>
         {!folder && <Row label="Modified:">{formatStamp(node.modified)}</Row>}
-        {!folder && <Row label="Accessed:">{formatDay(Math.max(created, node.modified))}</Row>}
+        {!folder && !recycled && <Row label="Accessed:">{formatDay(Math.max(created, node.modified))}</Row>}
       </div>
       <Rule />
       <div className="flex items-start">

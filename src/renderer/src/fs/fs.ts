@@ -254,7 +254,10 @@ export function fsReducer(state: FsState, action: FsAction): FsState {
       if (target.kind !== 'folder' && target.kind !== 'drive') return state
       if (isInside(state, target.id, node.id)) return state
       if (findChild(state, target.id, node.name)) return state
-      return put(state, { ...node, parent: target.id, modified: action.at })
+      const moved = put(state, { ...node, parent: target.id, modified: action.at })
+      if (!state.recycled[node.id] || isInside(state, target.id, RECYCLED_DIR)) return moved
+      const { [node.id]: _, ...recycled } = state.recycled
+      return { ...moved, recycled }
     }
     case 'recycle': {
       const node = state.nodes[action.id]

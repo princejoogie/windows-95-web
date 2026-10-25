@@ -21,6 +21,16 @@ function withFolder(): FsState {
 }
 
 describe('paste', () => {
+  it('pastes a recycled item cut from the bin into a folder and forgets where it was deleted from', () => {
+    const state = fsReducer(emptyDrive(at), { type: 'recycle', id: README, at })
+    const plan = planPaste(state, { op: 'cut', ids: [README] }, DESKTOP_DIR, at, ids())
+    const next = apply(state, plan.ok ? plan.actions : [])
+    expect(names(next, DESKTOP_DIR)).toEqual(['Readme.txt'])
+    expect(next.recycled[README]).toBeUndefined()
+    const copied = planPaste(state, { op: 'copy', ids: [README] }, DESKTOP_DIR, at, ids())
+    expect(copied.ok && copied.actions).toEqual([])
+  })
+
   it('copies into another folder under the same name, leaving the original', () => {
     const state = emptyDrive(at)
     const plan = planPaste(state, { op: 'copy', ids: [README] }, DESKTOP_DIR, at, ids())

@@ -86,7 +86,8 @@ export function planPaste(state: FsState, clip: Clip, dest: NodeId, at: number, 
   }
   for (const id of clip.ids) {
     const node = working.nodes[id]
-    if (!node || node.kind === 'drive' || isInside(working, id, RECYCLED_DIR)) continue
+    const restoring = clip.op === 'cut' && Boolean(working.recycled[id])
+    if (!node || node.kind === 'drive' || (isInside(working, id, RECYCLED_DIR) && !restoring)) continue
     if (isInside(working, dest, id)) {
       return fail(node, 'The destination folder is a subfolder of the source folder.')
     }

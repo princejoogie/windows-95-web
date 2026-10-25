@@ -19,7 +19,7 @@ import { type Clip, clipboard, type Plan, planPaste, planShortcuts } from '../..
 import { useKeyDown } from '../../shell/context'
 import { DeleteConfirmation } from '../../shell/DeleteConfirmation'
 import { backgroundMenu, type DesktopActions, type MenuFacts, nodeMenu } from '../../shell/desktopMenus'
-import { folderOptions, useNaming } from '../../shell/folderOptions'
+import { deletesForGood, folderOptions, useNaming } from '../../shell/folderOptions'
 import { getApp } from '../../shell/registry'
 import { launch, openNode, useWindows, windowsStore } from '../../shell/system'
 import type { WindowApi } from '../../shell/types'
@@ -39,8 +39,9 @@ import {
 } from '../../ui'
 import type { MenuEntry } from '../../ui/Menu'
 import { formatSize, isHidden } from '../../ui/properties'
+import { RecycleBinProperties } from '../recyclebin/Properties'
 import { fileIcon, floppyIcon, printerIcon, radioDot } from './art'
-import { FolderOptions, RecycleProperties } from './dialogs'
+import { FolderOptions } from './dialogs'
 import { FolderTree, treeIcon } from './FolderTree'
 import { DragGhost, useFileDrag } from './fileDrag'
 import {
@@ -302,23 +303,18 @@ export function FolderView({
     setSelection({ ids: new Set([result.id]), anchor: result.id, focus: result.id })
     setRenaming(result.id)
   }
+  const askDelete = (ids: readonly NodeId[]) => {
+    if (!ids.length) return
+    const permanent = recycled || deletesForGood(settings)
+    if (!permanent && !settings.confirmDelete) removeNodes(ids, false)
+    else setPrompt({ kind: 'confirm', action: permanent ? 'purge' : 'recycle', ids })
+  }
   const deleteSelected = () => {
-    if (!mutable || (!recycled && !writable)) return
-    if (!recycled && !settings.confirmDelete) {
-      removeNodes(
-        selected.map((node) => node.id),
-        false,
-      )
-      return
-    }
-    setPrompt({
-      kind: 'confirm',
-      action: recycled ? 'purge' : 'recycle',
-      ids: selected.map((node) => node.id),
-    })
+    if (mutable && (recycled || writable)) askDelete(selected.map((node) => node.id))
   }
   const cutSelected = () => {
-    if (writable && mutable) clipboard.dispatch({ op: 'cut', ids: selected.map((node) => node.id) })
+    if ((writable || recycled) && mutable)
+      clipboard.dispatch({ op: 'cut', ids: selected.map((node) => node.id) })
   }
   const copySelected = () => {
     if (!recycled && selected.length) clipboard.dispatch({ op: 'copy', ids: selected.map((node) => node.id) })
@@ -343,7 +339,7 @@ export function FolderView({
     if (!destination || recycled) return
     const done = carry(
       planPaste(fs.get(), source, destination, Date.now(), newNodeId),
-      source?.op === 'cut' ? 'Move' : undefined,
+      source?.op === 'cut' ? 'Move' : 'Copy',
     )
     if (done && source?.op === 'cut') clipboard.dispatch(null)
   }
@@ -531,10 +527,7 @@ export function FolderView({
       paste: () => paste(destination),
       pasteShortcut: () => shortcuts(clip?.ids ?? []),
       createShortcut: () => shortcuts(ids, folder?.id ?? DESKTOP_DIR),
-      remove: () => {
-        if (!recycled && !settings.confirmDelete) removeNodes(ids, false)
-        else setPrompt({ kind: 'confirm', action: recycled ? 'purge' : 'recycle', ids })
-      },
+      remove: () => askDelete(ids),
       rename: () => node && setRenaming(node.id),
       properties: () => {
         const target = node ?? folder
@@ -590,10 +583,13 @@ export function FolderView({
     }
     if (recycled && node)
       return [
-        { label: '&Restore', bold: true, onSelect: restore },
+        { label: 'R&estore', bold: true, onSelect: restore },
+        'separator',
+        { label: 'Cu&t', onSelect: act.cut },
+        'separator',
         { label: '&Delete', onSelect: act.remove },
         'separator',
-        { label: 'P&roperties', onSelect: act.properties },
+        { label: 'P&roperties', disabled: !facts.single, onSelect: act.properties },
       ]
     if (node?.kind === 'drive')
       return [
@@ -794,10 +790,7 @@ export function FolderView({
   const drag = useFileDrag(list, {
     error: (title, message) => setPrompt({ kind: 'error', title, message }),
     select: (ids) => setSelection({ ids: new Set(ids), anchor: ids[0] ?? null, focus: ids[0] ?? null }),
-    recycle: (ids) => {
-      if (settings.confirmDelete) setPrompt({ kind: 'confirm', action: 'recycle', ids })
-      else removeNodes(ids, false)
-    },
+    recycle: askDelete,
     place: (ids, offset) => {
       if (autoArrange || (view !== 'large' && view !== 'small')) return
       setPositions((old) => ({
@@ -824,7 +817,12 @@ export function FolderView({
                 onSelect: undo,
               },
               'separator',
-              { label: 'Cu&t', shortcut: 'Ctrl+X', disabled: !writable || !mutable, onSelect: cutSelected },
+              {
+                label: 'Cu&t',
+                shortcut: 'Ctrl+X',
+                disabled: !(writable || recycled) || !mutable,
+                onSelect: cutSelected,
+              },
               {
                 label: '&Copy',
                 shortcut: 'Ctrl+C',
@@ -949,7 +947,7 @@ export function FolderView({
           />
           {[
             { label: 'Up One Level', disabled: location.kind !== 'folder', run: up },
-            { label: 'Cut', disabled: !mutable || !writable, run: cutSelected },
+            { label: 'Cut', disabled: !mutable || !(writable || recycled), run: cutSelected },
             { label: 'Copy', disabled: !selected.length || recycled, run: copySelected },
             { label: 'Paste', disabled: !writable || !clip, run: () => paste() },
             { label: 'Undo', disabled: !undoStack.length, run: undo },
@@ -1268,7 +1266,7 @@ export function FolderView({
         <AboutDialog app="Windows 95" icon={icons.windowsLogo} onClose={() => setPrompt(null)} />
       )}
       {prompt?.kind === 'options' && <FolderOptions onClose={() => setPrompt(null)} />}
-      {prompt?.kind === 'bin-properties' && <RecycleProperties onClose={() => setPrompt(null)} />}
+      {prompt?.kind === 'bin-properties' && <RecycleBinProperties onClose={() => setPrompt(null)} />}
       {prompt?.kind === 'floppy' && (
         <MessageBox
           title={'A:\\'}
