@@ -5,6 +5,7 @@ const d = await connect(9411)
 try {
   await reset(d)
   await run(d, 'command')
+  assert.equal(await d.evaluate('document.activeElement.getAttribute("aria-label")'), 'MS-DOS command line')
   await d.type('help')
   await d.key('Enter')
   await d.type('edit new.txt')

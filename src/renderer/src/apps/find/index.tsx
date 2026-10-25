@@ -10,6 +10,7 @@ import { useNaming } from '../../shell/folderOptions'
 import { nodeIcon } from '../../shell/nodeIcon'
 import { launch, openNode, windowsStore } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
+import { remember } from '../../shell/undo'
 import {
   AboutDialog,
   Accel,
@@ -871,7 +872,7 @@ function Find({ window: appWindow, args }: AppProps) {
               label: '&Rename',
               disabled: isProtected(context.result.node.id),
               onSelect: () => {
-                setRenameText(context.result.node.name)
+                setRenameText(naming.label(context.result.node))
                 setRenaming(context.result)
               },
             },
@@ -885,7 +886,11 @@ function Find({ window: appWindow, args }: AppProps) {
           nodes={[deleting.node]}
           permanent={false}
           onAnswer={(yes) => {
-            if (yes) fs.recycle(deleting.node.id)
+            if (yes) {
+              const before = fs.get()
+              fs.recycle(deleting.node.id)
+              remember(before, fs.get(), 'Delete')
+            }
             setDeleting(null)
           }}
         />
@@ -896,9 +901,13 @@ function Find({ window: appWindow, args }: AppProps) {
             className="p-3 flex flex-col gap-3"
             onSubmit={(event) => {
               event.preventDefault()
-              const error = fs.rename(renaming.node.id, renameText)
+              const before = fs.get()
+              const error = fs.rename(renaming.node.id, naming.rename(renaming.node, renameText))
               if (error) setMessage(error)
-              else setRenaming(null)
+              else {
+                remember(before, fs.get(), 'Rename')
+                setRenaming(null)
+              }
             }}
           >
             <TextBox
