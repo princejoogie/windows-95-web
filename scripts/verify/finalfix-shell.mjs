@@ -357,12 +357,12 @@ const shell = async () => {
   for (const label of ['Settings', 'Find']) {
     await startItem(label)
     const rows = await read(
-      `[...document.querySelectorAll('[role="menu"][aria-label!="Start menu"] [role="menuitem"]')].map(e=>({label:e.textContent,icons:e.querySelectorAll('img').length,height:e.getBoundingClientRect().height}))`,
+      `[...document.querySelectorAll('[role="menu"]:not([aria-label="Start menu"]) > div > [role="menuitem"]')].map(e=>({label:e.textContent,icons:e.querySelectorAll('img').length,height:e.getBoundingClientRect().height,iconSize:e.querySelector('img')?.getBoundingClientRect().width}))`,
     )
     check(
       17,
       `${label} submenu has 16px icons and 20px rows`,
-      rows.length === 3 && rows.every((r) => r.icons && r.height === 20),
+      rows.length === 3 && rows.every((r) => r.icons && r.height === 20 && r.iconSize === 16),
       rows,
     )
     await shot(`17-${label.toLowerCase()}-icons`)
@@ -380,11 +380,58 @@ const shell = async () => {
   await shot('f1-solitaire-help')
 }
 
+const power = async () => {
+  await app.send('Page.reload')
+  await sleep(600)
+  await shot('13-boot')
+  await app.waitFor(`!!document.querySelector('[data-desktop]')`)
+  await startItem('Shut Down...')
+  await app.clickOn('input[value="dos"]')
+  await clickText('Yes')
+  await sleep(250)
+  check(
+    12,
+    'DOS restart hides the desktop, taskbar, and window chrome',
+    (await exists('[data-dos-session]')) && !(await exists('[data-desktop],[data-taskbar],[data-window]')),
+  )
+  await shot('12-dos-session')
+  if (!baseline) {
+    await app.type('ver')
+    await app.key('Enter')
+    check(
+      12,
+      'DOS session runs the shared interpreter',
+      await read(`document.querySelector('[data-dos-session]').textContent.includes('[Version 4.00.950]')`),
+    )
+    await app.type('win')
+    await app.key('Enter')
+    await app.waitFor(`!!document.querySelector('[data-desktop]')`)
+    check(12, 'WIN returns to Windows', await exists('[data-taskbar]'))
+    await shot('12-return-windows')
+    await run('command.com')
+    check(
+      12,
+      'ordinary DOS Prompt keeps its Windows chrome',
+      (await exists('[data-window]')) && (await exists('[data-taskbar]')),
+    )
+    await shot('12-ordinary-dos-prompt')
+  }
+  await reset()
+  await startItem('Shut Down...')
+  await clickText('Yes')
+  await sleep(500)
+  await shot('13-shutdown')
+  await app.waitFor(`document.body.textContent.includes("It's now safe to turn off your computer.")`)
+  check(13, 'shutdown reaches the safe-to-turn-off artwork', true)
+  await shot('13-safe-off')
+}
+
 try {
   await reset()
   if (phase === 'dialogs') await dialogs()
   if (phase === 'modeless') await modeless()
   if (phase === 'shell') await shell()
+  if (phase === 'power') await power()
 } finally {
   writeFileSync(
     join(proof, `${baseline ? 'before' : 'after'}-${phase}.json`),

@@ -4,6 +4,7 @@ import { DateTimeProperties } from '../apps/controlpanel/DateTimeProperties'
 import { DesktopDisplayProperties } from '../apps/controlpanel/DisplayProperties'
 import { children } from '../fs/fs'
 import { fs, installPrograms } from '../fs/store'
+import { ROOT } from '../fs/types'
 import { ScreenSaverHost } from '../settings/ScreenSaverHost'
 import { connectSystemSounds } from '../settings/sounds'
 import { beginSystemCursor } from '../system/cursors'
@@ -18,7 +19,7 @@ import { shellEvents } from './events'
 import { PowerScreens } from './PowerScreens'
 import { RunDialog } from './RunDialog'
 import { connectRecycleLimit } from './recycleLimit'
-import { apps, findAppByExe, getApp, programSpecs } from './registry'
+import { apps, findAppByExe, getApp, helpBookForApp, programSpecs } from './registry'
 import { type ShutDownChoice, ShutDownDialog } from './ShutDownDialog'
 import { StartMenu } from './StartMenu'
 import { openSystemMenu, SystemMenu } from './SystemMenu'
@@ -35,7 +36,7 @@ import type { Size, WindowId } from './types'
 import { Window } from './Window'
 
 type Power = 'booting' | 'running' | 'shutting-down' | 'restarting' | 'off'
-type ShellDialog = 'run' | 'shutdown' | 'taskbar' | 'datetime' | 'logon' | null
+type ShellDialog = 'run' | 'shutdown' | 'taskbar' | 'datetime' | 'logon' | 'msn' | null
 type Switch = { order: readonly WindowId[]; selected: WindowId }
 
 export function Shell() {
@@ -53,12 +54,17 @@ export function Shell() {
   const desktopRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const closing = useRef(false)
+  const windowsTap = useRef(false)
   const [size, setSize] = useState<Size>({ width: innerWidth, height: innerHeight - 28 })
   const state = useWindows((state) => state)
   const settings = useTaskbarSettings()
   const ordered = useMemo(() => [...state.windows].sort((a, b) => a.id - b.id), [state.windows])
   const stacking = new Map(state.windows.map((window, index) => [window.id, index + 1]))
   const openApp = (id: string) => {
+    if (id === 'msn') {
+      setDialog('msn')
+      return
+    }
     if (!launch(id)) {
       setMissing(id)
     }
@@ -84,12 +90,43 @@ export function Shell() {
     if (current) void animateWindow({ type: 'focus', id: current.selected })
   }
   const hostAction = useRef<(event: HostEvent) => void>(() => {})
+  const windowsKey = (key: string, down: boolean, shift: boolean, repeat: boolean) => {
+    if (key === 'Meta' || key === 'OS') {
+      if (down) {
+        if (!repeat) windowsTap.current = true
+      } else {
+        if (windowsTap.current) start()
+        windowsTap.current = false
+      }
+      return
+    }
+    windowsTap.current = false
+    if (!down || repeat) return
+    setStartOpen(false)
+    switch (key.toLowerCase()) {
+      case 'r':
+        setDialog('run')
+        break
+      case 'e':
+        launch('explorer', { folder: ROOT })
+        break
+      case 'f':
+        launch('find')
+        break
+      case 'm':
+        windowsStore.dispatch({ type: shift ? 'undoMinimizeAll' : 'minimizeAll' })
+        break
+    }
+  }
   hostAction.current = (event) => {
     if (power !== 'running') return
     if (event.type !== 'alt-release') cancelMenuAltTap()
     switch (event.type) {
       case 'host-close':
         setDialog('shutdown')
+        break
+      case 'windows-key':
+        windowsKey(event.key, event.down, event.shift, event.repeat)
         break
       case 'start':
         start()
@@ -149,6 +186,12 @@ export function Shell() {
       setStartOpen(false)
     }
     const key = (event: KeyboardEvent) => {
+      if (event.metaKey || event.key === 'Meta' || event.key === 'OS') {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        windowsKey(event.key, true, event.shiftKey, event.repeat)
+        return
+      }
       if (event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey && !event.repeat) {
         if (event.target instanceof Element && event.target.closest('[data-shortcut-key]')) return
         const shortcut = shortcutForKey(fs.get(), event.key)
@@ -196,15 +239,42 @@ export function Shell() {
       }
     }
     const keyUp = (event: KeyboardEvent) => {
+      if (event.key === 'Meta' || event.key === 'OS') windowsKey(event.key, false, event.shiftKey, false)
       if (event.key === 'Alt') release()
+    }
+    const help = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.key !== 'F1' ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        menuIsActive()
+      )
+        return
+      if (event.target instanceof Element && event.target.closest('[role="dialog"]')) return
+      const focused = windowsStore.get()
+      const app = focused.windows.find((window) => window.id === focused.focused)
+      const book = app && helpBookForApp(app.appId)
+      if (book) {
+        event.preventDefault()
+        launch('help', { book })
+      }
+    }
+    const blur = () => {
+      windowsTap.current = false
     }
     document.addEventListener('pointerdown', pointer, true)
     window.addEventListener('keydown', key, true)
     window.addEventListener('keyup', keyUp, true)
+    document.addEventListener('keydown', help)
+    window.addEventListener('blur', blur)
     return () => {
       document.removeEventListener('pointerdown', pointer, true)
       window.removeEventListener('keydown', key, true)
       window.removeEventListener('keyup', keyUp, true)
+      document.removeEventListener('keydown', help)
+      window.removeEventListener('blur', blur)
     }
   })
 
@@ -311,6 +381,15 @@ export function Shell() {
         )}
         {dialog === 'taskbar' && <TaskbarProperties onClose={() => setDialog(null)} />}
         {dialog === 'datetime' && <DateTimeProperties onClose={() => setDialog(null)} />}
+        {dialog === 'msn' && (
+          <MessageBox
+            title="The Microsoft Network"
+            icon="info"
+            message="The Microsoft Network is not installed. No online service provider is available."
+            buttons={['OK']}
+            onClose={() => setDialog(null)}
+          />
+        )}
         {dialog === 'logon' && (
           <Dialog title="Welcome to Windows" onClose={() => setDialog(null)} className="w-[340px]">
             <form
