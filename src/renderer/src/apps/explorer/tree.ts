@@ -38,11 +38,21 @@ export function folderTree(state: FsState): TreeEntry {
         children: [
           { key: 'floppy', label: '3½ Floppy (A:)', location: null, children: [] },
           folder(ROOT),
-          { key: 'controlpanel', label: 'Control Panel', location: null, children: [] },
-          { key: 'printers', label: 'Printers', location: null, children: [] },
+          {
+            key: 'controlpanel',
+            label: 'Control Panel',
+            location: { kind: 'shell', id: 'controlpanel' },
+            children: [],
+          },
+          { key: 'printers', label: 'Printers', location: { kind: 'shell', id: 'printers' }, children: [] },
         ],
       },
-      { key: 'network', label: 'Network Neighborhood', location: null, children: [] },
+      {
+        key: 'network',
+        label: 'Network Neighborhood',
+        location: { kind: 'shell', id: 'network' },
+        children: [],
+      },
       { key: 'recycle', label: 'Recycle Bin', location: { kind: 'recycle' }, children: [] },
     ],
   }

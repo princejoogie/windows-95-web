@@ -1,4 +1,5 @@
 import type { Settings } from './model'
+import { timeZoneInfo } from './timeZones'
 
 export interface ClockParts {
   year: number
@@ -9,9 +10,11 @@ export interface ClockParts {
   second: number
 }
 
-export function clockParts(timestamp: number, timeZone: string): ClockParts {
+export function clockParts(timestamp: number, timeZone: string, adjustForDaylightSaving = true): ClockParts {
+  const zone = adjustForDaylightSaving ? timeZone : 'UTC'
+  const at = timestamp + (adjustForDaylightSaving ? 0 : timeZoneInfo(timeZone).offset * 60000)
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
+    timeZone: zone,
     year: 'numeric',
     month: 'numeric',
     day: 'numeric',
@@ -19,7 +22,7 @@ export function clockParts(timestamp: number, timeZone: string): ClockParts {
     minute: 'numeric',
     second: 'numeric',
     hourCycle: 'h23',
-  }).formatToParts(timestamp)
+  }).formatToParts(at)
   const part = (name: Intl.DateTimeFormatPartTypes) =>
     Number(parts.find((item) => item.type === name)?.value ?? 0)
   return {
@@ -32,11 +35,16 @@ export function clockParts(timestamp: number, timeZone: string): ClockParts {
   }
 }
 
-export function clockOffsetForParts(parts: ClockParts, timeZone: string, now: number): number {
+export function clockOffsetForParts(
+  parts: ClockParts,
+  timeZone: string,
+  now: number,
+  adjustForDaylightSaving = true,
+): number {
   const desired = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second)
   let timestamp = desired
   for (let i = 0; i < 3; i++) {
-    const actual = clockParts(timestamp, timeZone)
+    const actual = clockParts(timestamp, timeZone, adjustForDaylightSaving)
     const wall = Date.UTC(
       actual.year,
       actual.month - 1,
@@ -60,17 +68,22 @@ const localeCodes: Record<Settings['regional']['locale'], string> = {
 }
 
 export function formatClock(settings: Settings, now = Date.now()): { time: string; longDate: string } {
-  const date = new Date(now + settings.clockOffset)
+  const zone = settings.adjustForDaylightSaving ? settings.timeZone : 'UTC'
+  const date = new Date(
+    now +
+      settings.clockOffset +
+      (settings.adjustForDaylightSaving ? 0 : timeZoneInfo(settings.timeZone).offset * 60000),
+  )
   const locale = localeCodes[settings.regional.locale]
   return {
     time: date.toLocaleTimeString(locale, {
-      timeZone: settings.timeZone,
+      timeZone: zone,
       hour: 'numeric',
       minute: '2-digit',
       hour12: !settings.regional.time24,
     }),
     longDate: date.toLocaleDateString(locale, {
-      timeZone: settings.timeZone,
+      timeZone: zone,
       weekday: 'long',
       year: 'numeric',
       month: 'long',

@@ -27,9 +27,9 @@ export const patterns = {
 export type PatternName = keyof typeof patterns
 export const patternNames = Object.keys(patterns).filter((name): name is PatternName => name in patterns)
 
-export function patternImage(name: PatternName, foreground = '#000000'): string {
+export function patternImage(name: PatternName, foreground = '#000000', rows = patterns[name]): string {
   return pixelArt(
-    patterns[name].map((row) => Array.from({ length: 8 }, (_, x) => (row & (128 >> x) ? 'x' : '.')).join('')),
+    rows.map((row) => Array.from({ length: 8 }, (_, x) => (row & (128 >> x) ? 'x' : '.')).join('')),
     { x: foreground },
   )
 }
@@ -85,6 +85,7 @@ export type WallpaperName = (typeof wallpaperNames)[number]
 export interface BackgroundSettings {
   desktopColor: string
   pattern: PatternName | null
+  customPattern: number[] | null
   wallpaper: WallpaperName | NodeId | null
   wallpaperMode: 'center' | 'tile'
 }
@@ -93,7 +94,9 @@ export function desktopBackground(
   settings: BackgroundSettings,
   nodes: readonly FsNode[] = [],
 ): Record<string, string> {
-  const pattern = settings.pattern ? `url("${patternImage(settings.pattern)}")` : 'none'
+  const pattern = settings.pattern
+    ? `url("${patternImage(settings.pattern, '#000000', settings.customPattern ?? patterns[settings.pattern])}")`
+    : 'none'
   const builtin = wallpaperNames.find((name) => name === settings.wallpaper)
   const wallpaper = builtin ? wallpapers[builtin] : fileWallpaperImage(settings.wallpaper, nodes)
   return {

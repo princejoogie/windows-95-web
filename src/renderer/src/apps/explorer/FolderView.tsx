@@ -59,6 +59,7 @@ import {
 import { folderPreferences, saveFolderPreferences } from './preferences'
 import { useRubberBand } from './rubberBand'
 import { Splitter } from './Splitter'
+import { type ShellAction, shellFolder } from './shellFolders'
 import { toolbarIcons } from './toolbar'
 import { folderTree, TREE_DESKTOP, treeRows } from './tree'
 import './explorer.css'
@@ -133,8 +134,12 @@ export function FolderView({
   const list = useRef<HTMLDivElement>(null)
   const typed = useRef({ text: '', at: 0 })
   const [location, setLocation] = useState(initial)
+  const virtual = location.kind === 'shell' ? shellFolder(location.id) : undefined
+  const [shellDialog, setShellDialog] = useState<string | null>(null)
+  const [shellViewOptions, setShellViewOptions] = useState<ReadonlySet<string>>(new Set())
+  const ShellDialog = virtual?.Dialog
   const keyOf = (place: Location) =>
-    `${exploring ? 'explore' : 'folder'}.${place.kind === 'folder' ? place.id : place.kind}`
+    `${exploring ? 'explore' : 'folder'}.${place.kind === 'folder' || place.kind === 'shell' ? place.id : place.kind}`
   const [initialPrefs] = useState(() =>
     folderPreferences(keyOf(initial), exploring, initial.kind === 'recycle'),
   )
@@ -176,13 +181,14 @@ export function FolderView({
     !isInside(state, folder.id, RECYCLED_DIR)
   const recycled = location.kind === 'recycle'
   const title =
-    location.kind === 'computer'
+    virtual?.title ??
+    (location.kind === 'computer'
       ? 'My Computer'
       : recycled
         ? 'Recycle Bin'
         : folder
           ? labelOf(folder)
-          : 'Folder'
+          : 'Folder')
   const setTitle = window.setTitle
   const path = folder ? pathOf(state, folder.id) : title
   useEffect(
@@ -191,6 +197,11 @@ export function FolderView({
   )
   const detailColumns = recycled ? recycleColumns : columns.slice(0, 4)
   const mutable = selected.length > 0 && selected.every((node) => !isProtected(node.id))
+  const performShell = (action: ShellAction) => {
+    if (action.kind === 'folder') navigate({ kind: 'shell', id: action.id })
+    else if (action.kind === 'app') launch(action.id)
+    else setShellDialog(action.id)
+  }
   const shellItems =
     location.kind === 'computer'
       ? [
@@ -210,15 +221,22 @@ export function FolderView({
             key: 'shell:printers',
             label: 'Printers',
             icon: printerIcon,
-            open: () => launch('controlpanel'),
+            open: () => launch('printers'),
           },
         ]
-      : []
+      : [...(virtual?.items ?? [])]
+          .sort((a, b) => (sort.direction === 'ascending' ? 1 : -1) * a.label.localeCompare(b.label))
+          .map((item) => ({ ...item, open: () => performShell(item.action) }))
   const order =
     location.kind === 'computer'
       ? ['shell:floppy', ...nodes.map((node) => node.id), 'shell:controlpanel', 'shell:printers']
-      : nodes.map((node) => node.id)
+      : [...nodes.map((node) => node.id), ...shellItems.map((item) => item.key)]
   const selectedShell = shellItems.filter((item) => selection.ids.has(item.key))
+  const singleShell = selectedShell.length === 1 ? selectedShell[0] : undefined
+  const shellProperties = () => {
+    const action = virtual?.properties ?? virtual?.items.find((item) => item.key === singleShell?.key)?.action
+    if (action) performShell(action)
+  }
   const selectedCount = selected.length + selectedShell.length
   const preferenceKey = keyOf(location)
   useLayoutEffect(() => {
@@ -294,6 +312,10 @@ export function FolderView({
       setPrompt({ kind: 'error', message: `There is no program associated with '${node.name}'.` })
   }
   const up = () => {
+    if (virtual) {
+      navigate(virtual.parent)
+      return
+    }
     if (location.kind !== 'folder') return
     const parent = folder?.parent
     setLocation(parent ? { kind: 'folder', id: parent } : { kind: 'computer' })
@@ -402,6 +424,7 @@ export function FolderView({
       prompt ||
       context ||
       shellMenu ||
+      shellDialog ||
       renaming ||
       event.target instanceof HTMLInputElement ||
       event.target instanceof HTMLTextAreaElement
@@ -418,7 +441,11 @@ export function FolderView({
     if ((event.key === 'F10' && event.shiftKey) || event.key === 'ContextMenu') {
       event.preventDefault()
       const rect = list.current?.getBoundingClientRect()
-      if (rect) setContext({ x: rect.left + 20, y: rect.top + 20, id: single?.id ?? null })
+      if (rect) {
+        const at = { x: rect.left + 20, y: rect.top + 20 }
+        if (singleShell) setShellMenu({ ...at, key: singleShell.key })
+        else setContext({ ...at, id: single?.id ?? null })
+      }
       return
     }
     if (['ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft', 'Home', 'End'].includes(event.key)) {
@@ -475,6 +502,7 @@ export function FolderView({
     if (event.key === 'Enter' && event.altKey) {
       event.preventDefault()
       if (single) setPrompt({ kind: 'properties', node: single })
+      else if (singleShell) shellProperties()
       return
     }
     if (event.key === 'Enter') {
@@ -580,6 +608,37 @@ export function FolderView({
     }
   }
   const menuFor = (id: NodeId | null): MenuEntry[] => {
+    if (virtual)
+      return [
+        {
+          label: '&View',
+          items: views.map((item) => ({
+            label: item.label,
+            checked: view === item.id,
+            onSelect: () => setView(item.id),
+          })),
+        },
+        ...backgroundMenu(
+          {
+            canPaste: false,
+            autoArrange,
+            binEmpty: true,
+            canFind: false,
+            single: false,
+            mutable: false,
+            hasProperties: false,
+            undo: null,
+          },
+          actionsFor(null),
+        ).slice(0, 2),
+        { label: '&Refresh', onSelect: () => setSort({ ...sort }) },
+        'separator',
+        { label: '&Paste', disabled: true },
+        { label: 'Paste &Shortcut', disabled: true },
+        { label: '&Undo', disabled: true },
+        'separator',
+        { label: 'P&roperties', disabled: !virtual.properties, onSelect: shellProperties },
+      ]
     const node = id ? state.nodes[id] : undefined
     const act = actionsFor(id)
     const facts: MenuFacts = {
@@ -633,6 +692,39 @@ export function FolderView({
       ...background,
     ]
   }
+  const shellCommands = (commands: NonNullable<typeof virtual>['fileCommands']): MenuEntry[] =>
+    (commands ?? []).map((command) =>
+      command === 'separator'
+        ? command
+        : {
+            label: command.label,
+            disabled: !command.action,
+            onSelect: () => command.action && performShell(command.action),
+          },
+    )
+  const shellFileItems: MenuEntry[] = [
+    {
+      label: '&Open',
+      bold: true,
+      disabled: !selectedShell.length,
+      onSelect: () => {
+        for (const item of selectedShell) item.open()
+      },
+    },
+    ...shellCommands(virtual?.fileCommands),
+    'separator',
+    { label: 'Create &Shortcut', disabled: true },
+    ...(virtual?.fileMutations === false
+      ? []
+      : [
+          { label: '&Delete', disabled: true },
+          { label: 'Rena&me', disabled: true },
+        ]),
+    'separator',
+    { label: 'P&roperties', disabled: !singleShell && !virtual?.properties, onSelect: shellProperties },
+    'separator',
+    { label: '&Close', onSelect: window.close },
+  ]
   const fileItems: MenuEntry[] = recycled
     ? [
         { label: '&Restore', disabled: !selected.length, onSelect: restore },
@@ -777,6 +869,16 @@ export function FolderView({
       >
         <span className="explorer-icon">
           <img src={item.icon} alt="" draggable={false} />
+          {selection.ids.has(item.key) && (
+            <span
+              className="explorer-icon-dither"
+              style={{
+                maskImage: `url("${item.icon}"), repeating-conic-gradient(#000 0 25%, transparent 0 50%)`,
+                maskSize: '100% 100%, 2px 2px',
+                maskComposite: 'intersect',
+              }}
+            />
+          )}
         </span>
         <span className="explorer-name">{item.label}</span>
       </span>
@@ -817,7 +919,7 @@ export function FolderView({
     <div ref={root} className="explorer h-full w-full flex flex-col" data-location={title}>
       <MenuBar
         menus={[
-          { label: '&File', items: fileItems },
+          { label: '&File', items: virtual ? shellFileItems : fileItems },
           {
             label: '&Edit',
             items: [
@@ -874,6 +976,17 @@ export function FolderView({
                 label: item.label,
                 icon: view === item.id ? radioDot : '',
                 onSelect: () => setView(item.id),
+              })),
+              ...(virtual?.viewCommands ?? []).map((label) => ({
+                label,
+                checked: shellViewOptions.has(label),
+                onSelect: () =>
+                  setShellViewOptions((old) => {
+                    const next = new Set(old)
+                    if (next.has(label)) next.delete(label)
+                    else next.add(label)
+                    return next
+                  }),
               })),
               'separator',
               ...backgroundMenu(
@@ -936,11 +1049,13 @@ export function FolderView({
             aria-label="Folder"
             className="w-[150px] shrink-0"
             value={
-              location.kind === 'folder'
-                ? location.id === DESKTOP_DIR
-                  ? TREE_DESKTOP
-                  : location.id
-                : location.kind
+              location.kind === 'shell'
+                ? location.id
+                : location.kind === 'folder'
+                  ? location.id === DESKTOP_DIR
+                    ? TREE_DESKTOP
+                    : location.id
+                  : location.kind
             }
             options={treeRows(folderTree(state), new Set([TREE_DESKTOP, 'computer', 'c'])).map((row) => ({
               key: row.key,
@@ -957,7 +1072,7 @@ export function FolderView({
             }}
           />
           {[
-            { label: 'Up One Level', disabled: location.kind !== 'folder', run: up },
+            { label: 'Up One Level', disabled: location.kind !== 'folder' && !virtual, run: up },
             { label: 'Cut', disabled: !mutable || !(writable || recycled), run: cutSelected },
             { label: 'Copy', disabled: !selected.length || recycled, run: copySelected },
             { label: 'Paste', disabled: !writable || !clip, run: () => paste() },
@@ -965,8 +1080,8 @@ export function FolderView({
             { label: 'Delete', disabled: !mutable, run: deleteSelected },
             {
               label: 'Properties',
-              disabled: !single,
-              run: () => single && setPrompt({ kind: 'properties', node: single }),
+              disabled: !single && !singleShell,
+              run: () => (single ? setPrompt({ kind: 'properties', node: single }) : shellProperties()),
             },
             ...views.map((item) => ({
               label: item.label.replace('&', ''),
@@ -1004,7 +1119,7 @@ export function FolderView({
                 onChoose={(entry) => {
                   if (entry.location) navigate(entry.location)
                   else if (entry.key === 'floppy') setPrompt({ kind: 'floppy' })
-                  else launch(entry.key === 'printers' ? 'controlpanel' : entry.key)
+                  else launch(entry.key)
                 }}
               />
             </div>
@@ -1130,35 +1245,49 @@ export function FolderView({
         <ContextMenu
           at={shellMenu}
           items={
-            shellMenu.key === 'tree:recycle'
+            virtual && !shellMenu.key.startsWith('tree:')
               ? [
-                  { label: '&Open', bold: true, onSelect: () => launch('recyclebin') },
-                  { label: '&Explore', onSelect: () => launch('explorer', { folder: RECYCLED_DIR }) },
-                  {
-                    label: 'Empty Recycle &Bin',
-                    disabled: !children(state, RECYCLED_DIR).length,
-                    onSelect: () =>
-                      setPrompt({
-                        kind: 'confirm',
-                        action: 'purge',
-                        ids: children(state, RECYCLED_DIR).map((node) => node.id),
-                      }),
-                  },
-                  'separator',
-                  { label: 'P&roperties', onSelect: () => setPrompt({ kind: 'bin-properties' }) },
-                ]
-              : [
                   {
                     label: '&Open',
                     bold: true,
-                    onSelect: () => {
-                      const item = shellItems.find((item) => item.key === shellMenu.key)
-                      if (item) item.open()
-                      else
-                        launch(shellMenu.key.slice(5) === 'computer' ? 'mycomputer' : shellMenu.key.slice(5))
-                    },
+                    onSelect: () => shellItems.find((item) => item.key === shellMenu.key)?.open(),
                   },
+                  ...shellCommands(virtual.contextCommands ?? virtual.fileCommands),
+                  'separator',
+                  { label: 'Create &Shortcut', disabled: true },
+                  { label: 'P&roperties', onSelect: shellProperties },
                 ]
+              : shellMenu.key === 'tree:recycle'
+                ? [
+                    { label: '&Open', bold: true, onSelect: () => launch('recyclebin') },
+                    { label: '&Explore', onSelect: () => launch('explorer', { folder: RECYCLED_DIR }) },
+                    {
+                      label: 'Empty Recycle &Bin',
+                      disabled: !children(state, RECYCLED_DIR).length,
+                      onSelect: () =>
+                        setPrompt({
+                          kind: 'confirm',
+                          action: 'purge',
+                          ids: children(state, RECYCLED_DIR).map((node) => node.id),
+                        }),
+                    },
+                    'separator',
+                    { label: 'P&roperties', onSelect: () => setPrompt({ kind: 'bin-properties' }) },
+                  ]
+                : [
+                    {
+                      label: '&Open',
+                      bold: true,
+                      onSelect: () => {
+                        const item = shellItems.find((item) => item.key === shellMenu.key)
+                        if (item) item.open()
+                        else
+                          launch(
+                            shellMenu.key.slice(5) === 'computer' ? 'mycomputer' : shellMenu.key.slice(5),
+                          )
+                      },
+                    },
+                  ]
           }
           onClose={() => setShellMenu(null)}
         />
@@ -1168,16 +1297,18 @@ export function FolderView({
           <StatusPane className="w-[150px] shrink-0">
             {selectedCount
               ? `${selectedCount} object(s) selected`
-              : `${order.length} object(s)${allNodes.length > nodes.length ? ` (plus ${allNodes.length - nodes.length} hidden)` : ''}`}
+              : `${order.length} ${virtual?.countNoun ?? 'object'}(s)${allNodes.length > nodes.length ? ` (plus ${allNodes.length - nodes.length} hidden)` : ''}`}
           </StatusPane>
           <StatusPane className="flex-1">
-            {single?.kind === 'drive'
-              ? `Free Space: ${formatSize(DRIVE_CAPACITY - driveUsed(state)).split(' (')[0]}, Capacity: ${formatSize(DRIVE_CAPACITY).split(' (')[0]}`
-              : location.kind === 'computer'
-                ? ''
-                : formatSize(
-                    (selectedCount ? selected : nodes).reduce((sum, node) => sum + fileSize(node), 0),
-                  ).split(' (')[0]}
+            {virtual
+              ? (virtual.items.find((item) => item.key === singleShell?.key)?.help ?? '')
+              : single?.kind === 'drive'
+                ? `Free Space: ${formatSize(DRIVE_CAPACITY - driveUsed(state)).split(' (')[0]}, Capacity: ${formatSize(DRIVE_CAPACITY).split(' (')[0]}`
+                : location.kind === 'computer'
+                  ? ''
+                  : formatSize(
+                      (selectedCount ? selected : nodes).reduce((sum, node) => sum + fileSize(node), 0),
+                    ).split(' (')[0]}
           </StatusPane>
         </StatusBar>
       )}
@@ -1289,6 +1420,7 @@ export function FolderView({
           }}
         />
       )}
+      {shellDialog && ShellDialog && <ShellDialog id={shellDialog} onClose={() => setShellDialog(null)} />}
     </div>
   )
 }
