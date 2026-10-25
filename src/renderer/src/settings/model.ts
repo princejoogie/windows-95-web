@@ -2,6 +2,7 @@ import type { FsNode } from '../fs/types'
 import type { SoundName as SystemSoundName } from '../system/sound'
 import { type BackgroundSettings, patternNames, wallpaperNames, wallpaperNode } from './backgrounds'
 import { type AppearanceSettings, schemeNames, themeColorNames } from './schemes'
+import { windowsTimeZones } from './timeZones'
 
 export const saverNames = [
   '(None)',
@@ -49,19 +50,7 @@ export const locales = [
   'German (Germany)',
   'Japanese (Japan)',
 ] as const
-export const timeZones = [
-  'Pacific/Midway',
-  'America/Los_Angeles',
-  'America/Denver',
-  'America/Chicago',
-  'America/New_York',
-  'UTC',
-  'Europe/London',
-  'Europe/Paris',
-  'Asia/Tokyo',
-  'Asia/Manila',
-  'Australia/Sydney',
-] as const
+export const timeZones = windowsTimeZones.map((zone) => zone.id)
 
 export interface Settings extends BackgroundSettings {
   appearance: AppearanceSettings
@@ -70,6 +59,7 @@ export interface Settings extends BackgroundSettings {
   soundScheme: Record<SoundEvent, SoundName>
   clockOffset: number
   timeZone: (typeof timeZones)[number]
+  adjustForDaylightSaving: boolean
   keyboard: { repeatDelay: number; repeatRate: number; cursorBlink: number }
   regional: {
     locale: (typeof locales)[number]
@@ -132,6 +122,7 @@ export const defaultSettings: Settings = {
   },
   clockOffset: 0,
   timeZone: 'Asia/Manila',
+  adjustForDaylightSaving: true,
   keyboard: { repeatDelay: 500, repeatRate: 20, cursorBlink: 530 },
   regional: { locale: 'English (United States)', currency: '$', dateFormat: 'M/d/yyyy', time24: false },
   accessibility: {
@@ -256,6 +247,7 @@ export function parseSettings(value: unknown, nodes: readonly FsNode[] = []): Se
     soundScheme,
     clockOffset: number(source.clockOffset, 0, -3155760000000, 3155760000000),
     timeZone: choice(source.timeZone, timeZones, defaults.timeZone),
+    adjustForDaylightSaving: bool(source.adjustForDaylightSaving, true),
     keyboard: {
       repeatDelay: number(keyboard.repeatDelay, 500, 250, 1000),
       repeatRate: number(keyboard.repeatRate, 20, 2, 30),

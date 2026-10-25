@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
-import { clockOffsetForParts, clockParts } from '../../settings/clock'
+import { useEffect, useRef, useState } from 'react'
+import { type ClockParts, clockOffsetForParts, clockParts } from '../../settings/clock'
 import { timeZones } from '../../settings/model'
+import { timeZoneInfo, windowsTimeZones } from '../../settings/timeZones'
 import { ComboBox } from '../../ui/ComboBox'
-import { GroupBox, TextBox } from '../../ui/fields'
+import { Checkbox, GroupBox, TextBox } from '../../ui/fields'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
+import { WorldMap } from './WorldMap'
 
 const months = [
   'January',
@@ -62,6 +64,95 @@ function AnalogClock({ hour, minute, second }: { hour: number; minute: number; s
   )
 }
 
+const formatTime = (time: ClockParts) =>
+  `${String(time.hour % 12 || 12).padStart(2, '0')}:${String(time.minute).padStart(2, '0')}:${String(time.second).padStart(2, '0')} ${time.hour < 12 ? 'AM' : 'PM'}`
+
+function TimeEdit({
+  parts,
+  onChange,
+}: {
+  parts: ClockParts
+  onChange: (patch: Partial<ClockParts>) => void
+}) {
+  const [value, setValue] = useState(() => formatTime(parts))
+  const [editing, setEditing] = useState(false)
+  const input = useRef<HTMLInputElement>(null)
+  const segment = useRef(0)
+  useEffect(() => {
+    if (!editing) setValue(formatTime(parts))
+  }, [parts, editing])
+  const commit = () => {
+    const match = /^(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)$/i.exec(value.trim())
+    if (
+      match &&
+      Number(match[1]) >= 1 &&
+      Number(match[1]) <= 12 &&
+      Number(match[2]) < 60 &&
+      Number(match[3]) < 60
+    )
+      onChange({
+        hour: (Number(match[1]) % 12) + (match[4]?.toUpperCase() === 'PM' ? 12 : 0),
+        minute: Number(match[2]),
+        second: Number(match[3]),
+      })
+    else setValue(formatTime(parts))
+    setEditing(false)
+  }
+  const step = (direction: number) => {
+    const field = segment.current === 0 ? 'hour' : segment.current === 1 ? 'minute' : 'second'
+    const limit = field === 'hour' ? 24 : 60
+    const patch =
+      segment.current === 3
+        ? { hour: (parts.hour + 12) % 24 }
+        : { [field]: (parts[field] + direction + limit) % limit }
+    onChange(patch)
+    setValue(formatTime({ ...parts, ...patch }))
+    input.current?.focus()
+    input.current?.setSelectionRange(segment.current * 3, segment.current * 3 + 2)
+  }
+  return (
+    <div className="flex mt-2 h-[23px] w-[125px] bg-white bevel-sunken p-[2px]">
+      <input
+        ref={input}
+        aria-label="Time"
+        className="w-[101px] min-w-0 bg-white outline-none text-center"
+        value={value}
+        onFocus={() => setEditing(true)}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={commit}
+        onSelect={(event) => {
+          segment.current = Math.min(3, Math.floor((event.currentTarget.selectionStart ?? 0) / 3))
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            commit()
+          }
+          if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            event.preventDefault()
+            step(event.key === 'ArrowUp' ? 1 : -1)
+          }
+        }}
+      />
+      <div className="flex flex-col w-[16px] shrink-0">
+        {[1, -1].map((direction) => (
+          <button
+            key={direction}
+            type="button"
+            tabIndex={-1}
+            aria-label={direction === 1 ? 'Increase time' : 'Decrease time'}
+            className="bevel-raised h-[9px] leading-[7px] text-[7px]"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => step(direction)}
+          >
+            {direction === 1 ? '▲' : '▼'}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function DateTimeProperties({ onClose }: { onClose: () => void }) {
   const state = useSettingsDraft()
   const { draft, change } = state
@@ -70,16 +161,21 @@ export function DateTimeProperties({ onClose }: { onClose: () => void }) {
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [])
-  const parts = clockParts(now + draft.clockOffset, draft.timeZone)
+  const parts = clockParts(now + draft.clockOffset, draft.timeZone, draft.adjustForDaylightSaving)
   const [yearInput, setYearInput] = useState(String(parts.year))
   useEffect(() => setYearInput(String(parts.year)), [parts.year])
   const update = (patch: Partial<typeof parts>) => {
     const current = Date.now()
+    setNow(current)
     change({
       clockOffset: clockOffsetForParts(
-        { ...clockParts(current + draft.clockOffset, draft.timeZone), ...patch },
+        {
+          ...clockParts(current + draft.clockOffset, draft.timeZone, draft.adjustForDaylightSaving),
+          ...patch,
+        },
         draft.timeZone,
         current,
+        draft.adjustForDaylightSaving,
       ),
     })
   }
@@ -155,23 +251,10 @@ export function DateTimeProperties({ onClose }: { onClose: () => void }) {
                 </GroupBox>
                 <GroupBox label="Time" className="flex-1 flex flex-col items-center">
                   <AnalogClock {...parts} />
-                  <TextBox
-                    aria-label="Time"
-                    type="time"
-                    step={1}
-                    className="w-[116px] mt-2"
-                    value={[parts.hour, parts.minute, parts.second]
-                      .map((value) => String(value).padStart(2, '0'))
-                      .join(':')}
-                    onChange={(event) => {
-                      const [hour, minute, second = 0] = event.target.value.split(':').map(Number)
-                      if (hour !== undefined && minute !== undefined) update({ hour, minute, second })
-                    }}
-                  />
+                  <TimeEdit parts={parts} onChange={update} />
                 </GroupBox>
               </div>
-              <p className="mt-5">Current time zone: {draft.timeZone.replaceAll('_', ' ')}</p>
-              <p className="mt-4">Select a date and time. Changes take effect when you choose Apply or OK.</p>
+              <p className="mt-5">Current time zone: {timeZoneInfo(draft.timeZone).standard}</p>
             </>
           ),
         },
@@ -187,23 +270,18 @@ export function DateTimeProperties({ onClose }: { onClose: () => void }) {
                   onChange={(value) =>
                     change({ timeZone: timeZones.find((zone) => zone === value) ?? 'UTC' })
                   }
-                  options={timeZones.map((name) => ({ key: name, label: name }))}
+                  options={windowsTimeZones.map((zone) => ({ key: zone.id, label: zone.label }))}
                 />
               </div>
-              <div className="mt-5 h-[150px] bg-[#008080] border border-shadow relative overflow-hidden">
-                <svg role="img" aria-label="Time zone map" viewBox="0 0 330 150" className="w-full h-full">
-                  <title>Time zone map</title>
-                  <path
-                    d="M12 32L35 14 80 18 108 35 85 59 62 56 53 79 35 62ZM70 77L101 80 112 106 91 145 81 119ZM149 25L188 15 200 26 240 18 278 26 315 51 284 66 261 60 255 89 232 83 220 63 201 70 192 56 170 61 161 45ZM160 66L187 67 206 87 195 112 178 127 166 103ZM265 109L297 102 314 125 285 136 271 126Z"
-                    fill="#808000"
-                    stroke="#c0c0c0"
-                  />
-                  {Array.from({ length: 12 }, (_, index) => (
-                    <path key={`zone-${index.toString()}`} d={`M${index * 30} 0v150`} stroke="#00a0a0" />
-                  ))}
-                </svg>
+              <div className="mt-5">
+                <WorldMap offset={timeZoneInfo(draft.timeZone).offset} />
               </div>
-              <p className="mt-4">Daylight saving time follows the selected time zone.</p>
+              <Checkbox
+                className="mt-4"
+                label="Automatically adjust clock for daylight saving changes"
+                checked={draft.adjustForDaylightSaving}
+                onChange={(event) => change({ adjustForDaylightSaving: event.target.checked })}
+              />
             </>
           ),
         },

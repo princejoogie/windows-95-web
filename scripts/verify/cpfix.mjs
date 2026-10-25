@@ -154,6 +154,57 @@ try {
       '07-network-restarted',
     )
   }
+  if (group === 'datetime') {
+    await run('control')
+    await c.clickOn('[data-shell-item="datetime"]', { count: 2 })
+    await check(
+      '16: Date and Time uses a text editor and classic spinner',
+      `document.querySelector('input[aria-label="Time"]').type === 'text' && !!document.querySelector('button[aria-label="Increase time"]') && document.body.textContent.includes('Current time zone: China Standard Time')`,
+      '16-date-time',
+    )
+    await c.clickOn('input[aria-label="Time"]')
+    await c.key('a', ['Control'])
+    await c.type('11:59:45 PM')
+    await c.key('Tab')
+    await click('Apply')
+    await check(
+      '16: typed time applies to the virtual clock',
+      `/11:59:4[5-9] PM/.test(document.querySelector('input[aria-label="Time"]').value)`,
+    )
+    await c.clickOn('input[aria-label="Time"]')
+    await c.key('Home')
+    await c.clickOn('button[aria-label="Increase time"]')
+    await check(
+      '16: time spinner increments the selected hour',
+      `document.querySelector('input[aria-label="Time"]').value.startsWith('12:59:')`,
+    )
+    await click('Time Zone', '[role="tab"]')
+    const before = await c.eval(`document.querySelector('img[alt*="selected zone"]').src`)
+    await c.clickOn('[role="combobox"][aria-label="Time zone"]')
+    await c.eval(
+      `(()=>{const e=[...document.querySelectorAll('[role="option"]')].find(e=>e.textContent.includes('Pacific Time (US & Canada); Tijuana'));e.scrollIntoView({block:'nearest'})})()`,
+    )
+    await click('(GMT-08:00) Pacific Time (US & Canada); Tijuana', '[role="option"]')
+    await check(
+      '16: zone selection uses the Windows 95 label and changes the highlighted map band',
+      `document.querySelector('[role="combobox"][aria-label="Time zone"]').textContent.includes('(GMT-08:00) Pacific Time') && document.querySelector('img[alt*="selected zone"]').src !== ${text(before)}`,
+      '16-time-zone',
+    )
+    await c.clickOn('input[type="checkbox"]')
+    await click('Apply')
+    await check(
+      '16: daylight-saving preference and zone are persisted',
+      `(()=>{const s=JSON.parse(localStorage.getItem('win95.settings.v1'));return s.adjustForDaylightSaving===false && s.timeZone==='America/Los_Angeles'})()`,
+      '16-dst-disabled',
+    )
+    await click('Date & Time', '[role="tab"]')
+    await check(
+      '16: Date and Time identifies the selected standard zone',
+      `document.body.textContent.includes('Current time zone: Pacific Standard Time')`,
+      '16-pacific-date-time',
+    )
+    await click('OK')
+  }
   if (group === 'folders') {
     await run('control')
     await check(
