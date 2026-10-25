@@ -327,12 +327,56 @@ async function capacity() {
   await shot('04-bin-limit-reduced')
 }
 
+async function abouts() {
+  await fresh()
+  await run('freecell')
+  await click(button('Help', `${top}.querySelector('[role="menubar"]')`))
+  await click(menuItem('About FreeCell...'))
+  await check(
+    `document.querySelector('[role="dialog"][aria-label="About FreeCell"]').textContent.includes('by Jim Horne')`,
+    'FreeCell uses the shared About box and retains its author credit',
+  )
+  await shot('05-freecell-about')
+  await click(button('OK'))
+  await check(`!document.querySelector('[role="dialog"]')`, 'FreeCell About closes with OK')
+  await fresh()
+  await run('mshearts')
+  await c.waitFor(`!!document.querySelector('[role="dialog"][aria-label="The Microsoft Hearts Network"]')`)
+  await click(
+    `document.querySelector('[role="dialog"] input[type="text"], [role="dialog"] input:not([type])')`,
+  )
+  await c.key('a', ['Control'])
+  await c.type('Polish Player')
+  await click(
+    `[...document.querySelectorAll('[role="dialog"] label')].find(e => e.textContent.includes('I want to be dealer'))`,
+  )
+  await shot('05-hearts-name-dialog')
+  await click(button('OK'))
+  await check(
+    `!!document.querySelector('.hearts-hand') && document.querySelector('[data-name="0"]').textContent === 'Polish Player'`,
+    'Hearts starts a local game after the name dialog',
+  )
+  await click(button('Help', `${top}.querySelector('[role="menubar"]')`))
+  await click(menuItem('About Hearts'))
+  await check(
+    `document.querySelector('[role="dialog"][aria-label="About Hearts"]').textContent.includes('Microsoft Hearts')`,
+    'Hearts opens the shared About box after the name dialog',
+  )
+  await shot('05-hearts-about')
+  await click(button('OK'))
+  await check(
+    `!document.querySelector('[role="dialog"]') && !!document.querySelector('.hearts-hand')`,
+    'Hearts returns to the dealt hand after About closes',
+  )
+}
+
 try {
   if (phase === 'menu') await menu()
   else if (phase === 'help') await help()
   else if (phase === 'undo') await desktopUndo()
   else if (phase === 'shortcut') await shortcut()
   else if (phase === 'capacity') await capacity()
+  else if (phase === 'abouts') await abouts()
   else throw new Error(`Unknown phase ${phase}`)
 } finally {
   c.close()

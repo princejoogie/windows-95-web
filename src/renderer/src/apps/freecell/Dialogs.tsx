@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { AboutDialog, Button, Checkbox, Dialog, GroupBox, Radio, TextBox } from '../../ui'
-import { icon } from './art'
+import { Button, Checkbox, Dialog, GroupBox, Radio, TextBox } from '../../ui'
 import { type GameNumber, gameNumber } from './game'
 import type { Options, Statistics } from './preferences'
 
@@ -231,8 +230,4 @@ export function StatisticsDialog({
       </div>
     </Dialog>
   )
-}
-
-export function About({ onClose }: { onClose: () => void }) {
-  return <AboutDialog app="FreeCell" icon={icon} credit="by Jim Horne" onClose={onClose} />
 }
