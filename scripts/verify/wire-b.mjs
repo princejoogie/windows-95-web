@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 // Live proof for wiring unit W-B. Run against a fresh app:
 //   W95_CDP_PORT=9391 W95_DATA_DIR=D:/tmp/wire-b-data bash scripts/verify/relaunch.sh --fresh
 //   node scripts/verify/wire-b.mjs <phase>

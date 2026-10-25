@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 // The desktop phase of shellfix-s2.mjs: findings 16 to 19, 46, and missing pieces 6 to 9.
 import { sleep } from './cdp.mjs'
 

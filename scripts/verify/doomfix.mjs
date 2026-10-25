@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 // Drives Doom 95 in the production Electron build over CDP with trusted input, and checks what the
 // canvas publishes in its data attributes. Usage: node scripts/verify/doomfix.mjs <port> <phase...>
 // Phases: menus, pause, strafe, shell, automap, options, help, saves, all.

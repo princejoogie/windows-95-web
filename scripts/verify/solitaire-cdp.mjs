@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 

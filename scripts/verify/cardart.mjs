@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 // Builds the card-art contact sheets as HTML from the live cards.ts module.
 // Usage: node scripts/verify/cardart.mjs [out dir]
 // Then screenshot each page with agent-browser (see proof/cardart/README.md).

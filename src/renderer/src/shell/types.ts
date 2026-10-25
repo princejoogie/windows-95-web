@@ -81,6 +81,7 @@ export interface WindowApi {
   readonly minimized: boolean
   setTitle(title: string): void
   onCloseRequest(handler: () => Promise<boolean>): () => void
+  onHelpRequest(handler: () => void): () => void
   close(): void
 }
 

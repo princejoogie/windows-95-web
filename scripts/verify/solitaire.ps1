@@ -1,3 +1,4 @@
+# Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 param(
   [int]$CdpPort = 9341,
   [string]$Url = 'http://127.0.0.1:5441',

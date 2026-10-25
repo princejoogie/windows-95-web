@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef } from 'react'
-import { menuIsActive } from '../ui/Menu'
+import { type MenuEntry, menuIsActive } from '../ui/Menu'
+import { registerSystemMenuItems } from './systemMenuItems'
 import type { WindowApi } from './types'
 
 export interface WindowContextValue {
@@ -19,6 +20,11 @@ export function useWindow(): WindowApi {
   const value = useContext(WindowContext)
   if (!value) throw new Error('useWindow is only available inside an app window')
   return value.api
+}
+
+export function useSystemMenu(items: readonly MenuEntry[]): void {
+  const { id } = useWindow()
+  useEffect(() => registerSystemMenuItems(id, items), [id, items])
 }
 
 /** Listens for keys while this window has focus. Outside a window it always listens. */

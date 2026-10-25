@@ -1,3 +1,4 @@
+# Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 param(
   [int]$Port = 9340,
   [string]$ProofDir = 'D:/codes/worktrees/windows-95-web/proof/minesfix',

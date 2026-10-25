@@ -3,11 +3,11 @@ import { useKeyDown } from '../../shell/context'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
 import { playSound } from '../../system/sound'
-import { MenuBar, MessageBox } from '../../ui'
+import { AboutDialog, MenuBar, MessageBox } from '../../ui'
 import { menuIsActive } from '../../ui/Menu'
 import { cardImage, cardName, slotImage } from '../solitaire/cards'
 import { icon, kingLeft, kingRight, smallIcon } from './art'
-import { About, MoveColumn, OptionsDialog, SelectGame, StatisticsDialog } from './Dialogs'
+import { MoveColumn, OptionsDialog, SelectGame, StatisticsDialog } from './Dialogs'
 import {
   CELLS,
   COLUMNS,
@@ -428,7 +428,9 @@ function FreeCell({ window: appWindow }: AppProps) {
           }}
         />
       )}
-      {modal.kind === 'about' && <About onClose={closeDialog} />}
+      {modal.kind === 'about' && (
+        <AboutDialog app="FreeCell" icon={icon} credit="by Jim Horne" onClose={closeDialog} />
+      )}
       {modal.kind === 'column' && (
         <MoveColumn
           onClose={() => {

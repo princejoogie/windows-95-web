@@ -105,6 +105,7 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
   const keyboard = useRef<{ mode: 'move' | 'size'; frame: Rect; client: Size } | null>(null)
   const resizable = app.window.kind === 'resizable'
   const closeHandler = useRef<(() => Promise<boolean>) | null>(null)
+  const [helpHandler, setHelpHandler] = useState<(() => void) | null>(null)
   const requestClose = useCallback(async () => {
     if (closeHandler.current) return closeHandler.current()
     windowsStore.dispatch({ type: 'close', id })
@@ -123,6 +124,10 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
         return () => {
           if (closeHandler.current === handler) closeHandler.current = null
         }
+      },
+      onHelpRequest: (handler) => {
+        setHelpHandler(() => handler)
+        return () => setHelpHandler((current) => (current === handler ? null : current))
       },
       close: () => {
         windowsStore.dispatch({ type: 'close', id })
@@ -331,7 +336,7 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
       <TitleBar
         title={state.title}
         active={focused && modalCount === 0 && !dialogFocused}
-        icon={smallIcon(app)}
+        icon={helpHandler ? undefined : smallIcon(app)}
         onPointerDown={(event) => {
           if (event.target instanceof HTMLImageElement) {
             event.preventDefault()
@@ -352,19 +357,25 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
         }}
         {...gestureHandlers}
       >
-        <TitleButton
-          glyph="minimize"
-          label="Minimize"
-          onClick={() => {
-            void animateWindow({ type: 'minimize', id })
-          }}
-        />
-        <TitleButton
-          glyph={maximized ? 'restore' : 'maximize'}
-          label={maximized ? 'Restore' : 'Maximize'}
-          disabled={!resizable}
-          onClick={toggleMaximize}
-        />
+        {helpHandler ? (
+          <TitleButton glyph="help" label="Help" onClick={helpHandler} />
+        ) : (
+          <>
+            <TitleButton
+              glyph="minimize"
+              label="Minimize"
+              onClick={() => {
+                void animateWindow({ type: 'minimize', id })
+              }}
+            />
+            <TitleButton
+              glyph={maximized ? 'restore' : 'maximize'}
+              label={maximized ? 'Restore' : 'Maximize'}
+              disabled={!resizable}
+              onClick={toggleMaximize}
+            />
+          </>
+        )}
         <span className="w-[2px]" />
         <TitleButton glyph="close" label="Close" onClick={requestClose} />
       </TitleBar>

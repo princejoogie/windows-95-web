@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { KEY_ITEMS } from './defs'
+import { IDLE, step, TICK } from './game'
 import { LEVELS } from './levels'
 import { type KeyColor, type Level, TEX } from './map'
+import { createWorld, PISTOL_START } from './world'
 
 /**
  * Floods the level from the start, opening a locked door only once its key has been reached, until
@@ -39,6 +41,18 @@ function reachable(level: Level): Set<number> {
 describe('levels', () => {
   it('ships three levels', () => {
     expect(LEVELS).toHaveLength(3)
+  })
+
+  it('lets a wounded player collect armor and a medikit at the Reactor start before fighting', () => {
+    const reactor = LEVELS[2]
+    if (!reactor) throw new Error('Reactor is missing')
+    const world = createWorld(reactor, 2, 1, { ...PISTOL_START, hp: 30 })
+    for (let time = 0; time < 0.3; time += TICK) step(world, { ...IDLE, forward: 1 })
+    for (let time = 0; time < 0.3; time += TICK) step(world, { ...IDLE, strafe: 1 })
+    expect(world.player.dead).toBe(false)
+    expect(world.player.armor).toBe(100)
+    expect(world.player.hp).toBe(55)
+    expect(world.items.filter((item) => item.taken).map((item) => item.kind)).toEqual(['armor', 'health'])
   })
 
   for (const level of LEVELS) {

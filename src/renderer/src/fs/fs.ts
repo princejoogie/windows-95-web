@@ -1,3 +1,4 @@
+import { shortcutKey } from './shortcutKey'
 import {
   type Attributes,
   DESKTOP_DIR,
@@ -20,7 +21,8 @@ export type FsAction =
   | { type: 'write'; id: NodeId; content: string; at: number }
   | { type: 'rename'; id: NodeId; name: string; at: number }
   | { type: 'move'; id: NodeId; parent: NodeId; at: number }
-  | { type: 'recycle'; id: NodeId; at: number }
+  | { type: 'recycle'; id: NodeId; at: number; from?: NodeId }
+  | { type: 'limitRecycleBin'; bytes: number }
   | { type: 'restore'; id: NodeId; at: number }
   | { type: 'purge'; id: NodeId }
   | { type: 'emptyRecycleBin' }
@@ -277,7 +279,27 @@ export function fsReducer(state: FsState, action: FsAction): FsState {
       const node = state.nodes[action.id]
       if (!node?.parent || isProtected(node.id) || isInside(state, node.id, RECYCLED_DIR)) return state
       const moved = put(state, { ...node, parent: RECYCLED_DIR })
-      return { ...moved, recycled: { ...moved.recycled, [node.id]: { from: node.parent, at: action.at } } }
+      return {
+        ...moved,
+        recycled: { ...moved.recycled, [node.id]: { from: action.from ?? node.parent, at: action.at } },
+      }
+    }
+    case 'limitRecycleBin': {
+      const deletions = children(state, RECYCLED_DIR).map((node) => ({
+        node,
+        at: state.recycled[node.id]?.at ?? node.modified,
+        size: [...subtree(state, node.id)]
+          .flatMap((id) => state.nodes[id] ?? [])
+          .reduce((sum, child) => sum + fileSize(child), 0),
+      }))
+      let bytes = deletions.reduce((sum, item) => sum + item.size, 0)
+      let next = state
+      for (const item of deletions.sort((a, b) => a.at - b.at || a.node.id.localeCompare(b.node.id))) {
+        if (bytes <= action.bytes) break
+        next = remove(next, item.node.id)
+        bytes -= item.size
+      }
+      return next
     }
     case 'restore': {
       const node = state.nodes[action.id]
@@ -300,16 +322,38 @@ export function fsReducer(state: FsState, action: FsAction): FsState {
       if (node?.kind !== 'shortcut') return state
       if ('node' in action.target && (!state.nodes[action.target.node] || action.target.node === node.id))
         return state
-      const { app: _app, target: _target, startIn: _startIn, run: _run, icon: _icon, ...base } = node
+      const {
+        app: _app,
+        target: _target,
+        startIn: _startIn,
+        run: _run,
+        icon: _icon,
+        shortcutKey: _shortcutKey,
+        ...base
+      } = node
+      const { shortcutKey: requestedKey, ...requestedSettings } = action.settings
+      const key = shortcutKey(requestedKey ?? '')
       const settings = Object.fromEntries(
-        Object.entries(action.settings).filter(
+        Object.entries(requestedSettings).filter(
           ([key, value]) => value && !(key === 'run' && value === 'normal'),
         ),
       ) as ShortcutSettings
       const link: FsNode =
         'node' in action.target
-          ? { ...base, ...settings, kind: 'shortcut', target: action.target.node }
-          : { ...base, ...settings, kind: 'shortcut', app: action.target.app }
+          ? {
+              ...base,
+              ...settings,
+              ...(key ? { shortcutKey: key } : {}),
+              kind: 'shortcut',
+              target: action.target.node,
+            }
+          : {
+              ...base,
+              ...settings,
+              ...(key ? { shortcutKey: key } : {}),
+              kind: 'shortcut',
+              app: action.target.app,
+            }
       return put(state, link)
     }
     case 'setLabel': {

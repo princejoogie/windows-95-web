@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 // A screen-only play helper for the balance check. It sends keys and saves a screenshot, and reads nothing
 // from the game. Each call unpauses, plays the moves, captures the window, and pauses again, so the level
 // clock runs only while keys are held.

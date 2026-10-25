@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 // Drives Paint in the running Electron app over CDP with real mouse and keyboard events.
 //   node scripts/verify/paintfix.mjs [cdp port] [proof dir]
 import assert from 'node:assert/strict'

@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 // CDP driver for the fidelity audit. Usage from a scenario script:
 //   import { connect } from './lib.mjs'
 //   const d = await connect(9322)

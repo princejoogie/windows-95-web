@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 // Usage: node drive.mjs <port> <steps.json | inline JSON>
 // Steps: {eval}, {click:[x,y], button?, count?, mods?}, {move:[x,y]}, {down:[x,y]}, {up:[x,y]},
 // {drag:{from:[x,y], to:[x,y], steps?, hold?}}, {key:'Escape', mods?:['Alt']}, {type:'text'}, {shot:'path'}, {wait:ms}

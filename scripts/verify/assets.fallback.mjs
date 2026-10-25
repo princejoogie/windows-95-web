@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import {

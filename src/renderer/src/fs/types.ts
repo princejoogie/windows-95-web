@@ -29,6 +29,8 @@ export interface ShortcutSettings {
   readonly run?: RunAs
   /** A Change Icon choice: a key of the shell's 32x32 icons, or `app:<id>` for an app's icon. */
   readonly icon?: string
+  /** The letter in a Ctrl+Alt shortcut. Absent means None. */
+  readonly shortcutKey?: string
 }
 
 export type FsNode =

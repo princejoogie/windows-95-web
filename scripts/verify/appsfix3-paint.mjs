@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 import assert from 'node:assert/strict'
 import { appMenu, clickText, connect, menuItem, reset, run } from './appsfix3-cdp.mjs'
 

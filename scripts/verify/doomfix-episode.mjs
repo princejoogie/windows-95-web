@@ -2,6 +2,8 @@
 // finished and the episode ends on its end screen. It needs a dev renderer (ELECTRON_RENDERER_URL pointing
 // at `pnpm dev:web`), because it reads the dev-only session on the canvas to aim and route. It never writes it.
 // Usage: node scripts/verify/doomfix-episode.mjs <port> [skill]
+
+import assert from 'node:assert/strict'
 import { appendFileSync } from 'node:fs'
 import { connect, sleep } from './cdp.mjs'
 
@@ -9,6 +11,8 @@ const [port = '9400', skillArg = '2'] = process.argv.slice(2)
 const PROOF = process.env.W95_PROOF ?? 'D:/codes/worktrees/windows-95-web/proof/doomfix'
 const c = await connect(Number(port))
 const skill = Number(skillArg)
+const noDeaths = process.env.W95_NO_DEATHS === '1'
+let deaths = 0
 const log = (name, detail) => {
   appendFileSync(
     `${PROOF}/episode.jsonl`,
@@ -20,7 +24,7 @@ const log = (name, detail) => {
 const read = () =>
   c.eval(`(()=>{const s=document.querySelector('[data-window] canvas').doom;const w=s.world;return {
     screen:s.screen.kind, page:s.screen.page??null, menu:s.menu&&s.menu.page, level:s.level,
-    w:w&&{x:w.player.x,y:w.player.y,a:w.player.angle,hp:w.player.hp,dead:w.player.dead,keys:w.player.keys,
+    w:w&&{x:w.player.x,y:w.player.y,a:w.player.angle,hp:w.player.hp,armor:w.player.armor,ammo:w.player.ammo,dead:w.player.dead,keys:w.player.keys,
       outcome:w.outcome, W:w.grid.width, H:w.grid.height,
       doors:w.grid.doors.map(d=>({x:d.x,y:d.y,open:d.open,key:d.key})),
       monsters:w.actors.filter(a=>a.kind!=='barrel'&&a.state!=='dead'&&a.state!=='dying').map(a=>({id:a.id,x:a.x,y:a.y,state:a.state})),
@@ -137,6 +141,8 @@ const ROUTES = [
       [13.5, 4.5],
       [17.5, 7.5],
       [17.5, 9.5],
+      [15.5, 12.5],
+      [23.5, 10.5],
       [21.5, 13.5],
       [17.5, 9.5],
       [12.5, 4.5],
@@ -147,6 +153,7 @@ const ROUTES = [
   },
   {
     waypoints: [
+      [6.5, 1.5],
       [9.5, 3.5],
       [15.5, 5.5],
       [15.5, 7.5],
@@ -158,10 +165,13 @@ const ROUTES = [
   },
   {
     waypoints: [
+      [3.5, 8.5],
       [5.5, 9.5],
       [5.5, 11.5],
       [2.5, 14.5],
       [5.5, 11.5],
+      [12.5, 12.5],
+      [15.5, 13.5],
       [24.5, 9.5],
       [24.5, 11.5],
       [26.5, 14.5],
@@ -183,8 +193,16 @@ async function shot(name) {
 
 async function playLevel(index) {
   const route = ROUTES[index]
-  for (let life = 0; life < 4; life++) {
+  for (let life = 0; life < (noDeaths ? 1 : 4); life++) {
     grid = await walls()
+    if (index === 2) {
+      await shot('episode-level3-start')
+      await hold('w', 300)
+      const { w } = await read()
+      log('level 3 start armor', { hp: w.hp, armor: w.armor, items: w.stats.items })
+      assert.equal(w.armor, 100, 'Reactor start armor was collected')
+      await shot('episode-level3-supplied')
+    }
     let ok = true
     for (const [x, y] of route.waypoints) {
       if (!(await go(x, y))) {
@@ -205,6 +223,8 @@ async function playLevel(index) {
       at: s.w && [s.w.x, s.w.y],
     })
     if (s.w?.dead) {
+      deaths++
+      assert.ok(!noDeaths, `Died on level ${index + 1}`)
       await sleep(1200)
       await hold(' ', 40)
       await sleep(300)
@@ -240,7 +260,12 @@ log('started', { skill, screen: (await read()).screen })
 for (let level = 0; level < 3; level++) {
   const done = await playLevel(level)
   const s = await read()
-  log(`level ${level + 1} ${done ? 'finished' : 'not finished'}`, { screen: s.screen, stats: s.w?.stats })
+  log(`level ${level + 1} ${done ? 'finished' : 'not finished'}`, {
+    screen: s.screen,
+    hp: s.w?.hp,
+    deaths,
+    stats: s.w?.stats,
+  })
   if (!done) process.exit(1)
   await sleep(2600)
   await shot(`episode-level${level + 1}-intermission`)

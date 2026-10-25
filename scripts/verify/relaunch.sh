@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 # Rebuilds, stops this worktree's Electron (matched by executable path, so other workers' apps are safe),
 # and starts it again on CDP port $W95_CDP_PORT (default 9331) with data in $W95_DATA_DIR.
 # Pass --fresh to wipe the data dir first.
