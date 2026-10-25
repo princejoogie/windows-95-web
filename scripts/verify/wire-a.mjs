@@ -229,6 +229,52 @@ try {
       '[...document.querySelectorAll("[style]")].some(el => el.style.cursor.includes("var(--cursor-ns-resize"))',
     )
   }
+  if (item === 'display') {
+    await c.clickOn('[aria-label="Desktop"]', { button: 'right' })
+    await clickText('Properties')
+    await check(
+      'Desktop Properties opens the Control Panel display sheet',
+      `!!document.querySelector('[role="dialog"][aria-label="Display Properties"] [aria-label="Monitor preview"]')`,
+      'display-properties',
+    )
+    await clickText('Cancel')
+    await c.clickOn('[data-clock]', { count: 2 })
+    await check(
+      'Double-clicking the taskbar clock opens Date/Time',
+      `!!document.querySelector('[role="dialog"][aria-label="Date/Time Properties"]')`,
+      'date-time',
+    )
+    await c.clickOn('[aria-label="Year"]')
+    await c.key('a', ['Control'])
+    await c.type('1995')
+    await c.key('Tab')
+    await clickText('OK')
+    await check(
+      'Clock reads the saved clock offset and time zone',
+      '(() => { const s = JSON.parse(localStorage.getItem("win95.settings.v1")); const expected = new Date(Date.now() + s.clockOffset).toLocaleTimeString("en-US", {timeZone: s.timeZone, hour:"numeric", minute:"2-digit", hour12:!s.regional.time24}); return document.querySelector("[data-clock]").textContent === expected && Math.abs(s.clockOffset) > 3600000 })()',
+      'clock-offset',
+    )
+    await c.eval(
+      '(() => {const s=JSON.parse(localStorage.getItem("win95.settings.v1"));s.screenSaver={...s.screenSaver,name:"Blank Screen",waitMinutes:1/60};localStorage.setItem("win95.settings.v1",JSON.stringify(s))})()',
+    )
+    await c.send('Page.reload')
+    await sleep(100)
+    await c.waitFor('!!document.querySelector("[data-screen-saver]")', 6000)
+    await check(
+      'Idle screen saver covers the desktop',
+      'document.querySelector("[data-screen-saver]")?.getAttribute("data-screen-saver") === "Blank Screen"',
+      'screen-saver-idle',
+    )
+    await c.key('Escape')
+    await check(
+      'User input dismisses the idle screen saver',
+      '!document.querySelector("[data-screen-saver]")',
+      'screen-saver-dismissed',
+    )
+    await c.eval(
+      '(() => {const s=JSON.parse(localStorage.getItem("win95.settings.v1"));s.screenSaver.name="(None)";s.clockOffset=0;localStorage.setItem("win95.settings.v1",JSON.stringify(s))})()',
+    )
+  }
   writeFileSync(join(proof, `${item}.json`), `${JSON.stringify({ port, item, checks }, null, 2)}\n`)
 } catch (error) {
   console.log(await c.eval('document.body.innerText'))

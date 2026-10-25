@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { HostEvent } from '../../../shared/ipc'
 import { DateTimeProperties } from '../apps/controlpanel/DateTimeProperties'
+import { DesktopDisplayProperties } from '../apps/controlpanel/DisplayProperties'
 import { children } from '../fs/fs'
 import { fs, installPrograms } from '../fs/store'
+import { ScreenSaverHost } from '../settings/ScreenSaverHost'
 import { connectSystemSounds } from '../settings/sounds'
 import { beginSystemCursor } from '../system/cursors'
 import { Button, Dialog, MessageBox, TextBox } from '../ui'
@@ -335,6 +337,8 @@ export function Shell() {
           />
         )}
         <SystemMenu />
+        <DesktopDisplayProperties />
+        <ScreenSaverHost />
         <TooltipLayer />
         <CaptionZoom />
         {switcher && (

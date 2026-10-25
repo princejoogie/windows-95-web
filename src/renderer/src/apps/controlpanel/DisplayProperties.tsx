@@ -10,6 +10,7 @@ import {
   standardColors,
   type ThemeColor,
 } from '../../settings/schemes'
+import { registerDesktopProperties } from '../../shell/Desktop'
 import { Button } from '../../ui/Button'
 import { Dialog } from '../../ui/Dialog'
 import { GroupBox, Radio, TextBox } from '../../ui/fields'
@@ -25,6 +26,12 @@ function Monitor({ children }: { children: ReactNode }) {
       <div className="cp-monitor-foot" />
     </div>
   )
+}
+
+export function DesktopDisplayProperties() {
+  const [open, setOpen] = useState(false)
+  useEffect(() => registerDesktopProperties(() => setOpen(true)), [])
+  return open ? <DisplayProperties onClose={() => setOpen(false)} /> : null
 }
 
 export function ColorPicker({
