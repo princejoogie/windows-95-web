@@ -49,6 +49,7 @@ import {
   touched,
   typeAhead,
 } from './desktopModel'
+import { useNaming } from './folderOptions'
 import { nodeIcon } from './nodeIcon'
 import { apps, getApp } from './registry'
 import { launch, openNode, useWindows, windowsStore } from './system'
@@ -121,7 +122,11 @@ export function registerDesktopProperties(open: () => void): () => void {
 }
 
 /** Shell icons in their manifest order, then the Desktop folder's visible files. */
-function desktopItems(state: FsState, labels: Readonly<Record<string, string>>): Item[] {
+function desktopItems(
+  state: FsState,
+  labels: Readonly<Record<string, string>>,
+  labelOf: (node: FsNode) => string,
+): Item[] {
   const shell: Item[] = apps
     .filter((app) => app.desktop)
     .sort((a, b) => (a.desktop?.order ?? 0) - (b.desktop?.order ?? 0))
@@ -139,7 +144,7 @@ function desktopItems(state: FsState, labels: Readonly<Record<string, string>>):
     .filter((node) => !isHidden(node))
     .map((node) => {
       const { icon, overlay } = nodeIcon(node)
-      return { kind: 'node', key: node.id, node, label: node.name, icon, overlay }
+      return { kind: 'node', key: node.id, node, label: labelOf(node), icon, overlay }
     })
   return [...shell, ...files]
 }
@@ -259,7 +264,8 @@ function DesktopIcon({
 export function Desktop({ size }: { size: Size }) {
   const [labels, setLabels] = useState<Readonly<Record<string, string>>>(() => load(LABELS_KEY, {}))
   const fsState = useFs((s) => s)
-  const items = useMemo(() => desktopItems(fsState, labels), [fsState, labels])
+  const naming = useNaming()
+  const items = useMemo(() => desktopItems(fsState, labels, naming.label), [fsState, labels, naming])
   const desktopFocused = useWindows((s) => s.focused === null)
   const clip = useStore(clipboard, (s) => s)
   const binItems = useMemo(() => children(fsState, RECYCLED_DIR), [fsState])
@@ -357,7 +363,7 @@ export function Desktop({ size }: { size: Size }) {
       localStorage.setItem(LABELS_KEY, JSON.stringify(next))
       return
     }
-    const error = fs.rename(item.node.id, name)
+    const error = fs.rename(item.node.id, naming.rename(item.node, name))
     if (error) showError('Error Renaming File', error)
   }
 

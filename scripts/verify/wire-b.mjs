@@ -632,7 +632,87 @@ async function sounds() {
   await closeWindows()
 }
 
-const phases = { fileDialog, dialogs, about, kit, systemMenu, sounds }
+const desktopLabels = () =>
+  app.eval(`[...document.querySelectorAll('[data-desktop-item]')].map(e => e.getAttribute('aria-label'))`)
+const desktopItem = (label) =>
+  `[...document.querySelectorAll('[data-desktop-item]')].find(e => e.getAttribute('aria-label') === ${q(label)})`
+const rowsOf = (title) =>
+  app.eval(
+    `[...${dialog(title)}.querySelectorAll('[role="tabpanel"] span')].filter(s => /^[A-Z][A-Za-z -]+:$/.test(s.textContent) && s.nextElementSibling).map(s => s.textContent + s.nextElementSibling.textContent.trim())`,
+  )
+
+async function properties() {
+  await closeWindows()
+  await app.click(700, 400, { button: 'right' })
+  await pickMenu('New')
+  await pickMenu('Text Document')
+  await app.waitFor(`!!document.querySelector('[data-desktop-item] input')`)
+  const editing = await app.eval(`document.querySelector('[data-desktop-item] input').value`)
+  await app.key('a', ['Control'])
+  await app.type('Notes')
+  await app.key('Enter')
+  await sleep(300)
+  const nodes = await app.eval(`Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).filter(n => n.parent === 'desktop').map(n => n.name)`)
+  const labels = await desktopLabels()
+  check(
+    editing === 'New Text Document' && labels.includes('Notes') && nodes.includes('Notes.txt'),
+    '4',
+    'desktop hides the registered .txt extension, and a rename keeps it',
+    { editing, labels, nodes },
+  )
+
+  await clickExpr(desktopItem('Minesweeper'), { button: 'right' })
+  await pickMenu('Properties')
+  await app.waitFor(`!!${dialog('Minesweeper Properties')}`)
+  const tabs = await app.eval(`[...${dialog('Minesweeper Properties')}.querySelectorAll('[role="tab"]')].map(t => t.textContent.trim())`)
+  await clickExpr(`[...${dialog('Minesweeper Properties')}.querySelectorAll('[role="tab"]')].find(t => t.textContent.trim() === 'Shortcut')`)
+  const fields = await app.eval(
+    `Object.fromEntries([...${dialog('Minesweeper Properties')}.querySelectorAll('input[aria-label]')].map(i => [i.getAttribute('aria-label'), i.value]))`,
+  )
+  const run = await app.eval(`${dialog('Minesweeper Properties')}.querySelector('[role="combobox"]').textContent.trim()`)
+  check(
+    tabs.join('|') === 'General|Shortcut' &&
+      /WINMINE\.EXE$/i.test(fields.Target) &&
+      fields['Start in'] === fields.Target.slice(0, fields.Target.lastIndexOf('\\')) &&
+      run === 'Normal window',
+    '4',
+    'a shortcut adds the Shortcut tab with Target, Start in, and Run',
+    { tabs, fields, run },
+  )
+  await shot('4-shortcut-tab', await dialogBox('Minesweeper Properties'))
+  await app.key('Escape')
+
+  await clickExpr(desktopItem('Notes'))
+  await app.key('Delete')
+  await app.waitFor(`!!document.querySelector('[role="dialog"]')`)
+  await app.key('Enter')
+  await sleep(300)
+  await clickExpr(desktopItem('Recycle Bin'), { count: 2 })
+  await app.waitFor(`[...document.querySelectorAll('[data-window]')].some(w => w.getAttribute('aria-label') === 'Recycle Bin')`)
+  await sleep(400)
+  const item = `[...${topWindow}.querySelectorAll('*')].find(e => e.children.length === 0 && e.textContent.trim() === 'Notes')`
+  await clickExpr(item, { button: 'right' })
+  await pickMenu('Properties')
+  await app.waitFor(`!!${dialog('Notes Properties')}`)
+  const rows = await rowsOf('Notes Properties')
+  const renamable = await app.eval(`!!${dialog('Notes Properties')}.querySelector('input[aria-label="Name"]')`)
+  const attributes = await app.eval(`[...${dialog('Notes Properties')}.querySelectorAll('input[type="checkbox"]')].every(c => c.disabled)`)
+  check(
+    rows[0]?.startsWith('Origin:C:\\WINDOWS\\Desktop') &&
+      rows.some((row) => row.startsWith('Deleted:')) &&
+      !rows.some((row) => row.startsWith('Location:')) &&
+      !renamable &&
+      attributes,
+    '4',
+    'a recycled item shows Origin and Deleted, with a read-only name and attributes',
+    { rows, renamable, attributes },
+  )
+  await shot('4-recycled-properties', await dialogBox('Notes Properties'))
+  await app.key('Escape')
+  await closeWindows()
+}
+
+const phases = { fileDialog, dialogs, about, kit, systemMenu, sounds, properties }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {

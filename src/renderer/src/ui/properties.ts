@@ -1,5 +1,6 @@
-import { children, extension, fileSize } from '../fs/fs'
+import { children, extension, fileSize, pathOf } from '../fs/fs'
 import { type Attributes, type FsNode, type FsState, RECYCLED_DIR } from '../fs/types'
+import { resolveShortcut } from '../shell/clipboard'
 
 const SHORT_CHARS = /^[A-Z0-9$%'`\-@{}~!#()&_^]*$/
 const BAD_SHORT_CHARS = /[+,;=[\]]/g
@@ -126,6 +127,12 @@ export const formatStamp = (at: number): string => {
   return `${day} ${date.toLocaleTimeString('en-US')}`
 }
 
+/** `10/25/26 4:18 PM`, the short form Explorer's Details view and the Recycle Bin use. */
+export const formatShortDate = (at: number): string => {
+  const date = new Date(at)
+  return `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear() % 100).padStart(2, '0')} ${date.getHours() % 12 || 12}:${String(date.getMinutes()).padStart(2, '0')} ${date.getHours() < 12 ? 'AM' : 'PM'}`
+}
+
 export const formatDay = (at: number): string =>
   new Date(at).toLocaleDateString('en-US', {
     weekday: 'long',
@@ -153,5 +160,33 @@ export function typeName(node: FsNode): string {
       if (ext === 'sys') return 'System file'
       return ext ? `${ext.toUpperCase()} File` : 'File'
     }
+  }
+}
+
+/** What a shortcut's Shortcut tab shows about the thing it opens. */
+export interface ShortcutInfo {
+  readonly type: string
+  readonly location: string
+  readonly target: string
+  readonly startIn: string
+  /** The folder Find Target opens. */
+  readonly folder: FsNode['id'] | null
+}
+
+export function shortcutInfo(state: FsState, node: FsNode): ShortcutInfo | null {
+  if (node.kind !== 'shortcut') return null
+  const resolved = resolveShortcut(state, node)
+  const target =
+    resolved?.kind === 'app'
+      ? Object.values(state.nodes).find((other) => other.kind === 'program' && other.app === resolved.app)
+      : resolved?.node
+  if (!target) return { type: '', location: '', target: '', startIn: '', folder: null }
+  const parent = target.parent ? state.nodes[target.parent] : undefined
+  return {
+    type: typeName(target),
+    location: parent?.name ?? '',
+    target: pathOf(state, target.id),
+    startIn: parent ? pathOf(state, parent.id) : '',
+    folder: parent?.id ?? null,
   }
 }

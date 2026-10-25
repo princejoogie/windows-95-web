@@ -8,7 +8,8 @@ import { CreateShortcut } from '../../shell/CreateShortcut'
 import { type Clip, clipboard, type Plan, planPaste, planShortcuts } from '../../shell/clipboard'
 import { useKeyDown } from '../../shell/context'
 import { backgroundMenu, type DesktopActions, type MenuFacts, nodeMenu } from '../../shell/desktopMenus'
-import { apps, getApp } from '../../shell/registry'
+import { folderOptions, useNaming } from '../../shell/folderOptions'
+import { getApp } from '../../shell/registry'
 import { launch, openNode, useWindows, windowsStore } from '../../shell/system'
 import type { WindowApi } from '../../shell/types'
 import {
@@ -34,18 +35,16 @@ import { history, planUndo, remember } from './history'
 import {
   cellValue,
   columns,
-  displayName,
   emptySelection,
   type Location,
   recycleColumns,
-  renamedName,
   type Selection,
   type Sort,
   selectNode,
   type View,
   visibleNodes,
 } from './model'
-import { folderPreferences, options, saveFolderPreferences } from './preferences'
+import { folderPreferences, saveFolderPreferences } from './preferences'
 import { useRubberBand } from './rubberBand'
 import { toolbarIcons } from './toolbar'
 import { folderTree, TREE_DESKTOP, treeRows } from './tree'
@@ -111,12 +110,9 @@ export function FolderView({
   const state = useFs((s) => s)
   const clip = useStore(clipboard, (s) => s)
   const undoStack = useStore(history, (s) => s)
-  const settings = useStore(options, (s) => s)
-  const registered = useMemo(
-    () => new Set(['bat', 'sys', 'ini', 'bmp', 'exe', ...apps.flatMap((app) => app.fileTypes ?? [])]),
-    [],
-  )
-  const labelOf = (node: FsNode) => displayName(node, settings.hideExtensions, registered)
+  const settings = useStore(folderOptions, (s) => s)
+  const naming = useNaming()
+  const labelOf = naming.label
   const list = useRef<HTMLDivElement>(null)
   const typed = useRef({ text: '', at: 0 })
   const [location, setLocation] = useState(initial)
@@ -240,7 +236,7 @@ export function FolderView({
     setRenaming(null)
     if (name === null) return
     const before = fs.get()
-    const error = fs.rename(node.id, renamedName(node, name, settings.hideExtensions, registered))
+    const error = fs.rename(node.id, naming.rename(node, name))
     if (error)
       setPrompt({
         kind: 'error',

@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import type { FsNode } from '../../fs/types'
 import { icons } from '../../icons'
+import { type FolderOptions as Options, folderOptions as options } from '../../shell/folderOptions'
 import { Button, Checkbox, Dialog, GroupBox, Radio, Tabs } from '../../ui'
-import { type Options, options } from './preferences'
 
 export function FolderOptions({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<'General' | 'View'>('General')

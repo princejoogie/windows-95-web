@@ -28,7 +28,7 @@ import {
   placeOf,
 } from './fileDialogModel'
 import { MessageBox } from './MessageBox'
-import { bytesOf, typeName } from './properties'
+import { bytesOf, formatShortDate, typeName } from './properties'
 import { Accel } from './text'
 import { useWhatsThis } from './WhatsThis'
 
@@ -81,11 +81,6 @@ function entryIcon(entry: ListEntry): string {
     ? icons.small.myComputer
     : icons.small.folderClosed
 }
-
-const shortDate = (at: number) =>
-  `${new Date(at).toLocaleDateString('en-US', { year: '2-digit', month: 'numeric', day: 'numeric' })} ${new Date(
-    at,
-  ).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
 
 /** Windows rounds sizes in Details up to whole kilobytes. */
 const sizeCell = (bytes: number) => `${Math.max(1, Math.ceil(bytes / 1024))}KB`
@@ -463,7 +458,7 @@ export function FileDialog({
                       {entry.node ? typeName(entry.node) : 'System Folder'}
                     </div>
                     <div className="w-[110px] px-[4px] truncate">
-                      {entry.node ? shortDate(entry.node.modified) : ''}
+                      {entry.node ? formatShortDate(entry.node.modified) : ''}
                     </div>
                   </div>
                 ))}
