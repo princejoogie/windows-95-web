@@ -914,7 +914,51 @@ async function labels() {
   )
 }
 
-const phases = { fileDialog, dialogs, about, kit, systemMenu, sounds, properties, captions, deletion, labels }
+async function fixedWindows() {
+  await closeWindows()
+  for (const exe of ['winmine', 'calc']) {
+    await run(exe)
+    await app.waitFor(`!!document.querySelector('[data-window]')`)
+    await sleep(300)
+    const before = await app.eval(`(${topWindow}).getBoundingClientRect().toJSON()`)
+    const button = await app.eval(
+      `(() => { const b = (${topWindow}).querySelector('button[aria-label="Maximize"]'); return { disabled: b.disabled, glyph: b.querySelector('img').getAttribute('src').length } })()`,
+    )
+    const caption = await app.eval(
+      `(()=>{const b=(${topWindow}).querySelector('.bg-title').getBoundingClientRect();return [b.x+b.width/2,b.y+8]})()`,
+    )
+    await app.click(caption[0], caption[1], { count: 2 })
+    await sleep(300)
+    const after = await app.eval(`(${topWindow}).getBoundingClientRect().toJSON()`)
+    check(
+      button.disabled && after.width === before.width && after.height === before.height,
+      '7',
+      `${exe}: the fixed window's Maximize is disabled and a caption double-click does not maximize`,
+      { button, before: [before.width, before.height], after: [after.width, after.height] },
+    )
+    await shot(`7-${exe}-maximize-disabled`, {
+      x: after.x + after.width - 70,
+      y: after.y,
+      width: 70,
+      height: 24,
+    })
+    await closeWindows()
+  }
+}
+
+const phases = {
+  fileDialog,
+  dialogs,
+  about,
+  kit,
+  systemMenu,
+  sounds,
+  properties,
+  captions,
+  deletion,
+  labels,
+  fixedWindows,
+}
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {
