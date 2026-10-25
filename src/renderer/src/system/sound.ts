@@ -1,3 +1,5 @@
+import { settingsStore } from '../settings/store'
+
 const soundUrls = import.meta.glob<string>('../assets/system/*.wav', {
   query: '?url',
   import: 'default',
@@ -48,6 +50,8 @@ async function resume(audio: AudioContext): Promise<void> {
 }
 
 export async function playSound(name: SoundName): Promise<SoundPlayback | null> {
+  const muted = () => Object.values(settingsStore.get().soundScheme).every((sound) => sound === '(None)')
+  if (muted()) return null
   const url = soundUrls[`../assets/system/${name}.wav`]
   if (!url) return null
   try {
@@ -57,7 +61,7 @@ export async function playSound(name: SoundName): Promise<SoundPlayback | null> 
     }
     const audio = context
     const [buffer] = await Promise.all([decode(name, url, audio), resume(audio)])
-    if (!buffer || audio.state !== 'running') return null
+    if (!buffer || audio.state !== 'running' || muted()) return null
     const source = audio.createBufferSource()
     source.buffer = buffer
     source.connect(audio.destination)

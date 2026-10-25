@@ -105,7 +105,12 @@ async function hear(name, label) {
 
 try {
   await c.send('Page.enable')
-  if (item === 'sounds') await c.send('Page.addScriptToEvaluateOnNewDocument', { source: audioProbe })
+  if (item === 'sounds') {
+    await c.send('Page.addScriptToEvaluateOnNewDocument', { source: audioProbe })
+    await c.eval(
+      '(() => {const s=JSON.parse(localStorage.getItem("win95.settings.v1") ?? "{}");delete s.soundScheme;localStorage.setItem("win95.settings.v1",JSON.stringify(s))})()',
+    )
+  }
   if (item === 'cursors' || item === 'wallpaper')
     await c.send('Page.addScriptToEvaluateOnNewDocument', { source: cursorProbe })
   await c.send('Page.reload')
@@ -183,6 +188,15 @@ try {
     )
     await hear('ding', 'Clicking a blocked owner plays the ding buffer')
     await clickText('No')
+    await run('notepad')
+    await c.type('Disposable recycle sound verification')
+    await c.key('s', ['Control'])
+    await c.clickOn('[role="dialog"] input[id$="-name"]')
+    await c.key('a', ['Control'])
+    await c.type(`WireA-${Date.now()}.txt`)
+    await clickText('Save')
+    await c.key('F4', ['Alt'])
+    await sleep(300)
     await run('C:\\My Documents')
     const recycled = await c.eval(
       'Object.values(JSON.parse(localStorage.getItem("w95.fs.v1")).nodes).find(node => node.kind === "file" && node.name.startsWith("WireA-"))?.id',
@@ -196,6 +210,16 @@ try {
     await clickText('Empty Recycle Bin')
     await clickText('Yes')
     await hear('recycle', 'Emptying Recycle Bin plays the recycle buffer')
+    await run('control')
+    await c.clickOn('[data-applet="sounds"]', { count: 2 })
+    await combo('Sound events', 'Critical Stop')
+    await combo('Sound name', 'notify')
+    await clickText('OK')
+    await c.key('F4', ['Alt'])
+    await run('missing-wire-a-program')
+    await hear('notify', 'An edited Critical Stop event plays the selected notify buffer')
+    await clickText('OK')
+    await clickText('Cancel')
     await run('control')
     await c.clickOn('[data-applet="sounds"]', { count: 2 })
     await c.clickOn('[aria-label="Sound scheme"]')
@@ -216,6 +240,21 @@ try {
     await check('No Sounds silences errors and blocked-owner clicks', 'window.__audio.length === 0')
     await clickText('OK')
     await clickText('Cancel')
+    await run('freecell')
+    await c.click(
+      ...(await c.eval(
+        '(() => {const card=[...document.querySelectorAll("[data-column]")].map(el=>el.querySelector("[data-card]:last-child")).find(el=>el && !el.dataset.card.startsWith("1-"));const b=card.getBoundingClientRect();return [b.x+b.width/2,b.y+90]})()',
+      )),
+    )
+    await c.clickOn('[data-home="0"]')
+    await sleep(250)
+    await check(
+      'No Sounds also silences direct app sound calls',
+      '!!document.querySelector("[role=dialog]") && window.__audio.length === 0',
+      'no-sounds-freecell',
+    )
+    await clickText('OK')
+    await c.key('F4', ['Alt'])
     await run('control')
     await c.clickOn('[data-applet="sounds"]', { count: 2 })
     await c.clickOn('[aria-label="Sound scheme"]')
