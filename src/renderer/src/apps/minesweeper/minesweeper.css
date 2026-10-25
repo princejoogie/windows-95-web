@@ -19,12 +19,22 @@
 }
 .mine-counter {
   display: flex;
-  padding: 1px;
   background: #000;
   border: 1px solid;
   border-color: #808080 #fff #fff #808080;
 }
+.minesweeper img {
+  image-rendering: pixelated;
+}
+.mine-counter img {
+  width: 13px;
+  height: 23px;
+  max-width: none;
+}
 .mine-face {
+  position: relative;
+  align-self: flex-start;
+  margin-top: -1px;
   width: 26px;
   height: 26px;
   display: grid;
@@ -37,7 +47,11 @@
 }
 .mine-face:active {
   box-shadow: inset 1px 1px #808080;
-  padding: 1px 0 0 1px;
+}
+.mine-face img {
+  position: absolute;
+  left: 3px;
+  top: 3px;
 }
 .mine-face:focus-visible {
   outline: 1px dotted #000;
@@ -62,9 +76,6 @@
   padding: 0;
   display: grid;
   place-items: center;
-  font:
-    bold 14px / 14px Arial,
-    sans-serif;
   touch-action: none;
 }
 .mine-cell img {
@@ -76,6 +87,9 @@
   border-left: 1px solid #808080;
   border-top: 1px solid #808080;
   box-shadow: none;
+}
+.mine-face:active img {
+  transform: translate(1px, 1px);
 }
 .mine-cell.mine-open img {
   position: absolute;
@@ -89,33 +103,6 @@
   outline: 1px dotted #000;
   outline-offset: -3px;
   z-index: 1;
-}
-.mine-cell[data-number="1"].mine-open {
-  color: #0000ff;
-}
-.mine-cell[data-number="2"].mine-open {
-  color: #008000;
-}
-.mine-cell[data-number="3"].mine-open {
-  color: #ff0000;
-}
-.mine-cell[data-number="4"].mine-open {
-  color: #000080;
-}
-.mine-cell[data-number="5"].mine-open {
-  color: #800000;
-}
-.mine-cell[data-number="6"].mine-open {
-  color: #008080;
-}
-.mine-cell[data-number="7"].mine-open {
-  color: #000;
-}
-.mine-cell[data-number="8"].mine-open {
-  color: #808080;
-}
-.mine-monochrome .mine-frame {
-  filter: grayscale(1);
 }
 .mine-custom {
   display: flex;
@@ -173,14 +160,23 @@
   justify-content: center;
 }
 .mine-about {
-  width: 300px;
+  width: 348px;
   display: grid;
   grid-template-columns: 32px 1fr;
-  gap: 16px;
+  gap: 14px;
   padding: 16px;
 }
 .mine-about p {
-  margin-bottom: 8px;
+  margin-bottom: 2px;
+}
+.mine-about-product p:last-child {
+  margin-top: 12px;
+}
+.mine-about-rule {
+  grid-column: 1 / -1;
+  height: 2px;
+  border-top: 1px solid #808080;
+  border-bottom: 1px solid #fff;
 }
 .mine-about button {
   grid-column: 2;

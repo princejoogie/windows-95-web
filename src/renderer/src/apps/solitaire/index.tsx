@@ -1,26 +1,40 @@
 import { type CSSProperties, type PointerEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useKeyDown } from '../../shell/context'
+import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
 import { Button, Checkbox, Dialog, GroupBox, MenuBar, Radio, StatusBar, StatusPane } from '../../ui'
+import { About } from './About'
 import { Cascade } from './Cascade'
-import { BACKS, type Back, backImage, cardImage, cardName, icon, SUIT_SYMBOLS, smallIcon } from './cards'
+import {
+  ANIMATED_BACKS,
+  BACKS,
+  type Back,
+  backImage,
+  cardImage,
+  cardName,
+  icon,
+  slotImage,
+  smallIcon,
+  stockImage,
+} from './cards'
 import { proofDeal } from './fixtures'
 import {
   type Action,
   type Card,
+  canMove,
   canRecycle,
-  DEFAULT_OPTIONS,
+  FOUNDATION_SLOTS,
   type Game,
   gameReducer,
   newGame,
   type Options,
   type Source,
-  SUITS,
   seededRandom,
   sourceCards,
   type Target,
 } from './game'
 import './solitaire.css'
+import { loadPreferences, type Preferences, savePreferences } from './preferences'
 
 interface Drag {
   source: Source
@@ -35,16 +49,16 @@ interface Drag {
 }
 const COLUMNS = [0, 1, 2, 3, 4, 5, 6] as const
 
-function initialGame(): Game {
+function initialGame(preferences: Preferences): Game {
   if (import.meta.env.DEV) {
     const params = new URLSearchParams(location.search)
     const fixture = proofDeal(params.get('solitaireDeal') ?? '')
     if (fixture) return fixture
     const seed = params.get('solitaireSeed')
     if (seed !== null && Number.isFinite(Number(seed)))
-      return newGame(DEFAULT_OPTIONS, seededRandom(Number(seed)))
+      return newGame(preferences.options, seededRandom(Number(seed)), preferences.vegasBalance)
   }
-  return newGame()
+  return newGame(preferences.options, Math.random, preferences.vegasBalance)
 }
 
 function OptionsDialog({
@@ -57,20 +71,58 @@ function OptionsDialog({
   onClose: () => void
 }) {
   const [draft, setDraft] = useState(options)
+  const form = useRef<HTMLFormElement>(null)
+  useEffect(() => {
+    form.current?.querySelector<HTMLInputElement>('input[name=solitaire-draw]:checked')?.focus()
+  }, [])
   return (
     <Dialog title="Options" onClose={onClose} className="w-[310px]">
-      <div className="flex flex-col gap-3 p-3">
+      <form
+        ref={form}
+        className="flex flex-col gap-3 p-3"
+        onSubmit={(event) => {
+          event.preventDefault()
+          onApply(draft)
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
+            event.preventDefault()
+            onApply(draft)
+          }
+          if (event.altKey) {
+            const input = form.current?.querySelector<HTMLInputElement>(
+              `input[data-shortcut="${event.key.toLowerCase()}"]:not(:disabled)`,
+            )
+            if (input) {
+              event.preventDefault()
+              event.stopPropagation()
+              input.focus()
+              input.click()
+            }
+          }
+        }}
+      >
         <div className="flex gap-3">
           <GroupBox label="Draw" className="flex flex-1 flex-col gap-2">
             <Radio
               name="solitaire-draw"
-              label="Draw one"
+              label={
+                <>
+                  Draw <u>o</u>ne
+                </>
+              }
+              data-shortcut="o"
               checked={draft.draw === 1}
               onChange={() => setDraft({ ...draft, draw: 1 })}
             />
             <Radio
               name="solitaire-draw"
-              label="Draw three"
+              label={
+                <>
+                  Draw t<u>h</u>ree
+                </>
+              }
+              data-shortcut="h"
               checked={draft.draw === 3}
               onChange={() => setDraft({ ...draft, draw: 3 })}
             />
@@ -78,44 +130,88 @@ function OptionsDialog({
           <GroupBox label="Scoring" className="flex flex-1 flex-col gap-2">
             <Radio
               name="solitaire-scoring"
-              label="Standard"
+              label={
+                <>
+                  <u>S</u>tandard
+                </>
+              }
+              data-shortcut="s"
               checked={draft.scoring === 'standard'}
               onChange={() => setDraft({ ...draft, scoring: 'standard' })}
             />
             <Radio
               name="solitaire-scoring"
-              label="Vegas"
+              label={
+                <>
+                  <u>V</u>egas
+                </>
+              }
+              data-shortcut="v"
               checked={draft.scoring === 'vegas'}
               onChange={() => setDraft({ ...draft, scoring: 'vegas' })}
             />
             <Radio
               name="solitaire-scoring"
-              label="None"
+              label={
+                <>
+                  <u>N</u>one
+                </>
+              }
+              data-shortcut="n"
               checked={draft.scoring === 'none'}
               onChange={() => setDraft({ ...draft, scoring: 'none' })}
             />
           </GroupBox>
         </div>
         <Checkbox
-          label="Timed game"
+          label={
+            <>
+              <u>T</u>imed game
+            </>
+          }
+          data-shortcut="t"
           checked={draft.timed}
           onChange={(event) => setDraft({ ...draft, timed: event.target.checked })}
         />
         <Checkbox
-          label="Status bar"
+          label={
+            <>
+              Status <u>b</u>ar
+            </>
+          }
+          data-shortcut="b"
           checked={draft.statusBar}
           onChange={(event) => setDraft({ ...draft, statusBar: event.target.checked })}
         />
         <Checkbox
-          label="Outline dragging"
+          label={
+            <>
+              Out<u>l</u>ine dragging
+            </>
+          }
+          data-shortcut="l"
           checked={draft.outline}
           onChange={(event) => setDraft({ ...draft, outline: event.target.checked })}
         />
+        <Checkbox
+          label={
+            <>
+              <u>K</u>eep score
+            </>
+          }
+          data-shortcut="k"
+          checked={draft.keepScore}
+          disabled={draft.scoring !== 'vegas'}
+          className={draft.scoring !== 'vegas' ? 'text-embossed' : ''}
+          onChange={(event) => setDraft({ ...draft, keepScore: event.target.checked })}
+        />
         <div className="flex justify-end gap-2 pt-1">
-          <Button onClick={() => onApply(draft)}>OK</Button>
+          <Button type="submit" isDefault>
+            OK
+          </Button>
           <Button onClick={onClose}>Cancel</Button>
         </div>
-      </div>
+      </form>
     </Dialog>
   )
 }
@@ -130,46 +226,101 @@ function DeckDialog({
   onClose: () => void
 }) {
   const [choice, setChoice] = useState(back)
+  const gallery = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    gallery.current?.querySelector<HTMLInputElement>('input:checked')?.focus()
+  }, [])
   return (
-    <Dialog title="Select Card Back" onClose={onClose}>
-      <div className="p-3">
-        <div className="flex gap-2">
+    <Dialog title="Select Card Back" onClose={onClose} className="w-[544px]">
+      <form
+        className="p-3"
+        onSubmit={(event) => {
+          event.preventDefault()
+          onApply(choice)
+        }}
+        onKeyDown={(event) => {
+          if (
+            event.key === 'Enter' &&
+            gallery.current?.contains(event.target instanceof Node ? event.target : null)
+          ) {
+            event.preventDefault()
+            onApply(choice)
+          }
+        }}
+      >
+        <div
+          ref={gallery}
+          role="radiogroup"
+          aria-label="Card backs"
+          className="grid grid-cols-6 gap-2"
+          onKeyDown={(event) => {
+            const offsets: Record<string, number> = {
+              ArrowLeft: -1,
+              ArrowRight: 1,
+              ArrowUp: -6,
+              ArrowDown: 6,
+            }
+            const offset = offsets[event.key]
+            if (offset === undefined) return
+            event.preventDefault()
+            const index = (BACKS.indexOf(choice) + offset + BACKS.length) % BACKS.length
+            const next = BACKS[index]
+            if (next) setChoice(next)
+            gallery.current?.querySelectorAll<HTMLInputElement>('input')[index]?.focus()
+          }}
+        >
           {BACKS.map((name) => (
-            <button
+            <label
               key={name}
-              type="button"
               title={name}
-              aria-label={name}
-              aria-pressed={choice === name}
-              className={`p-1 outline-none ${choice === name ? 'bevel-sunken bg-select' : 'bevel-raised'}`}
-              onClick={() => setChoice(name)}
+              className={`solitaire-back p-1 outline-none ${choice === name ? 'bevel-sunken bg-select' : 'bevel-raised'}`}
             >
+              <input
+                type="radio"
+                name="solitaire-back"
+                aria-label={name}
+                value={name}
+                checked={choice === name}
+                tabIndex={choice === name ? 0 : -1}
+                onChange={() => setChoice(name)}
+              />
               <img src={backImage(name)} width="71" height="96" alt={name} draggable={false} />
-            </button>
+            </label>
           ))}
         </div>
         <div className="flex justify-end gap-2 pt-3">
-          <Button onClick={() => onApply(choice)}>OK</Button>
+          <Button type="submit" isDefault>
+            OK
+          </Button>
           <Button onClick={onClose}>Cancel</Button>
         </div>
-      </div>
+      </form>
     </Dialog>
   )
 }
 
 function Solitaire({ window }: AppProps) {
-  const [game, setGame] = useState(initialGame)
-  const [back, setBack] = useState<Back>('Blue weave')
+  const [preferences] = useState(loadPreferences)
+  const [game, setGame] = useState(() => initialGame(preferences))
+  const [back, setBack] = useState<Back>(preferences.back)
+  const vegasBalance = useRef(preferences.vegasBalance)
   const [dialog, setDialog] = useState<'options' | 'deck' | 'about' | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
   const [cascadeStopped, setCascadeStopped] = useState(false)
+  const [backFrame, setBackFrame] = useState(0)
   const root = useRef<HTMLDivElement>(null)
   const suppressClick = useRef(false)
   const [size, setSize] = useState({ width: 620, height: 400 })
   const active = window.focused && !window.minimized && dialog === null
   const dispatch = (action: Action) => setGame((current) => gameReducer(current, action))
   const deal = () => {
-    setGame((current) => newGame(current.options))
+    setGame((current) =>
+      newGame(
+        current.options,
+        Math.random,
+        current.options.scoring === 'vegas' ? current.score : vegasBalance.current,
+      ),
+    )
     setCascadeStopped(false)
     setDrag(null)
   }
@@ -205,35 +356,43 @@ function Solitaire({ window }: AppProps) {
   useEffect(() => {
     if (!active) setDrag(null)
   }, [active])
+  useEffect(() => {
+    if (!active || !game.options.timed || game.phase !== 'playing' || !ANIMATED_BACKS.includes(back)) return
+    const interval = setInterval(() => setBackFrame((frame) => (frame + 1) % 4), 350)
+    return () => clearInterval(interval)
+  }, [active, game.options.timed, game.phase, back])
+  useEffect(() => {
+    if (game.options.scoring === 'vegas') vegasBalance.current = game.score
+    savePreferences({ options: game.options, back, vegasBalance: vegasBalance.current })
+  }, [game.options, game.score, back])
 
-  const scale = Math.max(0.75, Math.min(size.width / 620, size.height / 360, 1.75))
-  const cardWidth = 71 * scale
-  const cardHeight = 96 * scale
-  const margin = 12 * scale
+  const cardWidth = 71
+  const cardHeight = 96
+  const margin = 12
   const gap = (size.width - margin * 2 - cardWidth) / 6
-  const tableauY = 130 * scale
-  const columnX = (column: number) => margin + column * gap
+  const tableauY = 130
+  const columnX = (column: number) => Math.round(margin + column * gap)
   const offsets = game.tableau.map((column) => {
-    const natural = column.slice(0, -1).reduce((sum, card) => sum + (card.faceUp ? 21 : 9) * scale, 0)
+    const natural = column.slice(0, -1).reduce((sum, card) => sum + (card.faceUp ? 21 : 9), 0)
     const compression = natural
       ? Math.min(1, Math.max(0, size.height - tableauY - cardHeight - margin) / natural)
       : 1
     let top = tableauY
     return column.map((card) => {
       const value = top
-      top += (card.faceUp ? 21 : 9) * scale * compression
-      return value
+      top += (card.faceUp ? 21 : 9) * compression
+      return Math.round(value)
     })
   })
   const rect = (x: number, y: number): CSSProperties => ({
-    left: x,
-    top: y,
+    left: Math.round(x),
+    top: Math.round(y),
     width: cardWidth,
     height: cardHeight,
   })
   const autoFoundation = (source: Source) => {
-    const card = sourceCards(game, source)[0]
-    if (card) dispatch({ type: 'move', source, target: { kind: 'foundation', suit: card.suit } })
+    const pile = FOUNDATION_SLOTS.find((pile) => canMove(game, source, { kind: 'foundation', pile }))
+    if (pile !== undefined) dispatch({ type: 'move', source, target: { kind: 'foundation', pile } })
   }
   const begin = (event: PointerEvent<HTMLButtonElement>, source: Source) => {
     if (event.button !== 0 || game.phase !== 'playing' || !sourceCards(game, source).length) return
@@ -268,8 +427,9 @@ function Solitaire({ window }: AppProps) {
       for (let column = 0; column < 7; column++) {
         if (x < columnX(column) || x > columnX(column) + cardWidth) continue
         if (y >= tableauY && y < size.height) target = { kind: 'tableau', column }
-        const suit = SUITS[column - 3]
-        if (suit && y >= margin && y <= margin + cardHeight) target = { kind: 'foundation', suit }
+        const pile = FOUNDATION_SLOTS[column - 3]
+        if (pile !== undefined && y >= margin && y <= margin + cardHeight)
+          target = { kind: 'foundation', pile }
       }
       if (target) dispatch({ type: 'move', source: drag.source, target })
     }
@@ -281,7 +441,7 @@ function Solitaire({ window }: AppProps) {
     if (!drag?.moving || drag.source.kind !== source.kind) return false
     if (source.kind === 'waste') return true
     if (source.kind === 'foundation')
-      return drag.source.kind === 'foundation' && drag.source.suit === source.suit
+      return drag.source.kind === 'foundation' && drag.source.pile === source.pile
     return (
       drag.source.kind === 'tableau' &&
       source.column === drag.source.column &&
@@ -317,7 +477,7 @@ function Solitaire({ window }: AppProps) {
         if (faceUp && !suppressClick.current) autoFoundation(source)
       }}
     >
-      <img src={faceUp ? cardImage(card) : backImage(back)} alt="" draggable={false} />
+      <img src={faceUp ? cardImage(card) : backImage(back, backFrame)} alt="" draggable={false} />
     </button>
   )
   const fan = Math.min(game.waste.length, Math.max(1, game.wasteFan))
@@ -342,7 +502,14 @@ function Solitaire({ window }: AppProps) {
               { label: 'E&xit', onSelect: window.close },
             ],
           },
-          { label: '&Help', items: [{ label: '&About Solitaire', onSelect: () => setDialog('about') }] },
+          {
+            label: '&Help',
+            items: [
+              { label: '&Help Topics', onSelect: () => launch('help', { book: 'solitaire' }) },
+              'separator',
+              { label: '&About Solitaire', onSelect: () => setDialog('about') },
+            ],
+          },
         ]}
       />
       <div
@@ -382,15 +549,13 @@ function Solitaire({ window }: AppProps) {
           onClick={() => dispatch({ type: 'stock' })}
         >
           {game.stock.length ? (
-            <img src={backImage(back)} alt="" draggable={false} />
+            <img src={backImage(back, backFrame)} alt="" draggable={false} />
           ) : (
-            <span style={{ color: canRecycle(game) ? '#00ff00' : '#800000', fontSize: 50 * scale }}>
-              {canRecycle(game) ? '↻' : '×'}
-            </span>
+            <img src={stockImage(canRecycle(game))} alt="" draggable={false} />
           )}
         </button>
         {game.waste.slice(-fan).map((card, index) => {
-          const x = columnX(1) + index * 14 * scale
+          const x = columnX(1) + index * 14
           if (index === fan - 1) return cardButton(card, { kind: 'waste' }, x, margin)
           return (
             <img
@@ -404,23 +569,21 @@ function Solitaire({ window }: AppProps) {
             />
           )
         })}
-        {SUITS.map((suit, index) => {
-          const card = game.foundations[suit].at(-1)
+        {FOUNDATION_SLOTS.map((pile) => {
+          const card = game.foundations[pile].at(-1)
           return (
-            <div key={suit}>
+            <div key={pile}>
               <div
                 role="img"
                 className="solitaire-slot pointer-events-none"
-                style={rect(columnX(index + 3), margin)}
-                aria-label={`${suit} foundation`}
-                data-foundation={suit}
-                data-count={game.foundations[suit].length}
+                style={rect(columnX(pile + 3), margin)}
+                aria-label={`${card ? card.suit : 'Empty'} foundation ${pile + 1}`}
+                data-foundation={pile}
+                data-count={game.foundations[pile].length}
               >
-                <span style={{ fontSize: 35 * scale, color: '#008000', textShadow: '1px 1px #000' }}>
-                  {SUIT_SYMBOLS[suit]}
-                </span>
+                <img src={slotImage} alt="" draggable={false} />
               </div>
-              {card && cardButton(card, { kind: 'foundation', suit }, columnX(index + 3), margin)}
+              {card && cardButton(card, { kind: 'foundation', pile }, columnX(pile + 3), margin)}
             </div>
           )
         })}
@@ -435,7 +598,9 @@ function Solitaire({ window }: AppProps) {
                 aria-label={`Tableau column ${columnIndex + 1}`}
                 data-column={columnIndex}
                 data-count={column.length}
-              />
+              >
+                <img src={slotImage} alt="" draggable={false} />
+              </div>
               {column.map((card, index) =>
                 cardButton(
                   card,
@@ -455,7 +620,7 @@ function Solitaire({ window }: AppProps) {
                 <div
                   key={`${card.suit}-${card.rank}`}
                   className="absolute border border-white outline outline-black"
-                  style={rect(drag.x - drag.offsetX, drag.y - drag.offsetY + index * 21 * scale)}
+                  style={rect(drag.x - drag.offsetX, drag.y - drag.offsetY + index * 21)}
                 />
               ) : (
                 <img
@@ -463,7 +628,7 @@ function Solitaire({ window }: AppProps) {
                   src={cardImage(card)}
                   alt=""
                   className="absolute"
-                  style={rect(drag.x - drag.offsetX, drag.y - drag.offsetY + index * 21 * scale)}
+                  style={rect(drag.x - drag.offsetX, drag.y - drag.offsetY + index * 21)}
                 />
               ),
             )}
@@ -473,7 +638,7 @@ function Solitaire({ window }: AppProps) {
           <Cascade
             width={size.width}
             height={size.height}
-            scale={scale}
+            foundations={game.foundations}
             active={active}
             onStop={() => setCascadeStopped(true)}
           />
@@ -501,7 +666,13 @@ function Solitaire({ window }: AppProps) {
               options.scoring !== game.options.scoring ||
               options.timed !== game.options.timed
             ) {
-              setGame(newGame(options))
+              setGame(
+                newGame(
+                  options,
+                  Math.random,
+                  game.options.scoring === 'vegas' ? game.score : vegasBalance.current,
+                ),
+              )
               setCascadeStopped(false)
             } else setGame({ ...game, options })
             setDialog(null)
@@ -518,26 +689,7 @@ function Solitaire({ window }: AppProps) {
           }}
         />
       )}
-      {dialog === 'about' && (
-        <Dialog title="About Solitaire" onClose={() => setDialog(null)} className="w-[310px]">
-          <div className="flex gap-3 p-4">
-            <img src={icon} alt="" className="size-8" />
-            <div>
-              Microsoft Solitaire
-              <br />
-              Windows 95
-              <br />
-              <br />
-              Klondike
-              <br />
-              Build each foundation from Ace to King.
-            </div>
-          </div>
-          <div className="flex justify-end p-3 pt-0">
-            <Button onClick={() => setDialog(null)}>OK</Button>
-          </div>
-        </Dialog>
-      )}
+      {dialog === 'about' && <About onClose={() => setDialog(null)} />}
     </div>
   )
 }

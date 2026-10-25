@@ -2,6 +2,10 @@ import { join } from 'node:path'
 import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import { CHANNELS, type HostEvent } from '../shared/ipc'
 
+app.commandLine.appendSwitch('disable-font-subpixel-positioning')
+app.commandLine.appendSwitch('disable-lcd-text')
+app.commandLine.appendSwitch('enable-blink-features', 'NoFontAntialiasing')
+
 if (process.env.W95_DATA_DIR) app.setPath('userData', process.env.W95_DATA_DIR)
 if (process.env.W95_CDP_PORT) {
   app.commandLine.appendSwitch('remote-debugging-port', process.env.W95_CDP_PORT)

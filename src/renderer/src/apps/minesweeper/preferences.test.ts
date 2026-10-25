@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest'
+import { createGame, LEVELS } from './game'
 import { emptyRecords, parsePreferences } from './preferences'
 
 it('restores the chosen level, custom size, options, and best times', () => {
@@ -22,7 +23,19 @@ it('recovers defaults from corrupt storage and validates each record separately'
   ).toEqual({ ...emptyRecords(), beginner: { name: 'Ada', seconds: 12 } })
   expect(parsePreferences({ custom: { width: 999, height: 1, mines: 999 } }).custom).toEqual({
     width: 30,
-    height: 9,
-    mines: 232,
+    height: 8,
+    mines: 203,
+  })
+})
+
+it('defaults Custom to 8 by 8 and ignores old custom dimensions for the Beginner preset', () => {
+  expect(parsePreferences(null).custom).toEqual({ width: 8, height: 8, mines: 10 })
+  const preferences = parsePreferences({ level: 'beginner', custom: { width: 9, height: 9, mines: 10 } })
+  const size = preferences.level === 'custom' ? preferences.custom : LEVELS[preferences.level]
+  expect(createGame(size, 42).cells).toHaveLength(64)
+  expect(parsePreferences({ level: 'custom', custom: { width: 8, height: 8, mines: 10 } }).custom).toEqual({
+    width: 8,
+    height: 8,
+    mines: 10,
   })
 })

@@ -1,0 +1,22 @@
+.notepad-editor {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 1px;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: white;
+  color: black;
+  font-family: "Fixedsys Bitmap", var(--font-mono, "Fixedsys", "Courier New", monospace);
+  font-size: var(--system-fixedsys-size, 15px);
+  line-height: var(--system-fixedsys-height, 15px);
+  font-kerning: none;
+  -webkit-font-smoothing: none;
+  overflow: scroll;
+  user-select: text;
+}
+
+.notepad-editor[wrap="soft"] {
+  overflow-x: hidden;
+}

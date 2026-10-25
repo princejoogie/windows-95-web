@@ -2,27 +2,33 @@ import { useEffect, useReducer, useRef, useState } from 'react'
 import { createNode, fs, useFs } from '../../fs/store'
 import { DOCUMENTS_DIR, type NodeId } from '../../fs/types'
 import { useKeyDown } from '../../shell/context'
+import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
 import {
   Button,
   Checkbox,
-  Dialog,
   FileDialog,
   type FileDialogResult,
+  GroupBox,
   MenuBar,
   MessageBox,
   Radio,
-  TextArea,
+  Separator,
   TextBox,
 } from '../../ui'
+import { AboutAccessory } from './AboutAccessory'
 import { type DocumentState, documentReducer, findText } from './document'
 import { notepadIcon } from './icon'
+import { ModelessDialog } from './ModelessDialog'
+import { defaultPageSettings, PageSetup } from './PageSetup'
+import { revealSelection } from './revealSelection'
+import './notepad.css'
 
 type PendingAction = 'new' | 'open' | 'close'
 type Prompt =
   | { kind: 'confirm'; next: PendingAction }
   | { kind: 'file'; mode: 'open' | 'save'; next: PendingAction | null }
-  | { kind: 'find' }
+  | { kind: 'pageSetup' }
   | { kind: 'about' }
   | { kind: 'error'; message: string }
 
@@ -44,6 +50,8 @@ export function Notepad({ window: windowApi, args }: AppProps) {
   const dirty = document.text !== document.saved
   const [prompt, setPrompt] = useState<Prompt | null>(null)
   const [wordWrap, setWordWrap] = useState(false)
+  const [findOpen, setFindOpen] = useState(false)
+  const [pageSettings, setPageSettings] = useState(defaultPageSettings)
   const [selectionLength, setSelectionLength] = useState(0)
   const [query, setQuery] = useState('')
   const [matchCase, setMatchCase] = useState(false)
@@ -55,6 +63,9 @@ export function Notepad({ window: windowApi, args }: AppProps) {
     closeResult.current?.(false)
     closeResult.current = null
   }
+  useEffect(() => {
+    editor.current?.focus()
+  }, [])
 
   useEffect(() => windowApi.setTitle(`${name} - Notepad`), [windowApi, name])
 
@@ -129,11 +140,11 @@ export function Notepad({ window: windowApi, args }: AppProps) {
     else requestAnimationFrame(() => editor.current?.focus())
   }
 
-  const replaceSelection = (text: string, deleteNext = false) => {
+  const replaceSelection = (text: string) => {
     const area = editor.current
     if (!area) return
     const start = area.selectionStart
-    const end = area.selectionEnd + (deleteNext && area.selectionStart === area.selectionEnd ? 1 : 0)
+    const end = area.selectionEnd
     dispatch({ type: 'edit', text: document.text.slice(0, start) + text + document.text.slice(end) })
     requestAnimationFrame(() => {
       area.focus()
@@ -160,7 +171,7 @@ export function Notepad({ window: windowApi, args }: AppProps) {
 
   const findNext = () => {
     if (!query) {
-      setPrompt({ kind: 'find' })
+      setFindOpen(true)
       return
     }
     const area = editor.current
@@ -171,10 +182,11 @@ export function Notepad({ window: windowApi, args }: AppProps) {
       setPrompt({ kind: 'error', message: `Cannot find "${query}"` })
       return
     }
-    setPrompt(null)
     requestAnimationFrame(() => {
-      area.focus()
+      if (!findOpen) area.focus()
       area.setSelectionRange(index, index + query.length)
+      revealSelection(area)
+      setSelectionLength(query.length)
     })
   }
 
@@ -186,14 +198,14 @@ export function Notepad({ window: windowApi, args }: AppProps) {
   }
 
   useKeyDown((event) => {
-    if (prompt) return
+    if (prompt || (event.target instanceof Element && event.target.closest('[role="dialog"]'))) return
     const key = event.key.toLowerCase()
     if (event.ctrlKey && ['n', 'o', 's', 'f', 'z'].includes(key)) {
       event.preventDefault()
       if (key === 'n') request('new')
       if (key === 'o') request('open')
       if (key === 's') event.shiftKey ? setPrompt({ kind: 'file', mode: 'save', next: null }) : save()
-      if (key === 'f') setPrompt({ kind: 'find' })
+      if (key === 'f') setFindOpen(true)
       if (key === 'z') dispatch({ type: 'undo' })
     }
     if (event.key === 'F3') {
@@ -217,6 +229,17 @@ export function Notepad({ window: windowApi, args }: AppProps) {
               { label: '&Open...', shortcut: 'Ctrl+O', onSelect: () => request('open') },
               { label: '&Save', shortcut: 'Ctrl+S', onSelect: () => save() },
               { label: 'Save &As...', onSelect: () => setPrompt({ kind: 'file', mode: 'save', next: null }) },
+              'separator',
+              { label: 'Page Set&up...', onSelect: () => setPrompt({ kind: 'pageSetup' }) },
+              {
+                label: '&Print...',
+                onSelect: () =>
+                  setPrompt({
+                    kind: 'error',
+                    message:
+                      'No printers are installed. To install a printer, choose Settings from the Start menu, click Printers, and then double-click Add Printer.',
+                  }),
+              },
               'separator',
               { label: 'E&xit', onSelect: () => request('close') },
             ],
@@ -244,7 +267,12 @@ export function Notepad({ window: windowApi, args }: AppProps) {
                 onSelect: () => void clipboard('copy'),
               },
               { label: '&Paste', shortcut: 'Ctrl+V', onSelect: () => void clipboard('paste') },
-              { label: 'De&lete', shortcut: 'Del', onSelect: () => replaceSelection('', true) },
+              {
+                label: 'De&lete',
+                shortcut: 'Del',
+                disabled: selectionLength === 0,
+                onSelect: () => replaceSelection(''),
+              },
               'separator',
               {
                 label: 'Select &All',
@@ -263,21 +291,26 @@ export function Notepad({ window: windowApi, args }: AppProps) {
           {
             label: '&Search',
             items: [
-              { label: '&Find...', shortcut: 'Ctrl+F', onSelect: () => setPrompt({ kind: 'find' }) },
+              { label: '&Find...', shortcut: 'Ctrl+F', onSelect: () => setFindOpen(true) },
               { label: 'Find &Next', shortcut: 'F3', onSelect: findNext },
             ],
           },
           {
             label: '&Help',
-            items: [{ label: '&About Notepad', onSelect: () => setPrompt({ kind: 'about' }) }],
+            items: [
+              { label: '&Help Topics', onSelect: () => launch('help', { book: 'notepad' }) },
+              'separator',
+              { label: '&About Notepad', onSelect: () => setPrompt({ kind: 'about' }) },
+            ],
           },
         ]}
       />
-      <TextArea
+      <Separator className="shrink-0" />
+      <textarea
         ref={editor}
         aria-label="Document text"
-        className="flex-1 min-h-0 w-full font-mono text-[13px] leading-[16px]"
-        autoFocus
+        className="notepad-editor"
+        spellCheck={false}
         value={document.text}
         wrap={wordWrap ? 'soft' : 'off'}
         onChange={(event) => dispatch({ type: 'edit', text: event.target.value })}
@@ -312,10 +345,24 @@ export function Notepad({ window: windowApi, args }: AppProps) {
       {prompt?.kind === 'error' && (
         <MessageBox title="Notepad" icon="info" message={prompt.message} buttons={['OK']} onClose={cancel} />
       )}
-      {prompt?.kind === 'find' && (
-        <Dialog title="Find" onClose={() => setPrompt(null)} className="w-[360px]">
+      {findOpen && (
+        <ModelessDialog
+          title="Find"
+          blocked={prompt !== null}
+          onClose={() => {
+            setFindOpen(false)
+            editor.current?.focus()
+          }}
+          className="w-[395px]"
+        >
           <form
             className="flex gap-[12px] p-[10px]"
+            onKeyDown={(event) => {
+              if (event.key === 'F3') {
+                event.preventDefault()
+                findNext()
+              }
+            }}
             onSubmit={(event) => {
               event.preventDefault()
               findNext()
@@ -332,43 +379,56 @@ export function Notepad({ window: windowApi, args }: AppProps) {
                   onChange={(event) => setQuery(event.target.value)}
                 />
               </label>
-              <Checkbox
-                label="Match case"
-                checked={matchCase}
-                onChange={(event) => setMatchCase(event.target.checked)}
-              />
-              <div className="flex gap-[12px]">
-                <Radio
-                  label="Up"
-                  name={`direction-${windowApi.id}`}
-                  checked={direction === 'up'}
-                  onChange={() => setDirection('up')}
+              <div className="flex items-end gap-[12px]">
+                <Checkbox
+                  label="Match case"
+                  checked={matchCase}
+                  onChange={(event) => setMatchCase(event.target.checked)}
                 />
-                <Radio
-                  label="Down"
-                  name={`direction-${windowApi.id}`}
-                  checked={direction === 'down'}
-                  onChange={() => setDirection('down')}
-                />
+                <GroupBox label="Direction" className="flex gap-[12px]">
+                  <Radio
+                    label="Up"
+                    name={`direction-${windowApi.id}`}
+                    checked={direction === 'up'}
+                    onChange={() => setDirection('up')}
+                  />
+                  <Radio
+                    label="Down"
+                    name={`direction-${windowApi.id}`}
+                    checked={direction === 'down'}
+                    onChange={() => setDirection('down')}
+                  />
+                </GroupBox>
               </div>
             </div>
             <div className="flex flex-col gap-[6px]">
               <Button type="submit" isDefault disabled={!query}>
                 Find Next
               </Button>
-              <Button onClick={() => setPrompt(null)}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  setFindOpen(false)
+                  editor.current?.focus()
+                }}
+              >
+                Cancel
+              </Button>
             </div>
           </form>
-        </Dialog>
+        </ModelessDialog>
+      )}
+      {prompt?.kind === 'pageSetup' && (
+        <PageSetup
+          settings={pageSettings}
+          onSave={(settings) => {
+            setPageSettings(settings)
+            setPrompt(null)
+          }}
+          onCancel={() => setPrompt(null)}
+        />
       )}
       {prompt?.kind === 'about' && (
-        <MessageBox
-          title="About Notepad"
-          icon="info"
-          message={'Notepad\nWindows 95\nA text editor for your virtual C: drive.'}
-          buttons={['OK']}
-          onClose={() => setPrompt(null)}
-        />
+        <AboutAccessory name="Notepad" icon={notepadIcon} onClose={() => setPrompt(null)} />
       )}
     </div>
   )
@@ -381,6 +441,6 @@ export const app: AppManifest = {
   exe: 'NOTEPAD.EXE',
   startMenu: ['Accessories'],
   fileTypes: ['txt', 'bat', 'sys', 'ini', 'log'],
-  window: { kind: 'resizable', width: 500, height: 320, minWidth: 240, minHeight: 120 },
+  window: { kind: 'resizable', width: 560, height: 380, minWidth: 240, minHeight: 120 },
   component: Notepad,
 }

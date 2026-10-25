@@ -1,6 +1,7 @@
 import { fsStore } from '../fs/store'
 import type { FsNode, NodeId } from '../fs/types'
 import { createStore, useStore } from '../lib/store'
+import { resolveShortcut } from './clipboard'
 import { appForFile, getApp } from './registry'
 import type { LaunchArgs, WindowId } from './types'
 import { emptyWindows, type WindowsState, windowsReducer } from './windows'
@@ -25,8 +26,12 @@ export function launch(appId: string, args: LaunchArgs = {}): WindowId | null {
 export function opener(node: FsNode): { appId: string; args: LaunchArgs } | null {
   switch (node.kind) {
     case 'program':
-    case 'shortcut':
       return { appId: node.app, args: {} }
+    case 'shortcut': {
+      const target = resolveShortcut(fsStore.get(), node)
+      if (!target) return null
+      return target.kind === 'app' ? { appId: target.app, args: {} } : opener(target.node)
+    }
     case 'drive':
     case 'folder':
       return getApp('explorer') ? { appId: 'explorer', args: { folder: node.id } } : null

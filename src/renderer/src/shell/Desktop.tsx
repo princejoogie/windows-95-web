@@ -1,116 +1,186 @@
 import { type PointerEvent as ReactPointerEvent, useCallback, useMemo, useRef, useState } from 'react'
-import { children, isInside, uniqueName } from '../fs/fs'
-import { createNode, fs, useFs } from '../fs/store'
-import { DESKTOP_DIR, type FsNode, type NodeId } from '../fs/types'
-import { ContextMenu, type MenuEntry } from '../ui/Menu'
+import { children, isInside, isProtected, uniqueName } from '../fs/fs'
+import { createNode, fs, fsStore, newNodeId, useFs } from '../fs/store'
+import {
+  DESKTOP_DIR,
+  DOCUMENTS_DIR,
+  type FsNode,
+  type FsState,
+  type NodeId,
+  RECYCLED_DIR,
+  ROOT,
+} from '../fs/types'
+import { useStore } from '../lib/store'
+import { ContextMenu } from '../ui/Menu'
 import { MessageBox } from '../ui/MessageBox'
+import { PropertiesSheet } from '../ui/PropertiesSheet'
+import { bytesOf, isHidden, typeName } from '../ui/properties'
+import { TooltipLayer } from '../ui/Tooltip'
+import { CreateShortcut } from './CreateShortcut'
+import {
+  type Clip,
+  clipboard,
+  type Plan,
+  planPaste,
+  planShortcuts,
+  resolveShortcut,
+  type ShortcutTarget,
+} from './clipboard'
 import { useKeyDown } from './context'
+import {
+  type ArrangeBy,
+  backgroundMenu,
+  type DesktopActions,
+  type MenuFacts,
+  nodeMenu,
+  shellMenu,
+} from './desktopMenus'
+import {
+  arranged,
+  CELL,
+  type Direction,
+  gridOrder,
+  layout,
+  neighbor,
+  ORIGIN,
+  type Positions,
+  type Rect,
+  snap,
+  spanned,
+  touched,
+  typeAhead,
+} from './desktopModel'
 import { nodeIcon } from './nodeIcon'
-import { apps } from './registry'
+import { apps, getApp } from './registry'
 import { launch, openNode, useWindows, windowsStore } from './system'
-import type { Point, Size } from './types'
+import type { AppManifest, Point, Size } from './types'
 
 const POSITIONS_KEY = 'w95.desktop.v1'
-const CELL = { width: 75, height: 75 }
-const ORIGIN = { x: 2, y: 4 }
+const LABELS_KEY = 'w95.desktop.labels.v1'
+const ARRANGE_KEY = 'w95.desktop.arrange.v1'
 const DRAG_THRESHOLD = 3
+/** The double-click time: a second click on a selected label within it opens; after it, renames. */
+const SLOW_CLICK_MS = 500
+const TYPE_AHEAD_MS = 1000
 
-interface Item {
-  readonly key: string
-  readonly label: string
-  readonly icon: string
-  readonly overlay?: string | undefined
-  /** Present for items that are files in the Desktop folder, which can be renamed and deleted. */
-  readonly node?: FsNode
-  readonly onDrop?: ((ids: readonly NodeId[]) => void) | undefined
-  readonly open: () => void
+type Item =
+  | {
+      readonly kind: 'shell'
+      readonly key: string
+      readonly app: AppManifest
+      readonly label: string
+      readonly icon: string
+    }
+  | {
+      readonly kind: 'node'
+      readonly key: NodeId
+      readonly node: FsNode
+      readonly label: string
+      readonly icon: string
+      readonly overlay?: string | undefined
+    }
+
+interface Arrangement {
+  readonly auto: boolean
+  readonly by: ArrangeBy
 }
 
-type Positions = Readonly<Record<string, Point>>
-
-function loadPositions(): Positions {
-  try {
-    return JSON.parse(localStorage.getItem(POSITIONS_KEY) ?? '{}') as Positions
-  } catch {
-    return {}
-  }
-}
-
-const cellAt = (point: Point) => ({
-  column: Math.round((point.x - ORIGIN.x) / CELL.width),
-  row: Math.round((point.y - ORIGIN.y) / CELL.height),
-})
-const pointOf = (column: number, row: number): Point => ({
-  x: ORIGIN.x + column * CELL.width,
-  y: ORIGIN.y + row * CELL.height,
-})
-
-/** Saved spots first; everything else fills free cells top to bottom, then left to right. */
-function layout(items: readonly Item[], saved: Positions, desktop: Size): Map<string, Point> {
-  const rows = Math.max(1, Math.floor((desktop.height - ORIGIN.y) / CELL.height))
-  const placed = new Map<string, Point>()
-  const taken = new Set<string>()
-  for (const item of items) {
-    const point = saved[item.key]
-    if (!point) continue
-    placed.set(item.key, point)
-    const cell = cellAt(point)
-    taken.add(`${cell.column}:${cell.row}`)
-  }
-  let slot = 0
-  for (const item of items) {
-    if (placed.has(item.key)) continue
-    while (taken.has(`${Math.floor(slot / rows)}:${slot % rows}`)) slot++
-    placed.set(item.key, pointOf(Math.floor(slot / rows), slot % rows))
-    slot++
-  }
-  return placed
-}
-
-function useItems(): Item[] {
-  const state = useFs((s) => s)
-  return useMemo(() => {
-    const shell: Item[] = apps
-      .filter((app) => app.desktop)
-      .sort((a, b) => (a.desktop?.order ?? 0) - (b.desktop?.order ?? 0))
-      .map((app) => ({
-        key: `app:${app.id}`,
-        label: app.desktop?.label ?? app.title,
-        icon: app.desktop?.icon?.(state) ?? app.icon,
-        onDrop: app.desktop?.onDrop,
-        open: () => launch(app.id),
-      }))
-    const files: Item[] = children(state, DESKTOP_DIR).map((node) => {
-      const { icon, overlay } = nodeIcon(node)
-      return { key: node.id, label: node.name, icon, overlay, node, open: () => openNode(node.id) }
-    })
-    return [...shell, ...files]
-  }, [state])
-}
+type Prompt =
+  | { kind: 'recycle'; nodes: readonly FsNode[] }
+  | { kind: 'purge'; nodes: readonly FsNode[] }
+  | { kind: 'empty' }
+  | { kind: 'error'; title: string; message: string }
+  | { kind: 'properties'; id: NodeId }
+  | { kind: 'shortcut'; at: Point | null }
 
 interface Drag {
   key: string
   pointer: Point
-  from: Point
   offset: Point
   started: boolean
 }
 
-type Prompt = { kind: 'delete'; node: FsNode } | { kind: 'error'; title: string; message: string }
+function load<T>(key: string, fallback: T): T {
+  try {
+    return (JSON.parse(localStorage.getItem(key) ?? 'null') as T | null) ?? fallback
+  } catch {
+    return fallback
+  }
+}
+
+let desktopProperties: (() => void) | null = null
+
+/**
+ * Desktop > Properties opens Display Properties, which another unit provides. It registers its opener here
+ * and gets back an unregister function. Until then the item does nothing.
+ */
+export function registerDesktopProperties(open: () => void): () => void {
+  desktopProperties = open
+  return () => {
+    if (desktopProperties === open) desktopProperties = null
+  }
+}
+
+/** Shell icons in their manifest order, then the Desktop folder's visible files. */
+function desktopItems(state: FsState, labels: Readonly<Record<string, string>>): Item[] {
+  const shell: Item[] = apps
+    .filter((app) => app.desktop)
+    .sort((a, b) => (a.desktop?.order ?? 0) - (b.desktop?.order ?? 0))
+    .map((app) => {
+      const key = `app:${app.id}`
+      return {
+        kind: 'shell',
+        key,
+        app,
+        label: labels[key] ?? app.desktop?.label ?? app.title,
+        icon: app.desktop?.icon?.(state) ?? app.icon,
+      }
+    })
+  const files: Item[] = children(state, DESKTOP_DIR)
+    .filter((node) => !isHidden(node))
+    .map((node) => {
+      const { icon, overlay } = nodeIcon(node)
+      return { kind: 'node', key: node.id, node, label: node.name, icon, overlay }
+    })
+  return [...shell, ...files]
+}
+
+/** Items in the order Arrange Icons puts them: shell icons first, then folders, then files. */
+function arrangeOrder(items: readonly Item[], by: ArrangeBy): string[] {
+  const shell = items.filter((item) => item.kind === 'shell').map((item) => item.key)
+  const nodes = items.flatMap((item) => (item.kind === 'node' ? [item.node] : []))
+  const state = fs.get()
+  const rank = (node: FsNode) => (node.kind === 'folder' ? 0 : 1)
+  const byName = (a: FsNode, b: FsNode) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+  const compare: Record<ArrangeBy, (a: FsNode, b: FsNode) => number> = {
+    name: byName,
+    type: (a, b) => typeName(a).localeCompare(typeName(b)) || byName(a, b),
+    size: (a, b) => bytesOf(state, a) - bytesOf(state, b) || byName(a, b),
+    date: (a, b) => b.modified - a.modified || byName(a, b),
+  }
+  const sorted = [...nodes].sort((a, b) => rank(a) - rank(b) || compare[by](a, b))
+  return [...shell, ...sorted.map((node) => node.id)]
+}
 
 function DesktopIcon({
   item,
   at,
   selected,
+  focused,
   renaming,
+  ghosted,
   onPointerDown,
+  onOpen,
   onRename,
 }: {
   item: Item
   at: Point
   selected: boolean
+  focused: boolean
   renaming: boolean
+  ghosted: boolean
   onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void
+  onOpen: () => void
   onRename: (name: string | null) => void
 }) {
   return (
@@ -123,17 +193,35 @@ function DesktopIcon({
       className="absolute flex flex-col items-center w-[75px] outline-none"
       style={{ left: at.x, top: at.y }}
       onPointerDown={onPointerDown}
-      onDoubleClick={item.open}
+      onDoubleClick={onOpen}
     >
-      <div className="relative size-8 mt-[2px]">
-        <img src={item.icon} alt="" className="size-8" draggable={false} />
-        {item.overlay && (
+      <div className="relative size-8 mt-[2px]" data-icon>
+        <img
+          src={item.icon}
+          alt=""
+          className="size-8"
+          draggable={false}
+          style={
+            ghosted
+              ? {
+                  maskImage: 'repeating-conic-gradient(#000 0 25%, transparent 0 50%)',
+                  maskSize: '2px 2px',
+                  maskPosition: '1px 0',
+                }
+              : undefined
+          }
+        />
+        {item.kind === 'node' && item.overlay && (
           <img src={item.overlay} alt="" className="absolute left-0 bottom-0" draggable={false} />
         )}
         {selected && (
           <div
-            className="absolute inset-0 bg-select opacity-50"
-            style={{ maskImage: `url("${item.icon}")`, maskSize: '100% 100%' }}
+            className="absolute inset-0 bg-select"
+            style={{
+              maskImage: `url("${item.icon}"), repeating-conic-gradient(#000 0 25%, transparent 0 50%)`,
+              maskSize: '100% 100%, 2px 2px',
+              maskComposite: 'intersect',
+            }}
           />
         )}
       </div>
@@ -144,7 +232,8 @@ function DesktopIcon({
           defaultValue={item.label}
           className="mt-[4px] w-[72px] px-[1px] text-center bg-white text-black border border-black outline-none select-text"
           onFocus={(event) => {
-            const dot = item.node?.kind === 'file' ? event.target.value.lastIndexOf('.') : -1
+            const dot =
+              item.kind === 'node' && item.node.kind === 'file' ? event.target.value.lastIndexOf('.') : -1
             event.target.setSelectionRange(0, dot > 0 ? dot : event.target.value.length)
           }}
           onPointerDown={(event) => event.stopPropagation()}
@@ -157,8 +246,9 @@ function DesktopIcon({
         />
       ) : (
         <span
+          data-label
           className={`mt-[4px] px-[1px] max-w-[72px] text-center leading-[13px] break-words text-white
-            ${selected ? 'bg-select outline outline-1 outline-dotted outline-white' : 'line-clamp-2'}`}
+            ${selected ? 'bg-select' : 'line-clamp-2'} ${focused ? 'outline outline-1 outline-dotted outline-white -outline-offset-1' : ''}`}
         >
           {item.label}
         </span>
@@ -168,60 +258,242 @@ function DesktopIcon({
 }
 
 export function Desktop({ size }: { size: Size }) {
-  const items = useItems()
+  const [labels, setLabels] = useState<Readonly<Record<string, string>>>(() => load(LABELS_KEY, {}))
+  const fsState = useFs((s) => s)
+  const items = useMemo(() => desktopItems(fsState, labels), [fsState, labels])
   const desktopFocused = useWindows((s) => s.focused === null)
-  const [saved, setSaved] = useState<Positions>(loadPositions)
+  const clip = useStore(clipboard, (s) => s)
+  const binItems = useMemo(() => children(fsState, RECYCLED_DIR), [fsState])
+  const [saved, setSaved] = useState<Positions>(() => load(POSITIONS_KEY, {}))
+  const [arrangement, setArrangement] = useState<Arrangement>(() =>
+    load(ARRANGE_KEY, { auto: false, by: 'name' }),
+  )
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+  const [focusKey, setFocusKey] = useState<string | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [menu, setMenu] = useState<{ at: Point; key: string | null } | null>(null)
   const [prompt, setPrompt] = useState<Prompt | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
+  const [band, setBand] = useState<Rect | null>(null)
   const dragRef = useRef<Drag | null>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const slowClick = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const typed = useRef({ text: '', at: 0 })
 
-  const positions = useMemo(() => layout(items, saved, size), [items, saved, size])
+  const keys = useMemo(() => items.map((item) => item.key), [items])
+  const positions = useMemo(
+    () =>
+      arrangement.auto
+        ? new Map(Object.entries(arranged(arrangeOrder(items, arrangement.by), size)))
+        : layout(keys, saved, size),
+    [items, keys, saved, size, arrangement],
+  )
   const byKey = useMemo(() => new Map(items.map((item) => [item.key, item])), [items])
+  const ordered = useMemo(
+    () => gridOrder(positions).flatMap((key) => byKey.get(key) ?? []),
+    [positions, byKey],
+  )
 
   const savePositions = useCallback((next: Positions) => {
     setSaved(next)
     localStorage.setItem(POSITIONS_KEY, JSON.stringify(next))
   }, [])
+  const saveArrangement = (next: Arrangement) => {
+    setArrangement(next)
+    localStorage.setItem(ARRANGE_KEY, JSON.stringify(next))
+  }
 
-  const selectedNodes = () => [...selected].flatMap((key) => byKey.get(key)?.node ?? [])
+  const select = (next: Iterable<string>, focus?: string | null) => {
+    setSelected(new Set(next))
+    if (focus !== undefined) setFocusKey(focus)
+  }
+  const itemsOf = (keyList: Iterable<string>) => [...keyList].flatMap((key) => byKey.get(key) ?? [])
+  const nodesOf = (keyList: Iterable<string>) =>
+    itemsOf(keyList).flatMap((item) => (item.kind === 'node' ? [item.node] : []))
+  const showError = (title: string, message: string) => setPrompt({ kind: 'error', title, message })
+
+  /** Runs a clipboard or shortcut plan, then selects and places what it made. */
+  const carry = (plan: Plan, at: Point | null) => {
+    if (!plan.ok) {
+      showError(plan.title, plan.message)
+      return []
+    }
+    for (const action of plan.actions) fsStore.dispatch(action)
+    if (at && plan.created[0]) savePositions({ ...saved, [plan.created[0]]: snap(at) })
+    if (plan.created.length) select(plan.created, plan.created[0] ?? null)
+    return plan.created
+  }
+
+  const openItem = (item: Item) => {
+    if (item.kind === 'shell') {
+      launch(item.app.id)
+      return
+    }
+    if (openNode(item.node.id)) return
+    if (item.node.kind === 'shortcut' && !resolveShortcut(fs.get(), item.node)) {
+      showError(
+        'Problem with Shortcut',
+        `The item '${item.node.name}' that this shortcut refers to has been changed or moved, so this shortcut will no longer work properly.`,
+      )
+    }
+  }
+
+  const startRename = (key: string) => {
+    const item = byKey.get(key)
+    if (!item || (item.kind === 'node' && isProtected(item.node.id))) return
+    select([key], key)
+    setRenaming(key)
+  }
 
   const finishRename = (item: Item, name: string | null) => {
     setRenaming(null)
-    if (name === null || !item.node || name === item.label) return
+    if (name === null || name === item.label) return
+    if (item.kind === 'shell') {
+      if (!name.trim()) {
+        showError('Rename', 'You must type a filename.')
+        return
+      }
+      const next = { ...labels, [item.key]: name.trim() }
+      setLabels(next)
+      localStorage.setItem(LABELS_KEY, JSON.stringify(next))
+      return
+    }
     const error = fs.rename(item.node.id, name)
-    if (error) setPrompt({ kind: 'error', title: 'Error Renaming File', message: error })
+    if (error) showError('Error Renaming File', error)
   }
 
-  const createOnDesktop = (kind: 'folder' | 'file') => {
-    const state = fs.get()
-    const name = uniqueName(state, DESKTOP_DIR, kind === 'folder' ? 'New Folder' : 'New Text Document.txt')
+  const createOnDesktop = (kind: 'folder' | 'file', at: Point | null) => {
+    const name = uniqueName(fs.get(), DESKTOP_DIR, kind === 'folder' ? 'New Folder' : 'New Text Document.txt')
     const result = createNode(DESKTOP_DIR, name, kind === 'folder' ? { kind } : { kind, content: '' })
-    if ('id' in result) {
-      if (menu) savePositions({ ...saved, [result.id]: snap(menu.at) })
-      setSelected(new Set([result.id]))
-      setRenaming(result.id)
+    if (!('id' in result)) return
+    if (at) savePositions({ ...saved, [result.id]: snap(at) })
+    select([result.id], result.id)
+    setRenaming(result.id)
+  }
+
+  const targetsOf = (keyList: Iterable<string>): ShortcutTarget[] =>
+    itemsOf(keyList).map((item) =>
+      item.kind === 'shell'
+        ? { kind: 'app', app: item.app.id, label: item.label }
+        : { kind: 'node', id: item.node.id },
+    )
+
+  const askDelete = (keyList: Iterable<string>, permanent: boolean) => {
+    const nodes = nodesOf(keyList).filter((node) => !isProtected(node.id))
+    if (nodes.length) setPrompt({ kind: permanent ? 'purge' : 'recycle', nodes })
+  }
+
+  const openProperties = (key: string | null) => {
+    const item = key ? byKey.get(key) : undefined
+    if (!item) desktopProperties?.()
+    else if (item.kind === 'node') setPrompt({ kind: 'properties', id: item.node.id })
+  }
+
+  const putOnClipboard = (op: 'cut' | 'copy', keyList: Iterable<string>) => {
+    const nodes = nodesOf(keyList).filter((node) => op === 'copy' || !isProtected(node.id))
+    if (nodes.length) clipboard.dispatch({ op, ids: nodes.map((node) => node.id) })
+  }
+
+  const paste = (clipNow: Clip, dest: NodeId, at: Point | null) => {
+    const created = carry(
+      planPaste(fs.get(), clipNow, dest, Date.now(), newNodeId),
+      dest === DESKTOP_DIR ? at : null,
+    )
+    if (clipNow?.op === 'cut' && created.length) clipboard.dispatch(null)
+  }
+
+  const actionsFor = (key: string | null, at: Point | null): DesktopActions => {
+    const scope = key ? (selected.has(key) ? [...selected] : [key]) : []
+    const item = key ? byKey.get(key) : undefined
+    const folder =
+      item?.kind === 'node' && (item.node.kind === 'folder' || item.node.kind === 'drive') ? item.node : null
+    return {
+      open: () => {
+        for (const each of itemsOf(scope)) openItem(each)
+      },
+      explore: () => {
+        if (folder) launch('explorer', { folder: folder.id })
+        else if (item?.kind === 'shell' && item.app.id === 'mycomputer') launch('explorer', { folder: ROOT })
+        else if (item) openItem(item)
+      },
+      find: () => launch('find', folder ? { folder: folder.id } : {}),
+      cut: () => putOnClipboard('cut', scope),
+      copy: () => putOnClipboard('copy', scope),
+      paste: () => paste(clipboard.get(), folder?.id ?? DESKTOP_DIR, folder ? null : at),
+      pasteShortcut: () => {
+        const ids = clipboard.get()?.ids ?? []
+        carry(
+          planShortcuts(
+            fs.get(),
+            ids.map((id) => ({ kind: 'node', id })),
+            DESKTOP_DIR,
+            Date.now(),
+            newNodeId,
+          ),
+          at,
+        )
+      },
+      createShortcut: () =>
+        carry(planShortcuts(fs.get(), targetsOf(scope), DESKTOP_DIR, Date.now(), newNodeId), null),
+      remove: () => askDelete(scope, false),
+      rename: () => key && startRename(key),
+      properties: () => openProperties(key),
+      sendToDocuments: () =>
+        paste({ op: 'copy', ids: nodesOf(scope).map((node) => node.id) }, DOCUMENTS_DIR, null),
+      sendToDesktop: () =>
+        carry(planShortcuts(fs.get(), targetsOf(scope), DESKTOP_DIR, Date.now(), newNodeId), null),
+      emptyRecycleBin: () => setPrompt({ kind: 'empty' }),
+      arrange: (by) => {
+        saveArrangement({ ...arrangement, by })
+        savePositions(arranged(arrangeOrder(items, by), size))
+      },
+      toggleAutoArrange: () => {
+        const next = { ...arrangement, auto: !arrangement.auto }
+        saveArrangement(next)
+        if (!next.auto) savePositions(Object.fromEntries(positions))
+      },
+      lineUp: () => savePositions(Object.fromEntries([...positions].map(([k, p]) => [k, snap(p)]))),
+      newFolder: () => createOnDesktop('folder', at),
+      newShortcut: () => setPrompt({ kind: 'shortcut', at }),
+      newTextDocument: () => createOnDesktop('file', at),
+      desktopProperties: () => desktopProperties?.(),
     }
   }
 
-  const snap = (point: Point) => {
-    const cell = cellAt(point)
-    return pointOf(Math.max(0, cell.column), Math.max(0, cell.row))
+  const factsFor = (key: string | null): MenuFacts => {
+    const scope = key ? (selected.has(key) ? [...selected] : [key]) : []
+    const item = key ? byKey.get(key) : undefined
+    return {
+      canPaste: Boolean(clip?.ids.some((id) => fs.get().nodes[id])),
+      autoArrange: arrangement.auto,
+      binEmpty: binItems.length === 0,
+      canFind: Boolean(getApp('find')),
+      single: scope.length <= 1,
+      mutable: item?.kind === 'node' && !isProtected(item.node.id),
+      hasProperties: item?.kind === 'node',
+    }
+  }
+
+  const menuItems = (key: string | null, at: Point) => {
+    const item = key ? byKey.get(key) : undefined
+    const facts = factsFor(key)
+    const act = actionsFor(key, at)
+    if (!item) return backgroundMenu(facts, act)
+    return item.kind === 'shell' ? shellMenu(item.app.id, facts, act) : nodeMenu(item.node, facts, act)
   }
 
   const dropOn = (target: Item | undefined, dragged: Item): boolean => {
-    if (!target || target.key === dragged.key || !dragged.node) return false
-    const ids = selected.has(dragged.key) ? selectedNodes().map((n) => n.id) : [dragged.node.id]
-    if (target.onDrop) {
-      target.onDrop(ids)
+    if (!target || target.key === dragged.key || dragged.kind !== 'node') return false
+    const ids = nodesOf(selected.has(dragged.key) ? selected : [dragged.key]).map((node) => node.id)
+    const onDrop = target.kind === 'shell' ? target.app.desktop?.onDrop : undefined
+    if (onDrop) {
+      onDrop(ids)
       return true
     }
-    const folder = target.node
-    if (folder?.kind !== 'folder') return false
+    if (target.kind !== 'node' || target.node.kind !== 'folder') return false
+    const into = target.node.id
     for (const id of ids) {
-      if (!isInside(fs.get(), folder.id, id)) fs.move(id, folder.id)
+      if (!isInside(fs.get(), into, id)) fs.move(id, into)
     }
     return true
   }
@@ -230,8 +502,10 @@ export function Desktop({ size }: { size: Size }) {
     event.stopPropagation()
     windowsStore.dispatch({ type: 'blur' })
     setMenu(null)
+    clearTimeout(slowClick.current)
     if (event.button === 2) {
-      if (!selected.has(item.key)) setSelected(new Set([item.key]))
+      if (!selected.has(item.key)) select([item.key], item.key)
+      else setFocusKey(item.key)
       return
     }
     if (event.button !== 0) return
@@ -239,21 +513,21 @@ export function Desktop({ size }: { size: Size }) {
       const next = new Set(selected)
       if (next.has(item.key)) next.delete(item.key)
       else next.add(item.key)
-      setSelected(next)
+      select(next, item.key)
       return
     }
-    if (!selected.has(item.key)) setSelected(new Set([item.key]))
-    const from = positions.get(item.key) ?? ORIGIN
+    const onLabel = event.target instanceof Element && event.target.closest('[data-label]') !== null
+    const armed = onLabel && selected.size === 1 && selected.has(item.key)
+    if (!selected.has(item.key)) select([item.key], item.key)
+    else setFocusKey(item.key)
     event.currentTarget.setPointerCapture(event.pointerId)
     const target = event.currentTarget
-    const start: Drag = {
+    dragRef.current = {
       key: item.key,
       pointer: { x: event.clientX, y: event.clientY },
-      from,
       offset: { x: 0, y: 0 },
       started: false,
     }
-    dragRef.current = start
     const move = (e: PointerEvent) => {
       const current = dragRef.current
       if (!current) return
@@ -269,14 +543,18 @@ export function Desktop({ size }: { size: Size }) {
       const current = dragRef.current
       dragRef.current = null
       setDrag(null)
-      if (!current?.started) return
+      if (!current?.started) {
+        if (armed) slowClick.current = setTimeout(() => startRename(item.key), SLOW_CLICK_MS)
+        return
+      }
       const under = document
         .elementsFromPoint(e.clientX, e.clientY)
         .map((el) => el.closest<HTMLElement>('[data-desktop-item]')?.dataset.desktopItem)
         .find((key) => key && key !== current.key)
       if (dropOn(under ? byKey.get(under) : undefined, item)) return
+      if (arrangement.auto) return
       const moved = [...(selected.has(item.key) ? selected : [item.key])]
-      const next = { ...saved }
+      const next: Record<string, Point> = Object.fromEntries(positions)
       for (const key of moved) {
         const origin = positions.get(key)
         if (!origin) continue
@@ -292,70 +570,200 @@ export function Desktop({ size }: { size: Size }) {
     target.addEventListener('pointercancel', up)
   }
 
+  /** Rubber-band selection: drag on empty desktop to select every icon the dotted box touches. */
+  const onBackgroundPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return
+    windowsStore.dispatch({ type: 'blur' })
+    setMenu(null)
+    clearTimeout(slowClick.current)
+    if (event.button !== 0) return
+    const root = event.currentTarget
+    const origin = root.getBoundingClientRect()
+    const local = (e: { clientX: number; clientY: number }): Point => ({
+      x: e.clientX - origin.left,
+      y: e.clientY - origin.top,
+    })
+    const rects = new Map<string, Rect[]>()
+    for (const element of root.querySelectorAll<HTMLElement>('[data-desktop-item]')) {
+      const key = element.dataset.desktopItem
+      if (!key) continue
+      rects.set(
+        key,
+        [...element.querySelectorAll('[data-icon], [data-label]')].map((part) => {
+          const box = part.getBoundingClientRect()
+          return { x: box.left - origin.left, y: box.top - origin.top, width: box.width, height: box.height }
+        }),
+      )
+    }
+    const base = event.ctrlKey ? new Set(selected) : new Set<string>()
+    if (!event.ctrlKey) select([], null)
+    root.setPointerCapture(event.pointerId)
+    const from = local(event)
+    let started = false
+    const move = (e: PointerEvent) => {
+      const to = local(e)
+      if (!started && Math.abs(to.x - from.x) + Math.abs(to.y - from.y) < DRAG_THRESHOLD) return
+      started = true
+      const rect = spanned(from, to)
+      setBand(rect)
+      setSelected(new Set([...base, ...touched(rect, rects)]))
+    }
+    const up = () => {
+      root.removeEventListener('pointermove', move)
+      root.removeEventListener('pointerup', up)
+      root.removeEventListener('pointercancel', up)
+      setBand(null)
+    }
+    root.addEventListener('pointermove', move)
+    root.addEventListener('pointerup', up)
+    root.addEventListener('pointercancel', up)
+  }
+
+  const menuAt = (key: string | null): Point => {
+    const root = rootRef.current?.getBoundingClientRect()
+    const point = key ? positions.get(key) : undefined
+    if (!root) return { x: 0, y: 0 }
+    return point
+      ? { x: root.left + point.x + 37, y: root.top + point.y + 24 }
+      : { x: root.left + 4, y: root.top + 4 }
+  }
+
   useKeyDown((event) => {
-    if (!desktopFocused || renaming || prompt || event.target instanceof HTMLInputElement) return
-    const nodes = selectedNodes()
-    if (event.key === 'Enter') for (const key of selected) byKey.get(key)?.open()
-    if (event.key === 'Delete' && nodes[0]) setPrompt({ kind: 'delete', node: nodes[0] })
-    if (event.key === 'F2' && nodes.length === 1 && nodes[0]) setRenaming(nodes[0].id)
-    if (event.key === 'a' && event.ctrlKey) {
-      event.preventDefault()
-      setSelected(new Set(items.map((item) => item.key)))
+    const active = document.activeElement
+    const ours = active === document.body || (active instanceof Node && rootRef.current?.contains(active))
+    if (!desktopFocused || !ours || renaming || prompt || menu || event.target instanceof HTMLInputElement)
+      return
+    const arrows: Record<string, Direction> = {
+      ArrowUp: 'up',
+      ArrowDown: 'down',
+      ArrowLeft: 'left',
+      ArrowRight: 'right',
+    }
+    const direction = arrows[event.key]
+    const focus = focusKey && byKey.has(focusKey) ? focusKey : null
+    const scope = selected.size ? [...selected] : focus ? [focus] : []
+    const handled = () => event.preventDefault()
+    if (direction) {
+      handled()
+      const next = neighbor(positions, focus, direction)
+      if (!next) return
+      if (event.ctrlKey) setFocusKey(next)
+      else select([next], next)
+      return
+    }
+    if (event.key === 'Home' || event.key === 'End') {
+      handled()
+      const next = event.key === 'Home' ? ordered[0] : ordered.at(-1)
+      if (next) select([next.key], next.key)
+      return
+    }
+    if (event.key === ' ' && event.ctrlKey && focus) {
+      handled()
+      const next = new Set(selected)
+      if (next.has(focus)) next.delete(focus)
+      else next.add(focus)
+      setSelected(next)
+      return
+    }
+    if (event.key === 'Enter' && event.altKey) {
+      handled()
+      openProperties(scope.length === 1 ? (scope[0] ?? null) : null)
+      return
+    }
+    if (event.key === 'Enter') {
+      handled()
+      for (const item of itemsOf(scope)) openItem(item)
+      return
+    }
+    if ((event.key === 'F10' && event.shiftKey) || event.key === 'ContextMenu') {
+      handled()
+      const key = scope[0] ?? null
+      setMenu({ at: menuAt(key), key })
+      return
+    }
+    if (event.key === 'F2' && scope.length === 1 && scope[0]) {
+      handled()
+      startRename(scope[0])
+      return
+    }
+    if (event.key === 'Delete') {
+      handled()
+      askDelete(scope, event.shiftKey)
+      return
+    }
+    if (event.ctrlKey && !event.altKey) {
+      const key = event.key.toLowerCase()
+      if (key === 'a') {
+        handled()
+        select(keys, focus)
+      } else if (key === 'c' || key === 'x') {
+        handled()
+        putOnClipboard(key === 'c' ? 'copy' : 'cut', scope)
+      } else if (key === 'v') {
+        handled()
+        paste(clipboard.get(), DESKTOP_DIR, null)
+      }
+      return
+    }
+    if (event.key.length === 1 && !event.altKey && !event.metaKey && event.key !== ' ') {
+      const now = Date.now()
+      const text = now - typed.current.at > TYPE_AHEAD_MS ? event.key : typed.current.text + event.key
+      typed.current = { text, at: now }
+      const next = typeAhead(
+        ordered.map((item) => ({ key: item.key, label: item.label })),
+        focus,
+        text,
+      )
+      if (next) select([next], next)
     }
   })
 
-  const menuItems = (key: string | null): MenuEntry[] => {
-    const item = key ? byKey.get(key) : undefined
-    if (item) {
-      const node = item.node
-      return [
-        { label: '&Open', bold: true, onSelect: item.open },
-        'separator',
-        { label: '&Delete', disabled: !node, onSelect: () => node && setPrompt({ kind: 'delete', node }) },
-        { label: 'Rena&me', disabled: !node, onSelect: () => setRenaming(item.key) },
-        'separator',
-        { label: 'P&roperties', disabled: true },
-      ]
+  const answerDelete = (nodes: readonly FsNode[], permanent: boolean) => {
+    for (const node of nodes) {
+      if (permanent) fs.purge(node.id)
+      else fs.recycle(node.id)
     }
-    return [
-      {
-        label: 'Arrange &Icons',
-        items: [{ label: 'by &Name', onSelect: () => savePositions({}) }],
-      },
-      {
-        label: 'Line &up Icons',
-        onSelect: () => savePositions(Object.fromEntries([...positions].map(([k, p]) => [k, snap(p)]))),
-      },
-      'separator',
-      { label: '&Paste', disabled: true },
-      { label: 'Paste &Shortcut', disabled: true },
-      'separator',
-      {
-        label: 'Ne&w',
-        items: [
-          { label: '&Folder', onSelect: () => createOnDesktop('folder') },
-          'separator',
-          { label: 'Text Document', onSelect: () => createOnDesktop('file') },
-        ],
-      },
-      'separator',
-      { label: 'P&roperties', disabled: true },
-    ]
+    select([], null)
   }
+
+  const deletePrompt = (nodes: readonly FsNode[], permanent: boolean) => {
+    const [first] = nodes
+    if (!first) return null
+    const many = nodes.length > 1
+    const folder = !many && first.kind === 'folder'
+    const title = many
+      ? 'Confirm Multiple File Delete'
+      : folder
+        ? 'Confirm Folder Delete'
+        : 'Confirm File Delete'
+    const message = permanent
+      ? many
+        ? `Are you sure you want to delete these ${nodes.length} items?`
+        : `Are you sure you want to delete '${first.name}'?`
+      : many
+        ? `Are you sure you want to send these ${nodes.length} items to the Recycle Bin?`
+        : folder
+          ? `Are you sure you want to remove the folder '${first.name}' and move all its contents to the Recycle Bin?`
+          : `Are you sure you want to send '${first.name}' to the Recycle Bin?`
+    return { title, message, icon: folder ? ('warning' as const) : ('question' as const) }
+  }
+
+  const confirm =
+    prompt?.kind === 'recycle' || prompt?.kind === 'purge'
+      ? deletePrompt(prompt.nodes, prompt.kind === 'purge')
+      : prompt?.kind === 'empty'
+        ? deletePrompt(binItems, true)
+        : null
 
   return (
     <div
+      ref={rootRef}
       role="listbox"
       aria-label="Desktop"
       aria-multiselectable="true"
       tabIndex={0}
       className="absolute inset-0 bg-desktop outline-none"
-      onPointerDown={(event) => {
-        if (event.target !== event.currentTarget) return
-        windowsStore.dispatch({ type: 'blur' })
-        setSelected(new Set())
-        setMenu(null)
-      }}
+      onPointerDown={onBackgroundPointerDown}
       onContextMenu={(event) => {
         event.preventDefault()
         const key =
@@ -374,25 +782,41 @@ export function Desktop({ size }: { size: Size }) {
             item={item}
             at={moving && drag ? { x: at.x + drag.offset.x, y: at.y + drag.offset.y } : at}
             selected={selected.has(item.key)}
+            focused={focusKey === item.key && desktopFocused}
             renaming={renaming === item.key}
+            ghosted={clip?.op === 'cut' && item.kind === 'node' && clip.ids.includes(item.node.id)}
             onPointerDown={onIconPointerDown(item)}
+            onOpen={() => {
+              clearTimeout(slowClick.current)
+              openItem(item)
+            }}
             onRename={(name) => finishRename(item, name)}
           />
         )
       })}
-      {menu && <ContextMenu at={menu.at} items={menuItems(menu.key)} onClose={() => setMenu(null)} />}
-      {prompt?.kind === 'delete' && (
+      {band && (
+        <div
+          data-rubber-band
+          className="absolute pointer-events-none"
+          style={{ left: band.x, top: band.y, width: band.width, height: band.height }}
+        >
+          <span className="dotted-frame" />
+        </div>
+      )}
+      {menu && (
+        <ContextMenu at={menu.at} items={menuItems(menu.key, menu.at)} onClose={() => setMenu(null)} />
+      )}
+      {confirm && (prompt?.kind === 'recycle' || prompt?.kind === 'purge' || prompt?.kind === 'empty') && (
         <MessageBox
-          title="Confirm File Delete"
-          icon="question"
-          message={`Are you sure you want to send '${prompt.node.name}' to the Recycle Bin?`}
+          title={confirm.title}
+          icon={confirm.icon}
+          message={confirm.message}
           buttons={['Yes', 'No']}
           onClose={(answer) => {
             setPrompt(null)
             if (answer !== 'Yes') return
-            const nodes = selected.has(prompt.node.id) ? selectedNodes() : [prompt.node]
-            for (const node of nodes) fs.recycle(node.id)
-            setSelected(new Set())
+            if (prompt.kind === 'empty') fs.emptyRecycleBin()
+            else answerDelete(prompt.nodes, prompt.kind === 'purge')
           }}
         />
       )}
@@ -405,6 +829,24 @@ export function Desktop({ size }: { size: Size }) {
           onClose={() => setPrompt(null)}
         />
       )}
+      {prompt?.kind === 'properties' && <PropertiesSheet id={prompt.id} onClose={() => setPrompt(null)} />}
+      {prompt?.kind === 'shortcut' && (
+        <CreateShortcut
+          onClose={() => setPrompt(null)}
+          onFinish={(target, name) => {
+            const spec =
+              target.kind === 'app'
+                ? { kind: 'shortcut' as const, app: target.app }
+                : { kind: 'shortcut' as const, target: target.id }
+            const result = createNode(DESKTOP_DIR, name, spec)
+            if ('error' in result) return result.error
+            if (prompt.at) savePositions({ ...saved, [result.id]: snap(prompt.at) })
+            select([result.id], result.id)
+            return null
+          }}
+        />
+      )}
+      <TooltipLayer />
     </div>
   )
 }

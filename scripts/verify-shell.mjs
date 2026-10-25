@@ -54,6 +54,14 @@ function run(command) {
   browser('fill', '#run-command', command)
   browser('press', 'Enter')
 }
+/** The selector of the desktop icon labelled `name`. Its key is a node id, which changes per boot. */
+function desktopItem(name) {
+  const key = evaluate(
+    `[...document.querySelectorAll('[data-desktop-item]')].find(e => e.textContent === ${JSON.stringify(name)})?.dataset.desktopItem`,
+  )
+  assert.ok(key, `no desktop icon named ${name}`)
+  return `[data-desktop-item="${key}"]`
+}
 function rectangle(selector) {
   return evaluate(`document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect().toJSON()`)
 }
@@ -277,23 +285,34 @@ if (phase === 'smoke') {
 } else if (phase === 'desktop') {
   browser('reload')
   browser('wait', '[data-start-button]')
-  browser('click', '[data-desktop-item="desktop-readme"]')
+  browser('mouse', 'move', '400', '300')
+  browser('mouse', 'down', 'right')
+  browser('mouse', 'up', 'right')
+  waitMenu('New')
+  menu('New')
+  waitMenu('Text Document')
+  menu('Text Document')
+  browser('wait', '[data-desktop-item] input')
+  browser('fill', '[data-desktop-item] input', 'Readme.txt')
+  browser('press', 'Enter')
+  const readme = desktopItem('Readme.txt')
+  browser('click', readme)
   browser('press', 'F2')
   browser('wait', '[data-desktop-item] input')
   browser('fill', '[data-desktop-item] input', 'Shell Readme.txt')
   browser('press', 'Enter')
   check(
-    evaluate(
-      'document.querySelector(`[data-desktop-item="desktop-readme"]`).textContent.includes(`Shell Readme.txt`)',
-    ),
+    evaluate(`document.querySelector(${JSON.stringify(readme)}).textContent.includes('Shell Readme.txt')`),
     'F2 renames a desktop file',
   )
   shot('desktop-renamed')
-  const icon = rectangle('[data-desktop-item="desktop-readme"]')
+  const icon = rectangle(readme)
   drag({ x: icon.x + 35, y: icon.y + 18 }, { x: icon.x + 235, y: icon.y + 168 })
   browser('mouse', 'up')
   check(
-    evaluate('JSON.parse(localStorage.getItem(`w95.desktop.v1`))[`desktop-readme`].x > 100'),
+    evaluate(
+      `JSON.parse(localStorage.getItem('w95.desktop.v1'))[${JSON.stringify(readme.slice(20, -2))}].x > 100`,
+    ),
     'Dragging saves desktop icon positions',
   )
   shot('desktop-dragged')
@@ -316,12 +335,9 @@ if (phase === 'smoke') {
   )
   check(true, 'Confirmed deletion moves a file to C:\\RECYCLED')
   shot('desktop-deleted')
-  browser('dblclick', '[data-desktop-item="desktop-readme"]')
-  browser('wait', 'textarea')
-  check(
-    evaluate('document.querySelector(`textarea`).value.startsWith(`Welcome to Windows 95!`)'),
-    'A desktop document opens in Notepad',
-  )
+  browser('dblclick', readme)
+  browser('wait', '[data-window][aria-label="Shell Readme.txt - Notepad"]')
+  check(true, 'A desktop document opens in Notepad')
   shot('desktop-open-notepad')
   browser('click', '[data-window] button[aria-label="Close"]')
   start()
@@ -341,8 +357,11 @@ if (phase === 'smoke') {
     'note.txt survives a process restart',
   )
   shot('notepad-persisted')
-  const at = evaluate('JSON.parse(localStorage.getItem(`w95.desktop.v1`))[`desktop-readme`]')
-  const icon = rectangle('[data-desktop-item="desktop-readme"]')
+  const readme = desktopItem('Shell Readme.txt')
+  const at = evaluate(
+    `JSON.parse(localStorage.getItem('w95.desktop.v1'))[${JSON.stringify(readme.slice(20, -2))}]`,
+  )
+  const icon = rectangle(readme)
   check(icon.x === at.x && icon.y === at.y, 'Desktop positions survive a process restart')
   shot('desktop-persisted')
 } else if (phase === 'shutdown') {
