@@ -7,6 +7,10 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   pressed?: boolean
 }
 
+/**
+ * A Windows 95 push button. The ring and the focus rectangle live in `styles.css` (`push-button`), because
+ * which button wears the ring depends on where focus is in the whole dialog.
+ */
 export function Button({
   isDefault,
   pressed,
@@ -15,17 +19,16 @@ export function Button({
   type = 'button',
   ...rest
 }: ButtonProps) {
-  const ring = isDefault ? 'outline outline-1 outline-black -outline-offset-1' : ''
   return (
     <button
       type={type}
-      className={`group relative min-w-[75px] h-[23px] px-2 bg-face outline-none disabled:text-embossed
-        ${pressed ? 'bevel-pressed dither' : 'bevel-raised enabled:active:bevel-pressed'} ${ring} ${className}`}
+      data-default={isDefault || undefined}
+      className={`group relative min-w-[75px] h-[23px] px-2 bg-face disabled:text-embossed
+        ${pressed ? 'bevel-pressed dither outline-none' : 'push-button'} ${className}`}
       {...rest}
     >
       <span
-        className={`block group-focus-visible:outline group-focus-visible:outline-1 group-focus-visible:outline-dotted
-          group-focus-visible:outline-black ${pressed ? 'translate-x-px translate-y-px' : 'group-enabled:group-active:translate-x-px group-enabled:group-active:translate-y-px'}`}
+        className={`block ${pressed ? 'translate-x-px translate-y-px' : 'group-enabled:group-active:translate-x-px group-enabled:group-active:translate-y-px'}`}
       >
         {children}
       </span>

@@ -42,6 +42,7 @@ export function Taskbar({ startOpen, onStart }: TaskbarProps) {
       <button
         type="button"
         data-start-button
+        title="Click here to begin."
         aria-pressed={startOpen}
         aria-expanded={startOpen}
         className={`flex items-center gap-[3px] h-[22px] pl-[4px] pr-[5px] font-bold outline-none shrink-0

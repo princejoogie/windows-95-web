@@ -170,3 +170,88 @@
   color: var(--color-shadow);
   text-shadow: 1px 1px var(--color-hilight);
 }
+
+@layer base {
+  ::selection {
+    background: var(--color-select);
+    color: #fff;
+  }
+}
+
+/*
+ * Push buttons. Inside a dialog the focused push button wears the 1px black default ring; when focus is on
+ * anything else, the default button wears it.
+ */
+@layer components {
+  .push-button {
+    box-shadow:
+      inset -1px -1px var(--color-dark),
+      inset 1px 1px var(--color-hilight),
+      inset -2px -2px var(--color-shadow),
+      inset 2px 2px var(--color-light);
+  }
+
+  .push-button[data-default]:enabled,
+  [role="dialog"] .push-button:focus {
+    box-shadow:
+      inset 0 0 0 1px var(--color-dark),
+      inset -2px -2px var(--color-dark),
+      inset 2px 2px var(--color-hilight),
+      inset -3px -3px var(--color-shadow),
+      inset 3px 3px var(--color-light);
+  }
+
+  [role="dialog"]:has(.push-button:focus) .push-button[data-default]:not(:focus) {
+    box-shadow:
+      inset -1px -1px var(--color-dark),
+      inset 1px 1px var(--color-hilight),
+      inset -2px -2px var(--color-shadow),
+      inset 2px 2px var(--color-light);
+  }
+
+  .push-button:enabled:active {
+    box-shadow:
+      inset 0 0 0 1px var(--color-dark),
+      inset 0 0 0 2px var(--color-shadow);
+  }
+
+  /* The focus rectangle: every other pixel black, 4px inside the edge. */
+  [role="dialog"] .push-button:focus::after,
+  .push-button:focus-visible::after {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    pointer-events: none;
+    background: repeating-conic-gradient(var(--color-dark) 0 25%, transparent 0 50%) 0 0 / 2px 2px;
+    clip-path: polygon(
+      evenodd,
+      0 0,
+      100% 0,
+      100% 100%,
+      0 100%,
+      0 0,
+      1px 1px,
+      1px calc(100% - 1px),
+      calc(100% - 1px) calc(100% - 1px),
+      calc(100% - 1px) 1px,
+      1px 1px
+    );
+  }
+
+  .push-button:focus {
+    outline: none;
+  }
+
+  /* The yellow tip Windows shows after the pointer rests on a control. */
+  .tooltip {
+    position: fixed;
+    z-index: 20000;
+    padding: 1px 2px;
+    max-width: 400px;
+    background: var(--color-tooltip);
+    border: 1px solid var(--color-dark);
+    color: #000;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+}
