@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { cardImage } from './cards'
-import { RANKS, SUITS } from './game'
+import { FOUNDATION_SLOTS, type Foundations } from './game'
 
 interface FlyingCard {
   image: HTMLImageElement
@@ -13,13 +13,13 @@ interface FlyingCard {
 export function Cascade({
   width,
   height,
-  scale,
+  foundations,
   active,
   onStop,
 }: {
   width: number
   height: number
-  scale: number
+  foundations: Foundations
   active: boolean
   onStop: () => void
 }) {
@@ -41,17 +41,17 @@ export function Cascade({
       const state = progress.current
       state.next -= dt
       if (state.emitted < 52 && state.next <= 0) {
-        const suit = SUITS[state.emitted % 4]
-        const rank = RANKS[12 - Math.floor(state.emitted / 4)]
-        if (suit && rank) {
+        const pile = FOUNDATION_SLOTS[state.emitted % 4]
+        const card = pile === undefined ? undefined : foundations[pile][12 - Math.floor(state.emitted / 4)]
+        if (card) {
           const image = new Image()
-          image.src = cardImage({ suit, rank })
-          const gap = (width - 24 * scale - 71 * scale) / 6
+          image.src = cardImage(card)
+          const gap = (width - 24 - 71) / 6
           state.cards.push({
             image,
-            x: 12 * scale + (3 + (state.emitted % 4)) * gap,
-            y: 12 * scale,
-            vx: ((state.emitted % 3) + 2) * (state.emitted % 2 ? -1 : 1) * scale,
+            x: Math.round(12 + (3 + (state.emitted % 4)) * gap),
+            y: 12,
+            vx: ((state.emitted % 3) + 2) * (state.emitted % 2 ? -1 : 1),
             vy: 0,
           })
         }
@@ -60,21 +60,21 @@ export function Cascade({
       }
       for (const card of state.cards) {
         card.x += card.vx * dt
-        card.vy += 0.48 * scale * dt
+        card.vy += 0.48 * dt
         card.y += card.vy * dt
-        if (card.y + 96 * scale >= height && card.vy > 0) {
-          card.y = height - 96 * scale
-          card.vy = -Math.max(5 * scale, card.vy * 0.78)
+        if (card.y + 96 >= height && card.vy > 0) {
+          card.y = height - 96
+          card.vy = -Math.max(5, card.vy * 0.78)
         }
         if (card.image.complete && card.image.naturalWidth)
-          context.drawImage(card.image, card.x, card.y, 71 * scale, 96 * scale)
+          context.drawImage(card.image, Math.round(card.x), Math.round(card.y), 71, 96)
       }
-      state.cards = state.cards.filter((card) => card.x > -80 * scale && card.x < width)
+      state.cards = state.cards.filter((card) => card.x > -80 && card.x < width)
       frame = requestAnimationFrame(run)
     }
     frame = requestAnimationFrame(run)
     return () => cancelAnimationFrame(frame)
-  }, [active, height, scale, width])
+  }, [active, foundations, height, width])
   return (
     <button
       type="button"

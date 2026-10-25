@@ -8,12 +8,12 @@ export function proofDeal(kind: string): Game | null {
       stock: [],
       waste: [],
       tableau: [[], [], [], [], [], [], [{ suit: 'spades', rank: 13, faceUp: true }]],
-      foundations: {
-        clubs: RANKS.map((rank) => ({ rank, suit: 'clubs' })),
-        diamonds: RANKS.map((rank) => ({ rank, suit: 'diamonds' })),
-        hearts: RANKS.map((rank) => ({ rank, suit: 'hearts' })),
-        spades: RANKS.slice(0, 12).map((rank) => ({ rank, suit: 'spades' })),
-      },
+      foundations: [
+        RANKS.map((rank) => ({ rank, suit: 'clubs' })),
+        RANKS.map((rank) => ({ rank, suit: 'diamonds' })),
+        RANKS.map((rank) => ({ rank, suit: 'hearts' })),
+        RANKS.slice(0, 12).map((rank) => ({ rank, suit: 'spades' })),
+      ],
       elapsed: 90,
       score: 500,
     }
