@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useKeyDown } from '../../shell/context'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { Button, Dialog, MenuBar, TextBox } from '../../ui'
+import { Button, MenuBar, TextBox } from '../../ui'
 import { faces, flagIcon, largeMineIcon, mineIcon, wrongFlagIcon } from './art'
 import {
   advanceTime,
@@ -19,6 +19,7 @@ import {
   reveal,
   seconds,
 } from './game'
+import { MineDialog as Dialog } from './MineDialog'
 import { emptyRecords, loadPreferences, savePreferences } from './preferences'
 import './minesweeper.css'
 
@@ -69,7 +70,7 @@ function Counter({ value, label }: { value: number; label: string }) {
             <polygon
               key={segment}
               points={points}
-              fill={segments[digit]?.includes(segment) ? '#ff0000' : '#400000'}
+              fill={segments[digit]?.includes(segment) ? '#ff0000' : '#800000'}
             />
           ))}
         </svg>
