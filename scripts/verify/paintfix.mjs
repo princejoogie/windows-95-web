@@ -944,6 +944,19 @@ await check(
 )
 await closeDialogs()
 
+// The option box under the tools, three times larger, for each tool that has one.
+for (const name of ['Select', 'Eraser/Color Eraser', 'Magnifier', 'Brush', 'Airbrush', 'Line', 'Rectangle']) {
+  await tool(name)
+  const box = await rect(`${W} [data-paint="toolbox"]`)
+  const { result } = await send('Page.captureScreenshot', {
+    format: 'png',
+    clip: { x: box.x, y: box.y, width: box.w, height: box.h, scale: 3 },
+  })
+  const file = join(proof, `41-options-${name.split('/')[0].toLowerCase()}.png`)
+  writeFileSync(file, Buffer.from(result.data, 'base64'))
+  checks.push({ finding: 41, name: `${name} option box`, ok: true, file })
+}
+
 writeFileSync(join(proof, 'checks.json'), JSON.stringify(checks, null, 2))
 const failed = checks.filter((c) => !c.ok)
 console.log(`${checks.length - failed.length}/${checks.length} passed`)
