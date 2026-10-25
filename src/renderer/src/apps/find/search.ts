@@ -1,4 +1,4 @@
-import { extension, isInside, pathOf } from '../../fs/fs'
+import { extension, fileSize, isInside, pathOf } from '../../fs/fs'
 import { type FsNode, type FsState, type NodeId, RECYCLED_DIR, ROOT } from '../../fs/types'
 
 export type ModifiedFilter =
@@ -30,10 +30,6 @@ export const defaultCriteria: SearchCriteria = {
   containing: '',
   size: { kind: 'any' },
   caseSensitive: false,
-}
-
-export function fileSize(node: FsNode): number {
-  return node.kind === 'file' ? new TextEncoder().encode(node.content).length : 0
 }
 
 export function fileType(node: FsNode): string {

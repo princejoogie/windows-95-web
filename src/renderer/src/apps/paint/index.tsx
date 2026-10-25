@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { pathOf } from '../../fs/fs'
 import { createNode, fs, useFs } from '../../fs/store'
 import { DOCUMENTS_DIR, type NodeId } from '../../fs/types'
+import { setPaintWallpaper } from '../../settings/wallpaper'
 import { useKeyDown } from '../../shell/context'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
@@ -512,8 +513,20 @@ function Paint({ window: windowApi, args }: AppProps) {
         'separator',
         { label: 'S&end...', disabled: true },
         'separator',
-        { label: 'Set As &Wallpaper (Tiled)', disabled: true },
-        { label: 'Set As Wa&llpaper (Centered)', disabled: true },
+        {
+          label: 'Set As &Wallpaper (Tiled)',
+          onSelect: () =>
+            void setPaintWallpaper({ content: encodeBitmap(shown), mode: 'tile', file }).catch((cause) =>
+              error(String(cause)),
+            ),
+        },
+        {
+          label: 'Set As Wa&llpaper (Centered)',
+          onSelect: () =>
+            void setPaintWallpaper({ content: encodeBitmap(shown), mode: 'center', file }).catch((cause) =>
+              error(String(cause)),
+            ),
+        },
         'separator',
         ...(recentEntries.length ? recentEntries : [{ label: 'Recent File', disabled: true }]),
         'separator',

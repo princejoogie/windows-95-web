@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { cursors } from '../system/cursors'
 import { useModalCount } from '../ui/Dialog'
 import { TitleBar, TitleButton } from '../ui/TitleBar'
 import { registerCloseRequest } from './closeRequests'
@@ -48,10 +49,10 @@ const MIN_CLIENT = { width: 120, height: 40 }
 const KEEP_VISIBLE = 40
 
 const HANDLES: { edges: Edges; className: string; cursor: string }[] = [
-  { edges: { n: true }, className: 'left-[4px] right-[4px] top-0 h-[4px]', cursor: 'ns-resize' },
-  { edges: { s: true }, className: 'left-[4px] right-[4px] bottom-0 h-[4px]', cursor: 'ns-resize' },
-  { edges: { w: true }, className: 'top-[4px] bottom-[4px] left-0 w-[4px]', cursor: 'ew-resize' },
-  { edges: { e: true }, className: 'top-[4px] bottom-[4px] right-0 w-[4px]', cursor: 'ew-resize' },
+  { edges: { n: true }, className: 'left-[4px] right-[4px] top-0 h-[4px]', cursor: cursors.ns },
+  { edges: { s: true }, className: 'left-[4px] right-[4px] bottom-0 h-[4px]', cursor: cursors.ns },
+  { edges: { w: true }, className: 'top-[4px] bottom-[4px] left-0 w-[4px]', cursor: cursors.ew },
+  { edges: { e: true }, className: 'top-[4px] bottom-[4px] right-0 w-[4px]', cursor: cursors.ew },
   ...(['top', 'bottom'] as const).flatMap((vertical) =>
     (['left', 'right'] as const).flatMap((horizontal) => {
       const edges = {
@@ -60,7 +61,7 @@ const HANDLES: { edges: Edges; className: string; cursor: string }[] = [
         w: horizontal === 'left',
         e: horizontal === 'right',
       }
-      const cursor = edges.n === edges.w ? 'nwse-resize' : 'nesw-resize'
+      const cursor = edges.n === edges.w ? cursors.nwse : cursors.nesw
       return [
         { edges, className: `${vertical}-0 ${horizontal}-0 w-[20px] h-[4px]`, cursor },
         { edges, className: `${vertical}-0 ${horizontal}-0 w-[4px] h-[20px]`, cursor },

@@ -173,6 +173,7 @@ export function WordPad({ window: windowApi, args }: AppProps) {
   })
   const [recent, setRecent] = useState<NodeId[]>(readRecent)
   const [locks, setLocks] = useState({ caps: false, num: true, scroll: false })
+  const closeResult = useRef<((closed: boolean) => void) | null>(null)
   const node = useFs((state) => (file ? state.nodes[file] : undefined))
   const fsState = useFs((state) => state)
   const view = options.types[docType]
@@ -733,7 +734,7 @@ export function WordPad({ window: windowApi, args }: AppProps) {
           filters={dialog.mode === 'open' ? OPEN_FILTERS : SAVE_FILTERS}
           defaultExtension={extensionFor(docType)}
           onSelect={acceptFile}
-          onCancel={() => setDialog(null)}
+          onCancel={closeDialog}
         />
       )}
       {dialog?.kind === 'printFile' && (

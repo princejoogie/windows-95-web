@@ -41,25 +41,31 @@ textarea,
 }
 
 .system-cursor-ns,
-.cursor-ns-resize,
-[style*="cursor: ns-resize"] {
-  cursor: var(--cursor-ns-resize, ns-resize) !important;
+.cursor-ns-resize {
+  cursor: var(--cursor-ns-resize, ns-resize);
 }
 
 .system-cursor-ew,
-.cursor-ew-resize,
-[style*="cursor: ew-resize"] {
-  cursor: var(--cursor-ew-resize, ew-resize) !important;
+.cursor-ew-resize {
+  cursor: var(--cursor-ew-resize, ew-resize);
 }
 
 .system-cursor-nwse,
-.cursor-nwse-resize,
-[style*="cursor: nwse-resize"] {
-  cursor: var(--cursor-nwse-resize, nwse-resize) !important;
+.cursor-nwse-resize {
+  cursor: var(--cursor-nwse-resize, nwse-resize);
 }
 
 .system-cursor-nesw,
-.cursor-nesw-resize,
-[style*="cursor: nesw-resize"] {
-  cursor: var(--cursor-nesw-resize, nesw-resize) !important;
+.cursor-nesw-resize {
+  cursor: var(--cursor-nesw-resize, nesw-resize);
+}
+
+html[data-system-cursor="busy"],
+html[data-system-cursor="busy"] * {
+  cursor: var(--cursor-progress, progress);
+}
+
+html[data-system-cursor="wait"],
+html[data-system-cursor="wait"] * {
+  cursor: var(--cursor-wait, wait);
 }

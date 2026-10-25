@@ -1,3 +1,4 @@
+import type { FsNode, NodeId } from '../fs/types'
 import { pixelArt } from '../icons/pixel'
 
 export const patterns = {
@@ -84,13 +85,17 @@ export type WallpaperName = (typeof wallpaperNames)[number]
 export interface BackgroundSettings {
   desktopColor: string
   pattern: PatternName | null
-  wallpaper: WallpaperName | null
+  wallpaper: WallpaperName | NodeId | null
   wallpaperMode: 'center' | 'tile'
 }
 
-export function desktopBackground(settings: BackgroundSettings): Record<string, string> {
+export function desktopBackground(
+  settings: BackgroundSettings,
+  nodes: readonly FsNode[] = [],
+): Record<string, string> {
   const pattern = settings.pattern ? `url("${patternImage(settings.pattern)}")` : 'none'
-  const wallpaper = settings.wallpaper ? wallpapers[settings.wallpaper] : null
+  const builtin = wallpaperNames.find((name) => name === settings.wallpaper)
+  const wallpaper = builtin ? wallpapers[builtin] : fileWallpaperImage(settings.wallpaper, nodes)
   return {
     '--desktop-image': wallpaper ? `url("${wallpaper.image}"), ${pattern}` : pattern,
     '--desktop-repeat': wallpaper
@@ -98,5 +103,29 @@ export function desktopBackground(settings: BackgroundSettings): Record<string, 
       : 'repeat',
     '--desktop-position': wallpaper ? 'center center, left top' : 'left top',
     '--desktop-size': wallpaper ? `${wallpaper.width}px ${wallpaper.height}px, 8px 8px` : '8px 8px',
+  }
+}
+
+export function wallpaperNode(value: unknown, nodes: readonly FsNode[]) {
+  return nodes.find(
+    (node) => node.id === value && node.kind === 'file' && node.content.startsWith('data:image/png;base64,'),
+  )
+}
+
+function fileWallpaperImage(
+  value: unknown,
+  nodes: readonly FsNode[],
+): { image: string; width: number; height: number } | null {
+  const node = wallpaperNode(value, nodes)
+  if (node?.kind !== 'file') return null
+  try {
+    const bytes = Uint8Array.from(atob(node.content.slice(22, 54)), (char) => char.charCodeAt(0))
+    const header = new DataView(bytes.buffer)
+    if (header.getUint32(0) !== 0x89504e47 || header.getUint32(12) !== 0x49484452) return null
+    const width = header.getUint32(16)
+    const height = header.getUint32(20)
+    return width && height ? { image: node.content, width, height } : null
+  } catch {
+    return null
   }
 }
