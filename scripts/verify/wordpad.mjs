@@ -41,9 +41,7 @@ async function evaluate(expression) {
     returnByValue: true,
   })
   if (result.exceptionDetails)
-    throw new Error(
-      result.exceptionDetails.text + ' ' + (result.exceptionDetails.exception?.description ?? ''),
-    )
+    throw new Error(`${result.exceptionDetails.text} ${result.exceptionDetails.exception?.description ?? ''}`)
   return result.result.value
 }
 
@@ -515,7 +513,6 @@ try {
       '\\fi360',
     ].every((token) => saved.includes(token)),
   )
-  const htmlBefore = await editorHtml()
   await menu('File', 'New...')
   await until("!!document.querySelector('[role=dialog][aria-label=New]')")
   await check(
