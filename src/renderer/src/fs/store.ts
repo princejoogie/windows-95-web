@@ -1,6 +1,6 @@
 import { createStore, useStore } from '../lib/store'
 import { emptyDrive, fsReducer, validateName } from './fs'
-import type { FsNode, FsState, NodeId, ProgramSpec } from './types'
+import type { Attributes, FsNode, FsState, NodeId, ProgramSpec } from './types'
 
 const KEY = 'w95.fs.v1'
 const SAVE_DELAY_MS = 250
@@ -41,14 +41,19 @@ export function useFs<T>(select: (state: FsState) => T): T {
 
 export const newNodeId = (): NodeId => crypto.randomUUID() as NodeId
 
-type NewNode = { kind: 'folder' } | { kind: 'file'; content: string } | { kind: 'shortcut'; app: string }
+export type NewNode =
+  | { kind: 'folder' }
+  | { kind: 'file'; content: string }
+  | { kind: 'shortcut'; app: string }
+  | { kind: 'shortcut'; target: NodeId }
 
 /** Creates a node and returns its id, or returns the error message Windows would show. */
 export function createNode(parent: NodeId, name: string, spec: NewNode): { id: NodeId } | { error: string } {
   const error = validateName(fsStore.get(), parent, name)
   if (error) return { error }
   const id = newNodeId()
-  const node = { ...spec, id, name, parent, modified: Date.now() } as FsNode
+  const at = Date.now()
+  const node = { ...spec, id, name, parent, modified: at, created: at } as FsNode
   fsStore.dispatch({ type: 'create', node })
   return { id }
 }
@@ -68,4 +73,6 @@ export const fs = {
   restore: (id: NodeId) => fsStore.dispatch({ type: 'restore', id, at: Date.now() }),
   purge: (id: NodeId) => fsStore.dispatch({ type: 'purge', id }),
   emptyRecycleBin: () => fsStore.dispatch({ type: 'emptyRecycleBin' }),
+  setAttributes: (id: NodeId, attributes: Attributes) =>
+    fsStore.dispatch({ type: 'setAttributes', id, attributes }),
 }

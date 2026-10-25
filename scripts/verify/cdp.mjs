@@ -133,7 +133,13 @@ export async function connect(port) {
         modifiers,
         ...(printable ? { text: key } : key === 'Enter' ? { text: '\r' } : {}),
       })
-      await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: k.code, windowsVirtualKeyCode: k.vk, modifiers })
+      await send('Input.dispatchKeyEvent', {
+        type: 'keyUp',
+        key,
+        code: k.code,
+        windowsVirtualKeyCode: k.vk,
+        modifiers,
+      })
       for (const m of [...mods].reverse()) {
         const mk = keyInfo(m)
         await send('Input.dispatchKeyEvent', {

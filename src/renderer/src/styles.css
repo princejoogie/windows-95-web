@@ -191,6 +191,10 @@
       inset 2px 2px var(--color-light);
   }
 
+  .push-button:focus {
+    outline: none;
+  }
+
   .push-button[data-default]:enabled,
   [role="dialog"] .push-button:focus {
     box-shadow:
@@ -236,10 +240,6 @@
       calc(100% - 1px) 1px,
       1px 1px
     );
-  }
-
-  .push-button:focus {
-    outline: none;
   }
 
   /* The yellow tip Windows shows after the pointer rests on a control. */

@@ -1,4 +1,5 @@
 import {
+  type Attributes,
   DESKTOP_DIR,
   DOCUMENTS_DIR,
   type FsNode,
@@ -19,6 +20,7 @@ export type FsAction =
   | { type: 'restore'; id: NodeId; at: number }
   | { type: 'purge'; id: NodeId }
   | { type: 'emptyRecycleBin' }
+  | { type: 'setAttributes'; id: NodeId; attributes: Attributes }
   /** `shortcuts` also puts desktop shortcuts down. The shell passes it only on first boot. */
   | { type: 'installPrograms'; programs: readonly ProgramSpec[]; shortcuts: boolean; at: number }
 
@@ -234,6 +236,10 @@ export function fsReducer(state: FsState, action: FsAction): FsState {
       return children(state, RECYCLED_DIR).reduce((next, node) => remove(next, node.id), state)
     case 'installPrograms':
       return installPrograms(state, action.programs, action.shortcuts, action.at)
+    case 'setAttributes': {
+      const node = state.nodes[action.id]
+      return node ? put(state, { ...node, attributes: { ...node.attributes, ...action.attributes } }) : state
+    }
   }
 }
 
@@ -272,7 +278,6 @@ export function emptyDrive(at: number): FsState {
     folder(DOCUMENTS_DIR, 'My Documents', ROOT),
     folder(RECYCLED_DIR, 'RECYCLED', ROOT),
     file('readme', 'Readme.txt', DOCUMENTS_DIR, README),
-    file('desktop-readme', 'Readme.txt', DESKTOP_DIR, README),
     file('autoexec', 'AUTOEXEC.BAT', ROOT, '@ECHO OFF\r\nPROMPT $p$g\r\nSET TEMP=C:\\WINDOWS\\TEMP\r\n'),
     file('config', 'CONFIG.SYS', ROOT, 'DEVICE=C:\\WINDOWS\\HIMEM.SYS\r\nFILES=40\r\n'),
   ]
