@@ -1,6 +1,6 @@
 import type { Dispatch } from 'react'
 import { useId, useState } from 'react'
-import { Button, Checkbox, Radio } from '../../ui'
+import { Button, Checkbox, ComboBox, GroupBox, Radio } from '../../ui'
 import { ModelessDialog } from '../notepad/ModelessDialog'
 import { type Action, type Calculator, decimalOnly, type Key } from './engine'
 
@@ -90,7 +90,7 @@ export function Scientific({
   return (
     <>
       <div className="flex justify-between py-[8px]">
-        <fieldset className="flex gap-[12px]" aria-label="Number base">
+        <GroupBox label={<span className="sr-only">Number base</span>} className="flex gap-[12px]">
           {(
             [
               { label: 'Hex', base: 16 },
@@ -107,8 +107,11 @@ export function Scientific({
               onChange={() => dispatch({ kind: 'base', base })}
             />
           ))}
-        </fieldset>
-        <fieldset className="flex gap-[10px]" aria-label={state.base === 10 ? 'Angle unit' : 'Word size'}>
+        </GroupBox>
+        <GroupBox
+          label={<span className="sr-only">{state.base === 10 ? 'Angle unit' : 'Word size'}</span>}
+          className="flex gap-[10px]"
+        >
           {state.base === 10
             ? (
                 [
@@ -140,7 +143,7 @@ export function Scientific({
                   onChange={() => dispatch({ kind: 'word', bits })}
                 />
               ))}
-        </fieldset>
+        </GroupBox>
       </div>
       <div className="mb-[9px] flex items-center gap-[8px]">
         <Checkbox
@@ -217,19 +220,15 @@ export function Scientific({
           className="w-[255px]"
         >
           <div className="p-[10px] grid grid-cols-[1fr_75px] gap-[8px]">
-            <select
+            <ComboBox
               aria-label="Statistical data"
-              size={6}
-              className="bevel-sunken bg-white h-[110px] outline-none"
-              value={selection}
-              onChange={(event) => setSelected(Number(event.target.value))}
-            >
-              {state.samples.map((sample) => (
-                <option key={sample.id} value={sample.id}>
-                  {sample.value}
-                </option>
-              ))}
-            </select>
+              value={String(selection)}
+              onChange={(value) => setSelected(Number(value))}
+              options={state.samples.map((sample) => ({
+                key: String(sample.id),
+                label: String(sample.value),
+              }))}
+            />
             <div className="flex flex-col gap-[6px]">
               <Button onClick={() => setStatistics(false)}>RET</Button>
               <Button
@@ -246,7 +245,7 @@ export function Scientific({
               </Button>
               <Button onClick={() => dispatch({ kind: 'statistics', command: 'clear' })}>CAD</Button>
             </div>
-            <p>Count = {state.samples.length}</p>
+            <p>n={state.samples.length}</p>
           </div>
         </ModelessDialog>
       )}

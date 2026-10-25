@@ -1,5 +1,5 @@
 import { type CSSProperties, type ReactNode, useId, useState } from 'react'
-import { Button, Checkbox, Dialog, GroupBox, Radio, Separator, TextBox } from '../../ui'
+import { Button, Checkbox, ComboBox, Dialog, GroupBox, Radio, Separator, TextBox } from '../../ui'
 import { FONT_SIZES, FONTS, scriptsFor } from './fonts'
 import { runCss } from './html'
 import { wordpadIcon } from './icons'
@@ -288,18 +288,14 @@ export function FontDialog({
                 <span>
                   <span className="underline">C</span>olor:
                 </span>
-                <select
+                <ComboBox
                   id={`${id}-color`}
-                  className="h-[21px] bg-white bevel-sunken px-[2px] outline-none"
+                  aria-label="Color"
+                  className=""
                   value={style.color}
-                  onChange={(event) => setStyle((s) => ({ ...s, color: event.target.value }))}
-                >
-                  {COLORS.map((color) => (
-                    <option key={color.value} value={color.value}>
-                      {color.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(color) => setStyle((s) => ({ ...s, color }))}
+                  options={COLORS.map((color) => ({ key: color.value, label: color.name }))}
+                />
               </label>
             </div>
           </GroupBox>
@@ -326,11 +322,14 @@ export function FontDialog({
               <span>
                 Sc<span className="underline">r</span>ipt:
               </span>
-              <select id={`${id}-script`} className="h-[21px] bg-white bevel-sunken px-[2px] outline-none">
-                {scriptsFor(style.font).map((script) => (
-                  <option key={script}>{script}</option>
-                ))}
-              </select>
+              <ComboBox
+                id={`${id}-script`}
+                aria-label="Script"
+                className=""
+                value={scriptsFor(style.font)[0] ?? ''}
+                onChange={() => undefined}
+                options={scriptsFor(style.font).map((script) => ({ key: script, label: script }))}
+              />
             </label>
           </div>
         </div>
@@ -438,16 +437,19 @@ export function ParagraphDialog({
             <span>
               <span className="underline">A</span>lignment:
             </span>
-            <select
+            <ComboBox
               id={`${id}-align`}
-              className="h-[21px] w-[110px] bg-white bevel-sunken px-[2px] outline-none"
+              aria-label="Alignment"
+              className="w-[110px]"
               value={align}
-              onChange={(event) => setAlign(event.target.value as Alignment)}
-            >
-              <option value="left">Left</option>
-              <option value="right">Right</option>
-              <option value="center">Center</option>
-            </select>
+              onChange={(value) => {
+                if (value === 'left' || value === 'right' || value === 'center') setAlign(value)
+              }}
+              options={['left', 'right', 'center'].map((key) => ({
+                key,
+                label: key.charAt(0).toUpperCase() + key.slice(1),
+              }))}
+            />
           </label>
         </div>
         <Buttons>
@@ -774,27 +776,27 @@ export function PageSetupDialog({
               <span className="w-[50px]">
                 Si<span className="underline">z</span>e:
               </span>
-              <select
+              <ComboBox
                 id={`${id}-size`}
-                className="h-[21px] flex-1 bg-white bevel-sunken px-[2px] outline-none"
+                aria-label="Paper size"
+                className="flex-1"
                 value={draft.paper}
-                onChange={(event) => setDraft((d) => ({ ...d, paper: event.target.value }))}
-              >
-                {PAPER_SIZES.map((size) => (
-                  <option key={size.name}>{size.name}</option>
-                ))}
-              </select>
+                onChange={(paper) => setDraft((d) => ({ ...d, paper }))}
+                options={PAPER_SIZES.map((size) => ({ key: size.name, label: size.name }))}
+              />
             </label>
             <label htmlFor={`${id}-source`} className="flex items-center gap-[8px]">
               <span className="w-[50px]">
                 <span className="underline">S</span>ource:
               </span>
-              <select
+              <ComboBox
                 id={`${id}-source`}
-                className="h-[21px] flex-1 bg-white bevel-sunken px-[2px] outline-none"
-              >
-                <option>Default tray</option>
-              </select>
+                aria-label="Paper source"
+                className="flex-1"
+                value={'Default tray'}
+                onChange={() => undefined}
+                options={[{ key: 'Default tray', label: 'Default tray' }]}
+              />
             </label>
           </div>
         </GroupBox>
@@ -1046,9 +1048,14 @@ export function PrintDialog({ onPrint, onClose }: { onPrint: () => void; onClose
             <label htmlFor={`${id}-printer`}>
               <span className="underline">N</span>ame:
             </label>
-            <select id={`${id}-printer`} className="h-[21px] bg-white bevel-sunken px-[2px] outline-none">
-              <option>Generic / Text Only</option>
-            </select>
+            <ComboBox
+              id={`${id}-printer`}
+              aria-label="Printer name"
+              className=""
+              value={'Generic / Text Only'}
+              onChange={() => undefined}
+              options={[{ key: 'Generic / Text Only', label: 'Generic / Text Only' }]}
+            />
             <Button disabled>
               <span className="underline">P</span>roperties
             </Button>
