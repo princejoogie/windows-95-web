@@ -39,6 +39,7 @@ import {
   arranged,
   CELL,
   type Direction,
+  freeSpot,
   gridOrder,
   layout,
   neighbor,
@@ -327,7 +328,8 @@ export function Desktop({ size }: { size: Size }) {
       return []
     }
     for (const action of plan.actions) fsStore.dispatch(action)
-    if (at && plan.created[0]) savePositions({ ...saved, [plan.created[0]]: snap(at) })
+    if (at && plan.created[0])
+      savePositions({ ...saved, [plan.created[0]]: freeSpot(at, positions.values(), size) })
     if (plan.created.length) select(plan.created, plan.created[0] ?? null)
     return plan.created
   }
@@ -376,7 +378,7 @@ export function Desktop({ size }: { size: Size }) {
     const name = uniqueName(fs.get(), DESKTOP_DIR, kind === 'folder' ? 'New Folder' : 'New Text Document.txt')
     const result = createNode(DESKTOP_DIR, name, kind === 'folder' ? { kind } : { kind, content: '' })
     if (!('id' in result)) return
-    if (at) savePositions({ ...saved, [result.id]: snap(at) })
+    if (at) savePositions({ ...saved, [result.id]: freeSpot(at, positions.values(), size) })
     select([result.id], result.id)
     setRenaming(result.id)
   }
@@ -834,7 +836,8 @@ export function Desktop({ size }: { size: Size }) {
                 : { kind: 'shortcut' as const, target: target.id }
             const result = createNode(DESKTOP_DIR, name, spec)
             if ('error' in result) return result.error
-            if (prompt.at) savePositions({ ...saved, [result.id]: snap(prompt.at) })
+            if (prompt.at)
+              savePositions({ ...saved, [result.id]: freeSpot(prompt.at, positions.values(), size) })
             select([result.id], result.id)
             return null
           }}

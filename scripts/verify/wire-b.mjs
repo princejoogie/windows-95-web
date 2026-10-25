@@ -872,7 +872,49 @@ async function deletion() {
   await closeWindows()
 }
 
-const phases = { fileDialog, dialogs, about, kit, systemMenu, sounds, properties, captions, deletion }
+const desktopCells = () =>
+  app.eval(
+    `[...document.querySelectorAll('[data-desktop-item]')].map(e => { const b = e.getBoundingClientRect(); return { label: e.getAttribute('aria-label'), x: Math.round(b.x), y: Math.round(b.y) } })`,
+  )
+
+async function labels() {
+  await closeWindows()
+  for (let i = 0; i < 2; i++) {
+    await app.click(600, 300, { button: 'right' })
+    await pickMenu('New')
+    await pickMenu('Text Document')
+    await app.waitFor(`!!document.querySelector('[data-desktop-item] input')`)
+    await app.key('Enter')
+    await sleep(700)
+  }
+  const cells = await desktopCells()
+  const spots = new Set(cells.map((cell) => `${cell.x}:${cell.y}`))
+  check(
+    spots.size === cells.length && cells.some((cell) => cell.label === 'New Text Document (2)'),
+    '6',
+    'two documents created on the same spot land in separate cells',
+    cells.filter((cell) => cell.label.startsWith('New Text')),
+  )
+  await shot('6-desktop-no-overlap')
+  const ids = await app.eval(
+    `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).filter(n => n.parent === 'desktop' && n.name.startsWith('New Text')).map(n => n.id)`,
+  )
+  await app.eval(
+    `localStorage.setItem('w95.desktop.v1', JSON.stringify(Object.fromEntries(${JSON.stringify(ids)}.map(id => [id, { x: 302, y: 154 }]))))`,
+  )
+  await app.send('Page.reload')
+  await sleep(2500)
+  await app.waitFor(`document.querySelectorAll('[data-desktop-item]').length > 3`, 15000)
+  const after = await desktopCells()
+  check(
+    new Set(after.map((cell) => `${cell.x}:${cell.y}`)).size === after.length,
+    '6',
+    'saved positions that collide (stale data) still draw in separate cells after a reload',
+    after.filter((cell) => cell.label.startsWith('New Text')),
+  )
+}
+
+const phases = { fileDialog, dialogs, about, kit, systemMenu, sounds, properties, captions, deletion, labels }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {
