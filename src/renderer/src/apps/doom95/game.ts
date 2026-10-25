@@ -47,8 +47,8 @@ export const IDLE: TickInput = {
 }
 
 export const TICK = 1 / 60
-export const WALK_SPEED = 3.6
-export const RUN_SPEED = 6.6
+const WALK_SPEED = 3.6
+const RUN_SPEED = 6.6
 const TURN_SPEED = 2.6
 const RUN_TURN_SPEED = 4.2
 /** Doom reaches one cell to a door face, and door slabs sit half a cell behind it. */

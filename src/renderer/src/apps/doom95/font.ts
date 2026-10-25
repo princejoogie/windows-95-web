@@ -58,8 +58,7 @@ const ROWS = new Map(
   Object.entries(GLYPHS).map(([ch, bits]) => [ch, bits.split(' ').map((row) => Number.parseInt(row, 2))]),
 )
 
-export const GLYPH_W = 5
-export const GLYPH_H = 7
+const GLYPH_W = 5
 
 export const textWidth = (text: string, scale = 1): number =>
   Math.max(0, text.length * (GLYPH_W + 1) * scale - scale)

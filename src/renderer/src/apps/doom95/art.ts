@@ -118,11 +118,4 @@ export class Painter {
       if (c) pixels[i] = shade(c, 1 + (rng() - 0.5) * amount)
     }
   }
-
-  flipX(): Painter {
-    const out = Painter.create(this.width, this.height)
-    for (let y = 0; y < this.height; y++)
-      for (let x = 0; x < this.width; x++) out.set(this.width - 1 - x, y, this.get(x, y))
-    return out
-  }
 }

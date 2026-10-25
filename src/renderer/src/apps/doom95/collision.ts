@@ -8,7 +8,7 @@ export interface Position {
 }
 
 /** Whether a circle of radius `r` at `(x, y)` overlaps a solid cell. */
-export function overlapsSolid(grid: Grid, x: number, y: number, r: number): boolean {
+function overlapsSolid(grid: Grid, x: number, y: number, r: number): boolean {
   const x0 = Math.floor(x - r)
   const x1 = Math.floor(x + r - EPSILON)
   const y0 = Math.floor(y - r)

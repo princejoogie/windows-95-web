@@ -12,7 +12,7 @@ const FIREBALL_RADIUS = 0.1
 const DIRECTIONS = Array.from({ length: 8 }, (_, i) => (i * Math.PI) / 4)
 
 /** Monsters see in a half circle ahead of them, and always notice a player close enough to touch. */
-export function canSeePlayer(world: World, actor: Actor): boolean {
+function canSeePlayer(world: World, actor: Actor): boolean {
   const { player } = world
   if (player.dead) return false
   const dx = player.x - actor.x
