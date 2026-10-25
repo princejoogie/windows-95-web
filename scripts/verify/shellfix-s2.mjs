@@ -5,6 +5,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { connect, sleep } from './cdp.mjs'
 import { desktopPhase } from './desktop-phase.mjs'
+import { dialogPhase } from './dialog-phase.mjs'
 
 const port = Number(process.env.W95_CDP_PORT ?? 9331)
 const proof = resolve(process.env.W95_PROOF_DIR ?? '../proof/shellfix-s2')
@@ -285,6 +286,8 @@ async function desktop() {
     closeWindows,
   })
 }
-async function dialog() {}
+async function dialog() {
+  await dialogPhase({ app, check, shot, exists, pickMenu, closeWindows, openStartItem })
+}
 
 await main()

@@ -219,14 +219,19 @@
       inset 0 0 0 2px var(--color-shadow);
   }
 
-  /* The focus rectangle: every other pixel black, 4px inside the edge. */
+  /*
+   * The focus rectangle Windows draws by XOR: every other pixel inverted, so it reads dark on a gray button
+   * and pale yellow on a navy selection.
+   */
+  .dotted-frame,
   [role="dialog"] .push-button:focus::after,
   .push-button:focus-visible::after {
     content: "";
     position: absolute;
-    inset: 4px;
+    inset: 0;
     pointer-events: none;
-    background: repeating-conic-gradient(var(--color-dark) 0 25%, transparent 0 50%) 0 0 / 2px 2px;
+    mix-blend-mode: difference;
+    background: repeating-conic-gradient(#fff 0 25%, transparent 0 50%) 0 0 / 2px 2px;
     clip-path: polygon(
       evenodd,
       0 0,
@@ -240,6 +245,11 @@
       calc(100% - 1px) 1px,
       1px 1px
     );
+  }
+
+  [role="dialog"] .push-button:focus::after,
+  .push-button:focus-visible::after {
+    inset: 4px;
   }
 
   /* The yellow tip Windows shows after the pointer rests on a control. */

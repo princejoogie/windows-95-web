@@ -1,18 +1,37 @@
-import { useId, useMemo, useState } from 'react'
-import { children, isInside, pathOf } from '../fs/fs'
-import { fs, useFs } from '../fs/store'
-import { DOCUMENTS_DIR, type NodeId, RECYCLED_DIR, ROOT } from '../fs/types'
+import { type KeyboardEvent, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { extension, uniqueName } from '../fs/fs'
+import { createNode, fs, useFs } from '../fs/store'
+import { DOCUMENTS_DIR, type FsNode, type NodeId } from '../fs/types'
 import { icons } from '../icons'
-import { nodeIcon } from '../shell/nodeIcon'
+import { typeAhead } from '../shell/desktopModel'
 import { Button } from './Button'
+import { ComboBox, type ComboOption } from './ComboBox'
 import { Dialog } from './Dialog'
 import { TextBox } from './fields'
-import { chooseFile, type FileDialogResult, type FileTypeFilter, matchesFileType } from './fileChoice'
+import { chooseFile, type FileDialogResult, type FileTypeFilter } from './fileChoice'
+import { toolbarGlyphs } from './fileDialogArt'
+import {
+  folderOf,
+  type ListEntry,
+  listEntries,
+  lookInRows,
+  type Place,
+  type PlaceRow,
+  parentPlace,
+  placeKey,
+  placeOf,
+} from './fileDialogModel'
 import { MessageBox } from './MessageBox'
+import { bytesOf, typeName } from './properties'
+import { Accel } from './text'
 
 export type { FileDialogResult, FileTypeFilter } from './fileChoice'
 
 const ALL_FILES: readonly FileTypeFilter[] = [{ label: 'All Files (*.*)', extensions: ['*'] }]
+const ROW = 16
+const TYPE_AHEAD_MS = 1000
+
+type View = 'list' | 'details'
 
 export interface FileDialogProps {
   readonly mode: 'open' | 'save'
@@ -25,6 +44,71 @@ export interface FileDialogProps {
   readonly onCancel: () => void
 }
 
+function nodeSmallIcon(node: FsNode, open = false): string {
+  switch (node.kind) {
+    case 'drive':
+      return icons.small.drive
+    case 'folder':
+      return open ? icons.small.folderOpened : icons.small.folderClosed
+    case 'file':
+      return extension(node.name) === 'txt' ? icons.small.textDocument : icons.small.document
+    default:
+      return icons.small.program
+  }
+}
+
+function rowIcon(row: PlaceRow, nodes: Readonly<Record<NodeId, FsNode>>): string {
+  if (row.kind === 'desktop') return toolbarGlyphs.desktop
+  if (row.kind === 'computer') return icons.small.myComputer
+  const node = row.place.kind === 'folder' ? nodes[row.place.id] : undefined
+  return node ? nodeSmallIcon(node, row.kind === 'folder') : icons.small.folderClosed
+}
+
+function entryIcon(entry: ListEntry): string {
+  if (entry.node) return nodeSmallIcon(entry.node)
+  return entry.kind === 'place' && entry.place.kind === 'computer'
+    ? icons.small.myComputer
+    : icons.small.folderClosed
+}
+
+const shortDate = (at: number) =>
+  `${new Date(at).toLocaleDateString('en-US', { year: '2-digit', month: 'numeric', day: 'numeric' })} ${new Date(
+    at,
+  ).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+
+/** Windows rounds sizes in Details up to whole kilobytes. */
+const sizeCell = (bytes: number) => `${Math.max(1, Math.ceil(bytes / 1024))}KB`
+
+function ToolButton({
+  glyph,
+  label,
+  pressed,
+  disabled,
+  onClick,
+}: {
+  glyph: string
+  label: string
+  pressed?: boolean | undefined
+  disabled?: boolean
+  onClick: () => void
+}) {
+  return (
+    <Button
+      className="min-w-0! w-[23px]! h-[22px]! px-0! grid place-items-center"
+      title={label}
+      aria-label={label}
+      aria-pressed={pressed}
+      pressed={pressed ?? false}
+      disabled={disabled}
+      tabIndex={-1}
+      onClick={onClick}
+    >
+      <img src={glyph} alt="" className={disabled ? 'opacity-40' : ''} />
+    </Button>
+  )
+}
+
+/** The Windows 95 Open and Save As dialog. */
 export function FileDialog({
   mode,
   title = mode === 'open' ? 'Open' : 'Save As',
@@ -36,43 +120,49 @@ export function FileDialog({
   onCancel,
 }: FileDialogProps) {
   const state = useFs((s) => s)
-  const [folder, setFolder] = useState(initialFolder)
+  const [place, setPlace] = useState<Place>(() => placeOf(initialFolder))
   const [name, setName] = useState(initialName)
   const [filterIndex, setFilterIndex] = useState(0)
-  const [selected, setSelected] = useState<NodeId | null>(null)
+  const [cursor, setCursor] = useState<string | null>(null)
+  const [listFocused, setListFocused] = useState(false)
+  const [view, setView] = useState<View>('list')
+  const [renaming, setRenaming] = useState<NodeId | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [overwrite, setOverwrite] = useState<Extract<FileDialogResult, { kind: 'existing' }> | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const typed = useRef({ text: '', at: 0 })
   const id = useId()
   const filter = filters[filterIndex] ?? ALL_FILES[0]
-  const contents = useMemo(
-    () =>
-      children(state, folder).filter(
-        (node) =>
-          node.kind === 'folder' || (node.kind === 'file' && filter && matchesFileType(node.name, filter)),
-      ),
-    [state, folder, filter],
-  )
-  const folders = useMemo(
-    () =>
-      Object.values(state.nodes)
-        .filter(
-          (node) =>
-            (node.kind === 'drive' || node.kind === 'folder') && !isInside(state, node.id, RECYCLED_DIR),
-        )
-        .sort((a, b) => pathOf(state, a.id).localeCompare(pathOf(state, b.id))),
-    [state],
-  )
+  const entries = useMemo(() => (filter ? listEntries(state, place, filter) : []), [state, place, filter])
+  const rows = useMemo(() => lookInRows(state, place), [state, place])
+  const lookIn: ComboOption[] = rows.map((row) => ({
+    key: row.key,
+    label: row.label,
+    indent: row.indent,
+    icon: rowIcon(row, state.nodes),
+  }))
+  const parent = parentPlace(state, place)
+  const at = entries.findIndex((entry) => entry.key === cursor)
+  const current = entries[at]
 
-  const enterFolder = (next: NodeId) => {
-    setFolder(next)
-    setSelected(null)
+  useLayoutEffect(() => {
+    if (cursor)
+      listRef.current
+        ?.querySelector(`[data-entry="${CSS.escape(cursor)}"]`)
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [cursor])
+
+  const enter = (next: Place) => {
+    setPlace(next)
+    setCursor(null)
+    setRenaming(null)
   }
 
   const submit = (input = name) => {
-    const choice = chooseFile(fs.get(), folder, input, mode, defaultExtension)
+    const choice = chooseFile(fs.get(), folderOf(place), input, mode, defaultExtension)
     switch (choice.kind) {
       case 'folder':
-        enterFolder(choice.id)
+        enter(placeOf(choice.id))
         setName('')
         break
       case 'error':
@@ -88,106 +178,280 @@ export function FileDialog({
     }
   }
 
+  const activate = (entry: ListEntry) => {
+    if (entry.kind === 'place') enter(entry.place)
+    else submit(entry.label)
+  }
+
+  const choose = (entry: ListEntry | undefined) => {
+    if (!entry) return
+    setCursor(entry.key)
+    if (entry.kind === 'file') setName(entry.label)
+  }
+
+  const newFolder = () => {
+    if (place.kind === 'computer') return
+    const folder = folderOf(place)
+    const result = createNode(folder, uniqueName(fs.get(), folder, 'New Folder'), { kind: 'folder' })
+    if (!('id' in result)) return
+    setCursor(result.id)
+    setRenaming(result.id)
+  }
+
+  const finishRename = (node: FsNode, value: string | null) => {
+    setRenaming(null)
+    listRef.current?.focus()
+    if (value === null || value === node.name) return
+    const problem = fs.rename(node.id, value)
+    if (problem) setError(problem)
+  }
+
+  /** Rows per column in List view, so Left and Right jump a whole column. */
+  const perColumn = () => Math.max(1, Math.floor(((listRef.current?.clientHeight ?? ROW) - 4) / ROW))
+
+  const onListKey = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (renaming) return
+    const step: Partial<Record<string, number>> = {
+      ArrowDown: 1,
+      ArrowUp: -1,
+      ArrowRight: view === 'list' ? perColumn() : 0,
+      ArrowLeft: view === 'list' ? -perColumn() : 0,
+    }
+    const delta = step[event.key]
+    if (delta !== undefined) {
+      event.preventDefault()
+      if (!delta) return
+      const from = at < 0 ? (delta > 0 ? -1 : entries.length) : at
+      choose(entries[Math.max(0, Math.min(from + delta, entries.length - 1))])
+      return
+    }
+    if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault()
+      choose(event.key === 'Home' ? entries[0] : entries.at(-1))
+      return
+    }
+    if (event.key === 'Enter' && current) {
+      event.preventDefault()
+      activate(current)
+      return
+    }
+    if (event.key === 'Backspace') {
+      event.preventDefault()
+      if (parent) enter(parent)
+      return
+    }
+    if (event.key === 'F2' && current?.node && current.node.kind !== 'drive') {
+      event.preventDefault()
+      setRenaming(current.node.id)
+      return
+    }
+    if (event.key.length === 1 && !event.ctrlKey && !event.altKey && event.key !== ' ') {
+      const now = Date.now()
+      const text = now - typed.current.at > TYPE_AHEAD_MS ? event.key : typed.current.text + event.key
+      typed.current = { text, at: now }
+      const next = typeAhead(entries, cursor, text)
+      choose(entries.find((entry) => entry.key === next))
+    }
+  }
+
+  const label = (entry: ListEntry) => {
+    const lit = entry.key === cursor
+    if (renaming && entry.node?.id === renaming) {
+      const node = entry.node
+      return (
+        <input
+          // biome-ignore lint/a11y/noAutofocus: a new folder starts in rename, as Windows does
+          autoFocus
+          defaultValue={node.name}
+          className="h-[16px] px-[1px] bg-white border border-black outline-none select-text"
+          onFocus={(event) => event.target.select()}
+          onKeyDown={(event) => {
+            event.stopPropagation()
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              finishRename(node, event.currentTarget.value)
+            }
+            if (event.key === 'Escape') {
+              event.preventDefault()
+              event.nativeEvent.stopImmediatePropagation()
+              finishRename(node, null)
+            }
+          }}
+          onBlur={(event) => finishRename(node, event.currentTarget.value)}
+        />
+      )
+    }
+    return (
+      <span
+        className={`relative px-[1px] whitespace-nowrap ${lit ? (listFocused ? 'bg-select text-white' : 'bg-face') : ''}`}
+      >
+        {entry.label}
+        {lit && listFocused && <span aria-hidden="true" className="dotted-frame" />}
+      </span>
+    )
+  }
+
+  const select = (entry: ListEntry) => (
+    <div
+      key={entry.key}
+      role="option"
+      tabIndex={-1}
+      aria-selected={entry.key === cursor}
+      data-entry={entry.key}
+      className={`flex items-center h-[16px] gap-[2px] ${view === 'list' ? 'pr-[12px]' : ''}`}
+      onMouseDown={(event) => {
+        // The list keeps focus, so it survives this row unmounting when a folder opens.
+        event.preventDefault()
+        listRef.current?.focus()
+        choose(entry)
+      }}
+      onDoubleClick={() => activate(entry)}
+    >
+      <img src={entryIcon(entry)} alt="" className="size-4 shrink-0" />
+      {label(entry)}
+    </div>
+  )
+
   return (
     <>
-      <Dialog title={title} onClose={onCancel} className="w-[450px] max-w-full">
+      <Dialog title={title} onClose={onCancel} className="w-[430px] max-w-full">
         <form
-          className="flex flex-col gap-[8px] p-[10px]"
+          className="flex flex-col gap-[6px] px-[8px] pt-[8px] pb-[10px]"
           onSubmit={(event) => {
             event.preventDefault()
-            const node = selected ? state.nodes[selected] : undefined
-            if (node?.kind === 'folder') enterFolder(node.id)
+            if (renaming) return
+            if (current?.kind === 'place' && listFocused) enter(current.place)
+            else if (current?.kind === 'place' && !name.trim()) enter(current.place)
             else submit()
           }}
         >
-          <div className="flex items-center gap-[8px]">
-            <label htmlFor={`${id}-folder`} className="w-[65px]">
-              {mode === 'open' ? 'Look in:' : 'Save in:'}
+          <div className="flex items-center gap-[6px]">
+            <label htmlFor={`${id}-folder`} className="w-[60px] shrink-0">
+              <Accel label={mode === 'open' ? 'Look &in:' : 'Save &in:'} />
             </label>
-            <select
+            <ComboBox
               id={`${id}-folder`}
-              value={folder}
-              className="h-[22px] flex-1 min-w-0 bg-white bevel-sunken px-[3px]"
-              onChange={(event) => {
-                const next = folders.find((node) => node.id === event.target.value)
-                if (next) enterFolder(next.id)
+              className="w-[200px]"
+              options={lookIn}
+              value={placeKey(place)}
+              onChange={(key) => {
+                const row = rows.find((candidate) => candidate.key === key)
+                if (row) enter(row.place)
               }}
-            >
-              {folders.map((node) => (
-                <option key={node.id} value={node.id}>
-                  {pathOf(state, node.id)}
-                </option>
-              ))}
-            </select>
-            <Button
-              className="min-w-[28px] px-[4px]"
-              title="Up one level"
-              aria-label="Up one level"
-              disabled={folder === ROOT}
-              onClick={() => enterFolder(state.nodes[folder]?.parent ?? ROOT)}
-            >
-              <img src={icons.folderOpened} alt="" className="size-4 inline-block" />
-              <span aria-hidden="true">↑</span>
-            </Button>
+            />
+            <div className="flex gap-[2px] ml-[4px]">
+              <ToolButton
+                glyph={toolbarGlyphs.up}
+                label="Up One Level"
+                disabled={!parent}
+                onClick={() => parent && enter(parent)}
+              />
+              <ToolButton
+                glyph={toolbarGlyphs.newFolder}
+                label="Create New Folder"
+                disabled={place.kind === 'computer'}
+                onClick={newFolder}
+              />
+              <span className="w-[4px]" />
+              <ToolButton
+                glyph={toolbarGlyphs.list}
+                label="List"
+                pressed={view === 'list'}
+                onClick={() => setView('list')}
+              />
+              <ToolButton
+                glyph={toolbarGlyphs.details}
+                label="Details"
+                pressed={view === 'details'}
+                onClick={() => setView('details')}
+              />
+            </div>
           </div>
           <div
+            ref={listRef}
             role="listbox"
             aria-label="Folder contents"
-            className="h-[180px] overflow-auto bg-white bevel-sunken p-[3px]"
+            tabIndex={0}
+            className={`h-[136px] bg-white bevel-sunken p-[2px] outline-none ${view === 'list' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto'}`}
+            onFocus={(event) => {
+              setListFocused(true)
+              if (event.target === event.currentTarget && !cursor) choose(entries[0])
+            }}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setListFocused(false)
+            }}
+            onKeyDown={onListKey}
+            onPointerDown={(event) => {
+              if (event.target === event.currentTarget) setCursor(null)
+            }}
           >
-            {contents.map((node) => (
-              <button
-                key={node.id}
-                type="button"
-                role="option"
-                aria-selected={selected === node.id}
-                className={`flex items-center gap-[4px] w-full h-[20px] px-[2px] text-left outline-none focus-visible:outline-dotted focus-visible:outline-1 ${selected === node.id ? 'bg-select text-white' : ''}`}
-                onClick={() => {
-                  setSelected(node.id)
-                  if (node.kind === 'file') setName(node.name)
-                }}
-                onDoubleClick={() => (node.kind === 'folder' ? enterFolder(node.id) : submit(node.name))}
-              >
-                <img src={nodeIcon(node).icon} alt="" className="size-4" />
-                <span>{node.name}</span>
-              </button>
-            ))}
+            {view === 'list' ? (
+              <div className="flex flex-col flex-wrap content-start h-full">{entries.map(select)}</div>
+            ) : (
+              <div className="min-w-max">
+                <div className="flex h-[17px] sticky top-0 z-10">
+                  {[
+                    ['Name', 'w-[170px]'],
+                    ['Size', 'w-[60px] justify-end'],
+                    ['Type', 'w-[110px]'],
+                    ['Modified', 'w-[110px]'],
+                  ].map(([heading, width]) => (
+                    <div key={heading} className={`flex items-center px-[4px] bg-face bevel-raised ${width}`}>
+                      {heading}
+                    </div>
+                  ))}
+                </div>
+                {entries.map((entry) => (
+                  <div key={entry.key} className="flex">
+                    <div className="w-[170px] px-[2px] overflow-hidden">{select(entry)}</div>
+                    <div className="w-[60px] px-[4px] text-right">
+                      {entry.node?.kind === 'file' ? sizeCell(bytesOf(state, entry.node)) : ''}
+                    </div>
+                    <div className="w-[110px] px-[4px] truncate">
+                      {entry.node ? typeName(entry.node) : 'System Folder'}
+                    </div>
+                    <div className="w-[110px] px-[4px] truncate">
+                      {entry.node ? shortDate(entry.node.modified) : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="flex gap-[10px]">
-            <div className="flex-1 min-w-0 flex flex-col gap-[8px]">
-              <label htmlFor={`${id}-name`} className="flex items-center gap-[8px]">
-                <span className="w-[65px] shrink-0">File name:</span>
+          <div className="flex gap-[10px] mt-[2px]">
+            <div className="flex-1 min-w-0 flex flex-col gap-[7px]">
+              <div className="flex items-center gap-[6px]">
+                <label htmlFor={`${id}-name`} className="w-[80px] shrink-0">
+                  <Accel label="File &name:" />
+                </label>
                 <TextBox
                   id={`${id}-name`}
                   autoFocus
                   className="flex-1 min-w-0"
                   value={name}
                   onFocus={(event) => event.target.select()}
-                  onChange={(event) => {
-                    setName(event.target.value)
-                    setSelected(null)
+                  onChange={(event) => setName(event.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-[6px]">
+                <label htmlFor={`${id}-type`} className="w-[80px] shrink-0">
+                  <Accel label={mode === 'save' ? 'Save as &type:' : 'Files of &type:'} />
+                </label>
+                <ComboBox
+                  id={`${id}-type`}
+                  className="flex-1 min-w-0"
+                  options={filters.map((entry, index) => ({ key: String(index), label: entry.label }))}
+                  value={String(filterIndex)}
+                  onChange={(key) => {
+                    setFilterIndex(Number(key))
+                    setCursor(null)
                   }}
                 />
-              </label>
-              <label htmlFor={`${id}-type`} className="flex items-center gap-[8px]">
-                <span className="w-[65px] shrink-0">Files of type:</span>
-                <select
-                  id={`${id}-type`}
-                  value={filterIndex}
-                  className="h-[21px] flex-1 min-w-0 bg-white bevel-sunken px-[3px]"
-                  onChange={(event) => setFilterIndex(Number(event.target.value))}
-                >
-                  {filters.map((entry, index) => (
-                    <option key={entry.label} value={index}>
-                      {entry.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              </div>
             </div>
             <div className="flex flex-col gap-[6px]">
-              <Button type="submit" isDefault disabled={!name.trim() && !selected}>
-                {mode === 'open' ? 'Open' : 'Save'}
+              <Button type="submit" isDefault disabled={!name.trim() && !current}>
+                <Accel label={mode === 'open' ? '&Open' : '&Save'} />
               </Button>
               <Button onClick={onCancel}>Cancel</Button>
             </div>
