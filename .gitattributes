@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.ico binary
+*.ttf binary
+*.png binary
+*.wav binary
+*.cur binary
+*.fon binary

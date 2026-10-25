@@ -4,7 +4,7 @@
     "includes": ["**", "!out", "!dist", "!release", "!**/*.md", "!pnpm-lock.yaml", "!pnpm-workspace.yaml"]
   },
   "formatter": {
-    "lineEnding": "crlf",
+    "lineEnding": "lf",
     "indentStyle": "space",
     "indentWidth": 2,
     "lineWidth": 110
