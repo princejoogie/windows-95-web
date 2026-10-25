@@ -387,6 +387,24 @@ try {
       'wallpaper-restart',
     )
   }
+  if (item === 'notepad') {
+    await run('notepad')
+    await c.clickOn('[aria-label="Document text"]')
+    await c.type('Save prompt verification')
+    for (const [key, mods, action] of [
+      ['n', ['Control'], 'New'],
+      ['o', ['Control'], 'Open'],
+      ['F4', ['Alt'], 'Close'],
+    ]) {
+      await c.key(key, mods)
+      await check(
+        `${action} uses the exact Windows 95 save prompt and blank line`,
+        `document.querySelector('[role="dialog"] p')?.textContent === ${JSON.stringify('The text in the Untitled file has changed.\n\nDo you want to save the changes?')}`,
+        `notepad-${action.toLowerCase()}-prompt`,
+      )
+      await clickText('Cancel')
+    }
+  }
   writeFileSync(join(proof, `${item}.json`), `${JSON.stringify({ port, item, checks }, null, 2)}\n`)
 } catch (error) {
   console.log(await c.eval('document.body.innerText'))
