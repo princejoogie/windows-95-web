@@ -58,7 +58,8 @@ const MESSAGE_TIME = 3
 
 function movePlayer(world: World, input: TickInput, dt: number): void {
   const { player } = world
-  player.angle += input.turn * (input.run ? RUN_TURN_SPEED : TURN_SPEED) * dt + input.mouseTurn
+  const turned = player.angle + input.turn * (input.run ? RUN_TURN_SPEED : TURN_SPEED) * dt + input.mouseTurn
+  player.angle = Math.atan2(Math.sin(turned), Math.cos(turned))
   const cos = Math.cos(player.angle)
   const sin = Math.sin(player.angle)
   let mx = input.forward * cos - input.strafe * sin

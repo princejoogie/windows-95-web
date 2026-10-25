@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { damagePlayer } from './combat'
+import { damagePlayer, wake } from './combat'
 import { IDLE, step, TICK, type TickInput } from './game'
 import { parseLevel, TEX } from './map'
 import { createWorld, type World } from './world'
@@ -113,6 +113,24 @@ describe('monsters', () => {
     listener.angle = 0
     press(open, { fire: true })
     expect(listener.state).toBe('chase')
+  })
+
+  it('open plain doors to reach the player, but not locked ones', () => {
+    const chaseThrough = (door: string) => {
+      const w = world(['###########', `#>...${door}..t.#`, '###########'], 3)
+      const trooper = w.actors[0]
+      if (!trooper) throw new Error('no trooper')
+      w.player.hp = 1000
+      wake(w, trooper)
+      run(w, 4)
+      return { w, trooper }
+    }
+    const plain = chaseThrough('D')
+    expect(plain.w.events.some((event) => event.sound === 'doorOpen')).toBe(true)
+    expect(plain.trooper.x).toBeLessThan(5)
+    const locked = chaseThrough('R')
+    expect(locked.w.grid.doors[0]?.phase).toBe('closed')
+    expect(locked.trooper.x).toBeGreaterThan(6)
   })
 
   it('demons throw fireballs that hurt', () => {

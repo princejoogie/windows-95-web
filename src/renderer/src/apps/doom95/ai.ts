@@ -1,7 +1,7 @@
 import { slideMove } from './collision'
 import { applyHit, blast, damageActor, damagePlayer, spawnEffect, traceAttack, wake } from './combat'
 import { BARREL_BLAST_AT, MELEE_RANGE, MONSTER_DEFS, SKILLS } from './defs'
-import { isSolid } from './grid'
+import { doorAtCell, isSolid } from './grid'
 import { lineOfSight } from './raycast'
 import { spread } from './rng'
 import { type Actor, emit, isSolidActor, PLAYER_RADIUS, type World } from './world'
@@ -69,6 +69,21 @@ function blockedFor(world: World, actor: Actor, r: number) {
   }
 }
 
+/** Monsters walk through unlocked doors, opening them as they bump into them. */
+const passable = (world: World, cx: number, cy: number): boolean =>
+  !isSolid(world.grid, cx, cy) || doorAtCell(world.grid, cx, cy)?.key === null
+
+function openDoorAhead(world: World, actor: Actor): boolean {
+  const reach = MONSTER_DEFS[actor.kind].radius + 0.2
+  const cx = Math.floor(actor.x + actor.dirX * reach)
+  const cy = Math.floor(actor.y + actor.dirY * reach)
+  const door = doorAtCell(world.grid, cx, cy)
+  if (!door || door.key !== null || (door.phase !== 'closed' && door.phase !== 'closing')) return false
+  door.phase = 'opening'
+  emit(world, 'doorOpen', cx + 0.5, cy + 0.5)
+  return true
+}
+
 /** Heads for the open direction closest to the player, with some wobble so packs spread out. */
 function pickDirection(world: World, actor: Actor): void {
   const toPlayer = Math.atan2(world.player.y - actor.y, world.player.x - actor.x)
@@ -78,7 +93,7 @@ function pickDirection(world: World, actor: Actor): void {
   for (const dir of DIRECTIONS) {
     const px = actor.x + Math.cos(dir) * probe
     const py = actor.y + Math.sin(dir) * probe
-    if (isSolid(world.grid, Math.floor(px), Math.floor(py))) continue
+    if (!passable(world, Math.floor(px), Math.floor(py))) continue
     const diff = Math.abs(Math.atan2(Math.sin(dir - toPlayer), Math.cos(dir - toPlayer)))
     const score = diff + world.rng() * 0.9
     if (score < bestScore) {
@@ -142,8 +157,9 @@ function chase(world: World, actor: Actor, dt: number): void {
     actor.dirY * step,
     blockedFor(world, actor, def.radius),
   )
-  if (Math.hypot(actor.x - before.x, actor.y - before.y) < step * 0.3) pickDirection(world, actor)
-  else if (!(dist < 4 && actor.cooldown > 0)) actor.angle = Math.atan2(actor.dirY, actor.dirX)
+  if (Math.hypot(actor.x - before.x, actor.y - before.y) < step * 0.3) {
+    if (!openDoorAhead(world, actor)) pickDirection(world, actor)
+  } else if (!(dist < 4 && actor.cooldown > 0)) actor.angle = Math.atan2(actor.dirY, actor.dirX)
 }
 
 function fire(world: World, actor: Actor): void {
