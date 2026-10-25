@@ -65,19 +65,31 @@ async function record(c, scene, folder, proof) {
   frames.push({ file: 'initial.png', time: 0 })
   await c.eval('window.__videoAudio.start()')
   const start = performance.now()
-  const remove = c.on('Page.screencastFrame', (event) => {
+  const saveFrame = (data, source, sourceTimestamp) => {
     const time = (performance.now() - start) / 1000
     const file = `${String(frames.length).padStart(6, '0')}.png`
-    writeFileSync(join(folder, file), Buffer.from(event.data, 'base64'))
-    frames.push({ file, time, sourceTimestamp: event.metadata.timestamp })
+    writeFileSync(join(folder, file), Buffer.from(data, 'base64'))
+    frames.push({ file, time, source, sourceTimestamp })
+  }
+  const remove = c.on('Page.screencastFrame', (event) => {
+    saveFrame(event.data, 'screencast', event.metadata.timestamp)
     c.send('Page.screencastFrameAck', { sessionId: event.sessionId }).catch((error) =>
       errors.push(error.message),
     )
   })
   c.cue = (kind) => cues.push({ kind, time: (performance.now() - start) / 1000 })
   c.checkpoint = (name) => c.shot(join(proof, `${scene.id}-${name}.png`))
+  let sampling = true
+  let sampler
   try {
     await c.send('Page.startScreencast', { format: 'png', maxWidth: 1024, maxHeight: 768, everyNthFrame: 1 })
+    sampler = (async () => {
+      while (sampling) {
+        const result = await c.send('Page.captureScreenshot', { format: 'png' })
+        if (sampling) saveFrame(result.data, 'screenshot')
+        await wait(200)
+      }
+    })().catch((error) => errors.push(error.message))
     await scene.action(c)
     const remaining = duration * 1000 - (performance.now() - start)
     if (remaining < -150)
@@ -85,6 +97,8 @@ async function record(c, scene, folder, proof) {
         `${scene.id} actions overrun the ${duration}s capture by ${(-remaining / 1000).toFixed(2)}s`,
       )
     await wait(Math.max(0, remaining))
+    sampling = false
+    await sampler
     await c.send('Page.stopScreencast')
     remove()
     const audio = await c.eval('window.__videoAudio.stop()')
@@ -112,6 +126,8 @@ async function record(c, scene, folder, proof) {
     )
     return { ...scene, folder, frames: timeline.length, audioTracks, cues }
   } finally {
+    sampling = false
+    await sampler
     c.cue = () => {}
     c.checkpoint = () => {}
     remove()

@@ -6,7 +6,7 @@ Run this command from the checkout you want to film. It uses the production Elec
 node scripts/video/render.mjs
 ```
 
-The command builds the app, drives every footage scene over CDP, captures four title cards in a separate hidden Electron window, synthesizes the score, mixes recorded game audio, and encodes the outputs. It then checks the encoded file and writes the report and contact sheet.
+The command builds the app, drives every footage scene over CDP, captures four title cards in a separate hidden Electron window, synthesizes the score, mixes recorded game audio, and encodes the outputs. It then checks the encoded file and writes the report and contact sheet. Footage combines CDP screencast frames with production screenshots every 200 ms, which refresh the compositor during static scenes.
 
 The outputs are in `release/video/`, which the existing repository rules ignore.
 
