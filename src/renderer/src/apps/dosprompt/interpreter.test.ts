@@ -310,6 +310,16 @@ describe('COMMAND.COM', () => {
     expect(dos.run('notepad missing.txt').output).toEqual(['File not found'])
   })
 
+  it('copies installed programs and launches the copy from its new path', () => {
+    const dos = machine()
+    dos.run('COPY NOTEPAD.EXE C:\\NOTE.EXE')
+    expect(dos.node('C:\\NOTE.EXE')).toMatchObject({ kind: 'program', app: 'notepad' })
+    expect(dos.run('C:\\NOTE.EXE').effects).toEqual([{ kind: 'launch', app: 'notepad', args: {} }])
+    dos.run('COPY /Y CALC.EXE C:\\NOTE.EXE')
+    expect(dos.run('C:\\NOTE.EXE').effects).toEqual([{ kind: 'launch', app: 'calculator', args: {} }])
+    expect(dos.node('NOTEPAD.EXE')).toMatchObject({ kind: 'program', app: 'notepad' })
+  })
+
   it('supports START EDIT HELP /? and EXIT', () => {
     const dos = machine()
     expect(dos.run('START').effects).toEqual([

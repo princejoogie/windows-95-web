@@ -80,31 +80,31 @@ export function prompt(session: Session, state: FsState, now: number): string {
 }
 
 const HELP: Readonly<Record<string, string>> = {
-  CD: 'CD [drive:][path]\nCD .. changes to the parent directory. CHDIR is an alias.',
+  CD: 'CD [path]\nCD .. changes to the parent directory. CHDIR is an alias.',
   CLS: 'CLS\nClears the screen.',
   COPY: 'COPY [/Y] source [destination]\nCopies files. Use quotes around names that contain spaces.',
   DATE: 'DATE [mm-dd-yyyy]\nDisplays or sets the date for this MS-DOS session.',
-  DEL: 'DEL [drive:][path]filename\nDeletes files permanently. * and ? select matching names. ERASE is an alias.',
-  DIR: 'DIR [drive:][path][filename] [/P] [/W] [/S]\n/P Pauses after each screen. /W Uses wide format. /S Includes subdirectories.',
+  DEL: 'DEL filename\nDeletes files permanently. * and ? select matching names. ERASE is an alias.',
+  DIR: 'DIR [path] [filename] [/P] [/W] [/S]\n/P Pauses after each screen. /W Uses wide format. /S Includes subdirectories.',
   ECHO: 'ECHO [ON | OFF]\nECHO [message]\nECHO. prints a blank line. > writes a file and >> appends.',
   EDIT: 'EDIT [filename]\nOpens a text file in Notepad.',
   EXIT: 'EXIT\nCloses the MS-DOS Prompt window.',
   HELP: 'HELP [command]\nDisplays help for MS-DOS commands.',
-  MD: 'MD [drive:]path\nCreates a directory. MKDIR is an alias.',
+  MD: 'MD path\nCreates a directory. MKDIR is an alias.',
   MEM: 'MEM\nDisplays the virtual machine memory configuration.',
   MORE: 'MORE [filename]\nDisplays one screen at a time. Also accepts command | MORE or MORE < file.',
   MOVE: 'MOVE [/Y] source destination\nMoves files or renames a directory.',
-  PATH: 'PATH [[drive:]path[;...]]\nPATH ; clears the executable search path.',
+  PATH: 'PATH [path;...]\nPATH ; clears the executable search path.',
   PROMPT:
     'PROMPT [text]\n$P Path  $G >  $L <  $B |  $Q =  $N Drive\n$D Date  $T Time  $V Version  $_ New line  $$ Dollar sign',
-  RD: 'RD [drive:]path\nRemoves an empty directory. RMDIR is an alias.',
-  REN: 'REN [drive:][path]filename newname\nRenames a file or directory. RENAME is an alias.',
+  RD: 'RD path\nRemoves an empty directory. RMDIR is an alias.',
+  REN: 'REN filename newname\nRenames a file or directory. RENAME is an alias.',
   SET: 'SET [variable=[string]]\nDisplays, sets, or removes an environment variable.',
   START: 'START [program] [file]\nStarts a program or opens a file or directory in a new window.',
-  TIME: 'TIME [hh:mm[:ss]]\nDisplays or sets the time for this MS-DOS session.',
-  TYPE: 'TYPE [drive:][path]filename\nDisplays a text file.',
+  TIME: 'TIME hh:mm:ss\nDisplays or sets the time for this MS-DOS session. The argument is optional.',
+  TYPE: 'TYPE filename\nDisplays a text file.',
   VER: 'VER\nDisplays the Windows version.',
-  VOL: 'VOL [drive:]\nDisplays the disk volume label and serial number.',
+  VOL: 'VOL [drive]\nDisplays the disk volume label and serial number.',
 }
 const ALIASES: Readonly<Record<string, string>> = {
   CHDIR: 'CD',
@@ -396,7 +396,9 @@ export function execute(session: Session, filesystem: FsState, input: string, no
       const source = values[0] ?? ''
       const dest = values[1] ?? (command === 'COPY' ? '.' : '')
       const found = source
-        ? matches(state, next.cwd, source).filter((node) => command === 'MOVE' || node.kind === 'file')
+        ? matches(state, next.cwd, source).filter(
+            (node) => command === 'MOVE' || (node.kind !== 'folder' && node.kind !== 'drive'),
+          )
         : []
       if (!found.length) {
         fail('File not found')
@@ -444,14 +446,16 @@ export function execute(session: Session, filesystem: FsState, input: string, no
           error = invalid
           break
         }
-        if (existing && (existing.kind !== 'file' || node.kind !== 'file')) {
+        if (existing && (existing.kind === 'folder' || existing.kind === 'drive' || node.kind === 'folder')) {
           error = 'Access denied'
           break
         }
         overwrite ||= Boolean(existing)
-        if (command === 'COPY' && node.kind === 'file') {
-          if (existing) plan({ type: 'write', id: existing.id, content: node.content, at: now })
-          else
+        if (command === 'COPY') {
+          if (existing?.kind === 'file' && node.kind === 'file')
+            plan({ type: 'write', id: existing.id, content: node.content, at: now })
+          else {
+            if (existing) plan({ type: 'purge', id: existing.id })
             plan({
               type: 'create',
               node: {
@@ -462,6 +466,7 @@ export function execute(session: Session, filesystem: FsState, input: string, no
                 modified: now,
               },
             })
+          }
         } else {
           if (existing) plan({ type: 'purge', id: existing.id })
           let movingName = node.name

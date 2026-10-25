@@ -37,7 +37,7 @@ export function directory(
     const dots = current?.parent && (pattern === '*' || pattern === '*.*') ? ['.', '..'] : []
     output.push('', ` Directory of ${pathOf(state, id)}`, '')
     const row = (alias: string, directory: boolean, size: number, modified: number, longName: string) => {
-      const dot = alias.lastIndexOf('.')
+      const dot = alias === '..' ? -1 : alias.lastIndexOf('.')
       const stem = dot > 0 ? alias.slice(0, dot) : alias
       const ext = dot > 0 ? alias.slice(dot + 1) : ''
       return `${stem.padEnd(8)} ${ext.padEnd(3)} ${directory ? '    <DIR> ' : number(size).padStart(10)}  ${stamp(modified)} ${longName}`
