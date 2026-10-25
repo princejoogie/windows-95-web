@@ -38,6 +38,13 @@ function emptyStock(game: Game): Game {
 }
 
 describe('Klondike deal and moves', () => {
+  it.each(SUITS)('accepts an Ace of clubs in the empty %s foundation position', (slot) => {
+    const game = position({ waste: [up(1, 'clubs')] })
+    const next = move(game, { kind: 'waste' }, { kind: 'foundation', suit: slot })
+    expect(next.foundations[slot]).toEqual([up(1, 'clubs')])
+    expect(next.waste).toEqual([])
+  })
+
   it('deals 52 distinct cards with one face-up card per column and a repeatable seed', () => {
     const game = newGame(DEFAULT_OPTIONS, seededRandom(95))
     expect(game).toEqual(newGame(DEFAULT_OPTIONS, seededRandom(95)))
