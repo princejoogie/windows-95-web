@@ -8,6 +8,7 @@ import { openNode } from '../shell/system'
 import { Button } from './Button'
 import { ComboBox } from './ComboBox'
 import { Dialog } from './Dialog'
+import { DriveProperties } from './DriveProperties'
 import { Checkbox, TextBox } from './fields'
 import { MessageBox } from './MessageBox'
 import {
@@ -126,13 +127,14 @@ export function PropertiesSheet({ id, onClose }: { id: NodeId; onClose: () => vo
   const [tab, setTab] = useState('General')
   const [error, setError] = useState<string | null>(null)
   if (!node || !flags) return null
+  if (node.kind === 'drive') return <DriveProperties node={node} state={state} onClose={onClose} />
 
   const recycled = state.recycled[node.id]
   const label = naming.label(node)
   const original = attributesOf(node)
-  const renamable = !recycled && node.kind !== 'drive' && !isProtected(node.id)
+  const renamable = !recycled && !isProtected(node.id)
   const changed = name !== label || FLAGS.some(({ key }) => flags[key] !== original[key])
-  const folder = node.kind === 'folder' || node.kind === 'drive'
+  const folder = node.kind === 'folder'
   const created = node.created ?? node.modified
   const tabs = node.kind === 'shortcut' ? ['General', 'Shortcut'] : ['General']
 

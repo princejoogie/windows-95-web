@@ -620,7 +620,60 @@ async function tree() {
   }
 }
 
-const phases = { panes, explorer, sizes, deletion, bin, shared, tree }
+async function drive() {
+  await fresh()
+  await openOnDesktop('My Computer')
+  const mc = windowNamed('My Computer')
+  await clickExpr(itemIn(mc, '(C:)'), { button: 'right' })
+  await pickMenu('Properties')
+  await app.waitFor(`!!${dialog('(C:) Properties')}`)
+  const sheet = dialog('(C:) Properties')
+  const general = await app.eval(
+    `({ tabs: [...${sheet}.querySelectorAll('[role="tab"]')].map(t => t.textContent), text: ${sheet}.querySelector('[role="tabpanel"]').innerText, pie: !!${sheet}.querySelector('canvas[role="img"]'), label: ${sheet}.querySelector('input').value })`,
+  )
+  check(
+    general.tabs.join('|') === 'General|Tools' &&
+      /Used space:\s+[\d,]+ bytes/.test(general.text) &&
+      /Free space:\s+[\d,]+ bytes/.test(general.text) &&
+      /Capacity:\s+536,870,912 bytes\s+512MB/.test(general.text) &&
+      general.text.includes('Type:\nLocal Disk') &&
+      general.text.includes('Drive C') &&
+      general.pie,
+    '14',
+    '(C:) Properties is the drive sheet: Label, Type, used and free space, capacity, the pie, and Drive C',
+    general,
+  )
+  await shot('14-drive-general', await dialogBox('(C:) Properties'))
+  await clickExpr(`[...${sheet}.querySelectorAll('[role="tab"]')][1]`)
+  const tools = await app.eval(
+    `({ groups: [...${sheet}.querySelectorAll('legend')].map(l => l.textContent), buttons: [...${sheet}.querySelectorAll('[role="tabpanel"] button')].map(b => b.textContent) })`,
+  )
+  check(
+    tools.groups.join('|') === 'Error-checking status|Backup status|Defragmentation status' &&
+      tools.buttons.join('|') === 'Check Now...|Backup Now...|Defragment Now...',
+    '14',
+    'the Tools page has error-checking, backup, and defragmentation status with their buttons',
+    tools,
+  )
+  await shot('14-drive-tools', await dialogBox('(C:) Properties'))
+  await clickExpr(buttonIn(sheet, 'Check Now...'))
+  await app.waitFor(`!!${dialog('ScanDisk')}`)
+  const scandisk = await app.eval(`${dialog('ScanDisk')}.innerText`)
+  check(scandisk.includes('not installed'), '14', 'Check Now says the tool is not installed', scandisk)
+  await app.key('Enter')
+  await clickExpr(`[...${sheet}.querySelectorAll('[role="tab"]')][0]`)
+  await clickExpr(`${sheet}.querySelector('input')`)
+  await app.type('Work')
+  await clickExpr(buttonIn(sheet, 'OK'))
+  await sleep(200)
+  const named = await app.eval(
+    `[...${mc}.querySelectorAll('[role="option"]')].map(o => o.textContent.trim())`,
+  )
+  check(named.includes('Work (C:)'), '14', 'a typed label renames the drive Work (C:)', named)
+  await shot('14-drive-labeled', await boxOf(mc))
+}
+
+const phases = { panes, explorer, sizes, deletion, bin, shared, tree, drive }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {
