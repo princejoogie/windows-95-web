@@ -1,4 +1,4 @@
-import { children, extension } from '../fs/fs'
+import { children, extension, fileSize } from '../fs/fs'
 import { type Attributes, type FsNode, type FsState, RECYCLED_DIR } from '../fs/types'
 
 const SHORT_CHARS = /^[A-Z0-9$%'`\-@{}~!#()&_^]*$/
@@ -78,8 +78,7 @@ export const isHidden = (node: FsNode): boolean => attributesOf(node).hidden
 
 /** Bytes a node takes: a file's text, or a folder's whole contents. */
 export function bytesOf(state: FsState, node: FsNode): number {
-  if (node.kind === 'file') return new TextEncoder().encode(node.content).length
-  if (node.kind !== 'folder' && node.kind !== 'drive') return 0
+  if (node.kind !== 'folder' && node.kind !== 'drive') return fileSize(node)
   return children(state, node.id).reduce((sum, child) => sum + bytesOf(state, child), 0)
 }
 

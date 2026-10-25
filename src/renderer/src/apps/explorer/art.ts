@@ -1,0 +1,118 @@
+import type { FsNode } from '../../fs/types'
+import { icons } from '../../icons'
+import { pixelArt } from '../../icons/pixel'
+import { nodeIcon } from '../../shell/nodeIcon'
+
+const folder = pixelArt([
+  '................................',
+  '................................',
+  '..YYYYYYYYYY....................',
+  '..YyyyyyyyyY....................',
+  '..YyyyyyyyyYYYYYYYYYYYYYYYYYY...',
+  '..YyyyyyyyyyyyyyyyyyyyyyyyyyY...',
+  '..YwwwwwwwwwwwwwwwwwwwwwwwwY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YwyyyyyyyyyyyyyyyyyyyyyyyYY...',
+  '..YYYYYYYYYYYYYYYYYYYYYYYYYYY...',
+  '...kkkkkkkkkkkkkkkkkkkkkkkkk....',
+  '................................',
+  '................................',
+  '................................',
+  '................................',
+  '................................',
+])
+export const smallFolder = pixelArt([
+  '................',
+  '..YYYYY.........',
+  '.YyyyyyY........',
+  '.YyyyyyYYYYYYYY.',
+  '.YwwwwwwwwwwwwY.',
+  '.YwyyyyyyyyyyYY.',
+  '.YwyyyyyyyyyyYY.',
+  '.YwyyyyyyyyyyYY.',
+  '.YwyyyyyyyyyyYY.',
+  '.YwyyyyyyyyyyYY.',
+  '.YwyyyyyyyyyyYY.',
+  '.YYYYYYYYYYYYYY.',
+  '..kkkkkkkkkkkk..',
+  '................',
+  '................',
+  '................',
+])
+export const floppyIcon = pixelArt([
+  '................',
+  '................',
+  '................',
+  '................',
+  '.....kkkkkkkkk..',
+  '...kksssssssssk.',
+  '..kssssssssssgk.',
+  '.kkkkkkkkkkkkgk.',
+  '.kwwwwwwwwwwkgk.',
+  '.kwsggggggsskgk.',
+  '.kwswwwwwwsskgk.',
+  '.kwslssssssskkk.',
+  '.kwgggggggggk...',
+  '.kkkkkkkkkkkk...',
+  '................',
+  '................',
+])
+export const printerIcon = pixelArt([
+  '.....kkkkkk.....',
+  '.....kwwwwk.....',
+  '.....kwwwwk.....',
+  '...kkkwwwwkkk...',
+  '..kssssssssssk..',
+  '.kwwwwwwwwwwwwk.',
+  '.kwssssssssssgk.',
+  '.kwsskkkkkkssgk.',
+  '.kwskswwwwsklgk.',
+  '.kkkkkwwwwkkkkk.',
+  '.....kwwwwk.....',
+  '.....kwwwwk.....',
+  '.....kkkkkk.....',
+  '................',
+  '................',
+  '................',
+])
+export const radioDot = pixelArt([
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '......kkk.......',
+  '.....kkkkk......',
+  '.....kkkkk......',
+  '.....kkkkk......',
+  '......kkk.......',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+])
+export function fileIcon(node: FsNode, small = false): ReturnType<typeof nodeIcon> {
+  return node.kind === 'folder'
+    ? { icon: small ? smallFolder : folder }
+    : node.kind === 'drive'
+      ? { icon: small ? icons.small.drive : icons.drive }
+      : nodeIcon(node)
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { children, emptyDrive, fsReducer, validateName } from '../../fs/fs'
 import { DOCUMENTS_DIR, ROOT, WINDOWS_DIR } from '../../fs/types'
-import { cellValue, columns, emptySelection, selectNode, sizeOf, visibleNodes } from './model'
+import { cellValue, columns, emptySelection, formatDate, selectNode, sizeOf, visibleNodes } from './model'
 
 const state = emptyDrive(1000)
 const sort = { column: 'name', direction: 'ascending' } as const
@@ -51,7 +51,7 @@ describe('Explorer view model', () => {
     const recycled = fsReducer(state, { type: 'recycle', id: readme.id, at: 2000 })
     expect(visibleNodes(recycled, { kind: 'recycle' }, sort).map((n) => n.id)).toEqual([readme.id])
     expect(cellValue(recycled, readme, 'original')).toBe('C:\\My Documents')
-    expect(cellValue(recycled, readme, 'deleted')).toBe(new Date(2000).toLocaleString('en-US'))
+    expect(cellValue(recycled, readme, 'deleted')).toBe(formatDate(2000))
   })
 })
 

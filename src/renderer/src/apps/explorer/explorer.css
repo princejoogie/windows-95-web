@@ -103,14 +103,6 @@
 .explorer-toolbar > button:disabled {
   color: #808080;
 }
-.explorer-toolbar > button > img {
-  width: 16px;
-  height: 16px;
-  margin: auto;
-}
-:where(.explorer-toolbar > button:disabled) > img {
-  opacity: 0.4;
-}
 .explorer-files {
   flex: 1;
   min-height: 0;
@@ -122,6 +114,38 @@
   min-height: 100%;
   outline: none;
   align-content: start;
+}
+.explorer-details .explorer-items {
+  min-height: calc(100% - 20px);
+}
+.explorer-tabs {
+  display: flex;
+  align-items: end;
+  height: 22px;
+  padding-left: 2px;
+}
+.explorer-tabs > button {
+  height: 19px;
+  padding: 2px 8px;
+  box-shadow:
+    inset 1px 1px #fff,
+    inset -1px 0 #000,
+    inset -2px 0 #808080;
+}
+.explorer-tabs > button[aria-selected="true"] {
+  height: 22px;
+  position: relative;
+  z-index: 1;
+  background: var(--color-face);
+}
+.explorer-icon-dither {
+  position: absolute;
+  inset: 0;
+  background: var(--color-select);
+  pointer-events: none;
+}
+.explorer-size {
+  text-align: right;
 }
 .explorer-item {
   display: flex;
@@ -234,7 +258,7 @@
   align-items: center;
   gap: 3px;
 }
-.explorer-details .selected {
+.explorer-details .selected .explorer-name {
   background: var(--color-select);
   color: white;
 }
@@ -248,13 +272,15 @@
   outline: none;
   user-select: text;
 }
-.explorer-properties {
-  display: grid;
-  grid-template-columns: 65px minmax(160px, 280px);
-  gap: 10px;
-  padding: 15px;
-  user-select: text;
+.explorer-large [data-shell-item] > .explorer-label {
+  flex-direction: column;
+  gap: 4px;
 }
-.explorer-properties dd {
-  overflow-wrap: anywhere;
+.explorer-toolbar > button > img {
+  width: 16px;
+  height: 16px;
+  margin: auto;
+}
+.explorer-toolbar > button:disabled > img {
+  opacity: 0.4;
 }

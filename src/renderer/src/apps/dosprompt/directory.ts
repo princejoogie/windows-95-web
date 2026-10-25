@@ -1,11 +1,10 @@
-import { children, pathOf } from '../../fs/fs'
+import { children, fileSize, pathOf } from '../../fs/fs'
 import type { FsNode, FsState, NodeId } from '../../fs/types'
 import { shortNames, wildcard } from './paths'
 
 export const VOLUME = [' Volume in drive C has no label', ' Volume Serial Number is 1995-0950']
 export const DISK_BYTES = 536870912
-export const bytes = (node: FsNode): number =>
-  node.kind === 'file' ? new TextEncoder().encode(node.content).length : 0
+export const bytes = (node: FsNode): number => fileSize(node)
 export const number = (value: number): string => value.toLocaleString('en-US')
 export const freeBytes = (state: FsState): number =>
   Math.max(0, DISK_BYTES - Object.values(state.nodes).reduce((total, node) => total + bytes(node), 0))

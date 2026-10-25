@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { type FsState, ROOT } from '../../fs/types'
 import { icons } from '../../icons'
 import { getApp } from '../../shell/registry'
+import { floppyIcon, printerIcon, smallFolder } from './art'
 import type { Location } from './model'
 import { expandTo, folderTree, type TreeEntry, treeRows } from './tree'
 
@@ -12,7 +13,9 @@ export function treeIcon(entry: Pick<TreeEntry, 'key'>): string {
     case 'computer':
       return icons.myComputer
     case 'c':
-      return icons.drive
+      return icons.small.drive
+    case 'floppy':
+      return floppyIcon
     case 'network':
       return getApp('network')?.icon ?? icons.myComputer
     case 'recycle':
@@ -20,9 +23,9 @@ export function treeIcon(entry: Pick<TreeEntry, 'key'>): string {
     case 'controlpanel':
       return getApp('controlpanel')?.icon ?? icons.program
     case 'printers':
-      return icons.program
+      return printerIcon
     default:
-      return icons.folderClosed
+      return smallFolder
   }
 }
 

@@ -22,6 +22,6 @@ export const app: AppManifest = {
       for (const id of ids) fs.recycle(id)
     },
   },
-  window: { kind: 'resizable', width: 520, height: 300, minWidth: 240, minHeight: 180 },
+  window: { kind: 'resizable', width: 660, height: 300, minWidth: 300, minHeight: 180 },
   component: RecycleBin,
 }

@@ -29,6 +29,26 @@ const PROTECTED: ReadonlySet<NodeId> = new Set([ROOT, WINDOWS_DIR, DESKTOP_DIR, 
 
 export const isProtected = (id: NodeId): boolean => PROTECTED.has(id)
 
+/** Logical file lengths. Executable bytes are represented by installed program nodes. */
+export function fileSize(node: FsNode): number {
+  if (node.kind === 'file') return new TextEncoder().encode(node.content).length
+  if (node.kind === 'shortcut') return 352
+  if (node.kind !== 'program') return 0
+  const sizes: Readonly<Record<string, number>> = {
+    'CALC.EXE': 59392,
+    'NOTEPAD.EXE': 34304,
+    'WINMINE.EXE': 24064,
+    'SOL.EXE': 180736,
+    'EXPLORER.EXE': 204288,
+    'MSPAINT.EXE': 311296,
+    'COMMAND.EXE': 93812,
+    'COMMAND.COM': 93812,
+    'CONTROL.EXE': 11264,
+    'WINHELP.EXE': 265728,
+  }
+  return sizes[node.name.toUpperCase()] ?? 32768
+}
+
 export function extension(name: string): string {
   const dot = name.lastIndexOf('.')
   return dot <= 0 ? '' : name.slice(dot + 1).toLowerCase()
