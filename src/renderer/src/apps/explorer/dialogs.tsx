@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import type { FsNode } from '../../fs/types'
 import { icons } from '../../icons'
-import { Button, Checkbox, Dialog, GroupBox, Radio } from '../../ui'
+import { Button, Checkbox, Dialog, GroupBox, Radio, Tabs } from '../../ui'
 import { type Options, options } from './preferences'
 
 export function FolderOptions({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState('General')
+  const [tab, setTab] = useState<'General' | 'View'>('General')
   const [draft, setDraft] = useState<Options>(options.get())
   const changed = JSON.stringify(draft) !== JSON.stringify(options.get())
   const apply = () => options.dispatch(draft)
@@ -19,20 +19,7 @@ export function FolderOptions({ onClose }: { onClose: () => void }) {
           onClose()
         }}
       >
-        <div role="tablist" className="explorer-tabs">
-          {['General', 'View'].map((name) => (
-            <button
-              key={name}
-              type="button"
-              role="tab"
-              aria-selected={tab === name}
-              onClick={() => setTab(name)}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
-        <div className="bevel-window p-4 min-h-[210px]">
+        <Tabs tabs={['General', 'View']} active={tab} onChange={setTab} pageClassName="p-4 min-h-[210px]">
           {tab === 'General' ? (
             <GroupBox label="Browse folders as follows" className="flex flex-col gap-3">
               <Radio
@@ -71,7 +58,7 @@ export function FolderOptions({ onClose }: { onClose: () => void }) {
               />
             </div>
           )}
-        </div>
+        </Tabs>
         <div className="flex justify-end gap-[6px] pt-2">
           <Button type="submit" isDefault>
             OK
@@ -87,7 +74,7 @@ export function FolderOptions({ onClose }: { onClose: () => void }) {
 }
 
 export function RecycleProperties({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState('Global')
+  const [tab, setTab] = useState<'Global' | '(C:)'>('Global')
   const [draft, setDraft] = useState(options.get())
   return (
     <Dialog title="Recycle Bin Properties" onClose={onClose} className="w-[350px]">
@@ -99,20 +86,12 @@ export function RecycleProperties({ onClose }: { onClose: () => void }) {
           onClose()
         }}
       >
-        <div role="tablist" className="explorer-tabs">
-          {['Global', '(C:)'].map((name) => (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === name}
-              key={name}
-              onClick={() => setTab(name)}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
-        <div className="bevel-window p-4 flex flex-col gap-5 min-h-[180px]">
+        <Tabs
+          tabs={['Global', '(C:)']}
+          active={tab}
+          onChange={setTab}
+          pageClassName="p-4 flex flex-col gap-5 min-h-[180px]"
+        >
           <div className="flex items-center gap-4">
             <img src={icons.binEmpty} className="size-8" alt="" />
             <span>
@@ -126,7 +105,7 @@ export function RecycleProperties({ onClose }: { onClose: () => void }) {
             checked={draft.confirmDelete}
             onChange={(event) => setDraft({ ...draft, confirmDelete: event.target.checked })}
           />
-        </div>
+        </Tabs>
         <div className="flex justify-end gap-[6px] pt-2">
           <Button type="submit" isDefault>
             OK

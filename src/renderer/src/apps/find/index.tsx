@@ -16,9 +16,10 @@ import {
   Radio,
   StatusBar,
   StatusPane,
+  Tabs,
   TextBox,
 } from '../../ui'
-import { CommandMenu, Tabs } from '../help/controls'
+import { CommandMenu } from '../help/controls'
 import '../help/help.css'
 import { findIcon } from './icons'
 import {
@@ -322,8 +323,7 @@ function Find({ window: appWindow, args }: AppProps) {
         }}
       >
         <fieldset disabled={running} className="find-criteria">
-          <Tabs items={tabs} value={tab} onChange={setTab} />
-          <div role="tabpanel" aria-label={tab} className="classic-sheet">
+          <Tabs tabs={tabs} active={tab} onChange={setTab} pageClassName="h-[160px] px-[12px] py-[13px]">
             {tab === 'Name & Location' && (
               <>
                 <div className="find-form-row">
@@ -533,7 +533,7 @@ function Find({ window: appWindow, args }: AppProps) {
                 </div>
               </>
             )}
-          </div>
+          </Tabs>
         </fieldset>
         <div className="find-actions">
           <Button type="submit" isDefault disabled={running}>

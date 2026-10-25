@@ -1,9 +1,9 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useKeyDown } from '../../shell/context'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { AboutDialog, Accel, Button, Dialog, MessageBox, TextBox } from '../../ui'
+import { AboutDialog, Accel, Button, Dialog, MessageBox, Tabs, TextBox } from '../../ui'
 import { type HelpBook, type HelpTopic, indexOf, parseParagraph, searchTopics, topicsOf } from './books'
-import { CommandMenu, Tabs } from './controls'
+import { CommandMenu } from './controls'
 import { help } from './help'
 import { bookClosed, bookOpen, helpIcon, pageIcon } from './icons'
 import './help.css'
@@ -67,8 +67,13 @@ function HelpTopics({
   }
   return (
     <div className="help-browser">
-      <Tabs items={tabs} value={tab} onChange={setTab} />
-      <div className="classic-sheet" role="tabpanel" aria-label={tab}>
+      <Tabs
+        tabs={tabs}
+        active={tab}
+        onChange={setTab}
+        className="flex-1 min-h-0"
+        pageClassName="flex-1 min-h-0 flex flex-col p-[13px]"
+      >
         <p className="mb-3">
           {tab === 'Contents'
             ? 'Click a book, and then click Open. Or click another tab.'
@@ -194,7 +199,7 @@ function HelpTopics({
             </select>
           </>
         )}
-      </div>
+      </Tabs>
       <div className="flex justify-end gap-2 pt-3">
         <Button data-help-display isDefault disabled={tab === 'Find' && !findTopic} onClick={display}>
           <Accel

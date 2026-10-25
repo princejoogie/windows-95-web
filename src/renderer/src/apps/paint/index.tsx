@@ -134,11 +134,18 @@ const MENU_HELP: Record<string, string> = {
   'Help Topics': 'Lists Help topics.',
   'About Paint': 'Displays program information, version number, and copyright.',
 }
-const MENU_LABELS = Object.keys(MENU_HELP).sort((a, b) => b.length - a.length)
-function menuHelp(text: string): string | null {
-  if (/^\d /.test(text)) return 'Opens this document.'
-  const label = MENU_LABELS.find((entry) => text.startsWith(entry))
-  return label ? (MENU_HELP[label] ?? null) : null
+/** Attaches each command's status bar help to its menu entry. */
+function withHelp(entries: readonly MenuEntry[]): MenuEntry[] {
+  return entries.map((entry) => {
+    if (entry === 'separator') return entry
+    const label = entry.label.replace('&', '')
+    const help = /^\d /.test(label) ? 'Opens this document.' : MENU_HELP[label]
+    return {
+      ...entry,
+      ...(help ? { help } : {}),
+      ...(entry.items ? { items: withHelp(entry.items) } : {}),
+    }
+  })
 }
 
 type Command = 'new' | 'open' | 'exit'
@@ -194,16 +201,6 @@ function Paint({ window: windowApi, args }: AppProps) {
   const [recent, addRecent] = useRecent()
   const clipboard = useClipboard()
   const scroller = useRef<HTMLDivElement>(null)
-  const menuBar = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const element = menuBar.current
-    if (!element) return
-    const observer = new MutationObserver(() => {
-      if (!element.querySelector('[role="menu"]')) setHelp(null)
-    })
-    observer.observe(element, { childList: true, subtree: true })
-    return () => observer.disconnect()
-  }, [])
   const loadVersion = useRef(0)
   const closeResult = useRef<((closed: boolean) => void) | null>(null)
   const cancelClose = () => {
@@ -653,19 +650,7 @@ function Paint({ window: windowApi, args }: AppProps) {
   const size = dragSize ?? (marquee ? rectOf(marquee) : null)
   return (
     <div className="relative flex h-full w-full flex-col bg-face">
-      <div
-        ref={menuBar}
-        className="contents"
-        onPointerOver={(event) => {
-          const item = (event.target as HTMLElement).closest('[role="menuitem"]')
-          if (item) setHelp(menuHelp(item.textContent ?? ''))
-        }}
-        onPointerOut={(event) => {
-          if ((event.target as HTMLElement).closest('[role="menuitem"]')) setHelp(null)
-        }}
-      >
-        <MenuBar menus={menus} />
-      </div>
+      <MenuBar menus={menus.map((menu) => ({ ...menu, items: withHelp(menu.items) }))} onHelp={setHelp} />
       <div className="flex flex-1 min-h-0">
         {panels.toolBox && (
           <ToolBox

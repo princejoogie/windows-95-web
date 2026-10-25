@@ -14,6 +14,7 @@ import { WindowContext } from '../shell/context'
 import { shellEvents } from '../shell/events'
 import { type MenuState, menuKey } from '../shell/menuMachine'
 import type { Point } from '../shell/types'
+import { highlightedHelp } from './menuHelp'
 import { Accel, accelKey } from './text'
 
 export type MenuEntry =
@@ -25,6 +26,8 @@ export type MenuEntry =
       readonly shortcut?: string
       readonly icon?: string
       readonly bold?: boolean
+      /** What the app's status bar says while this item is highlighted. */
+      readonly help?: string
       readonly items?: readonly MenuEntry[]
     }
   | 'separator'
@@ -340,7 +343,14 @@ export interface MenuBarMenu {
   readonly label: string
   readonly items: readonly MenuEntry[]
 }
-export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
+export function MenuBar({
+  menus,
+  onHelp,
+}: {
+  menus: readonly MenuBarMenu[]
+  /** Receives the highlighted item's help while a menu is open, and `null` when the menus close. */
+  onHelp?: (help: string | null) => void
+}) {
   const root = useRef<HTMLDivElement>(null)
   const popup = useRef<HTMLDivElement>(null)
   const titleRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -356,6 +366,13 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
   const { state, setState, close } = controller
   const latest = useRef(menus)
   latest.current = menus
+  const help = highlightedHelp(
+    menus.map((menu) => menu.items),
+    state,
+  )
+  const reportHelp = useRef(onHelp)
+  reportHelp.current = onHelp
+  useEffect(() => reportHelp.current?.(help), [help])
   useEffect(() => {
     if (!focused) {
       setState({ kind: 'closed' })

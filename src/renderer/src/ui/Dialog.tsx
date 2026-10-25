@@ -163,7 +163,7 @@ export function Dialog({
       if (menuIsActive()) return
       if (event.target instanceof Element && event.target.closest('[role="combobox"][aria-expanded="true"]'))
         return
-      if (event.key === 'Tab') {
+      if (event.key === 'Tab' && !event.ctrlKey) {
         const elements = focusable(),
           first = elements[0],
           last = elements.at(-1)

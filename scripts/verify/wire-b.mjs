@@ -336,7 +336,65 @@ async function about() {
   }
 }
 
-const phases = { fileDialog, dialogs, about }
+const selectedTab = (title) =>
+  app.eval(`${dialog(title)}.querySelector('[role="tab"][aria-selected="true"]')?.textContent.trim()`)
+const statusText = () =>
+  app.eval(`[...${topWindow}.querySelectorAll('*')].filter(e => e.children.length === 0 && /For Help|Opens|Creates|Saves/.test(e.textContent)).map(e => e.textContent.trim())[0] ?? null`)
+
+async function kit() {
+  await closeWindows()
+  await app.click(600, 755, { button: 'right' })
+  await pickMenu('Properties')
+  await app.waitFor(`!!${dialog('Taskbar Properties')}`)
+  check((await selectedTab('Taskbar Properties')) === 'Taskbar Options', '3b', 'Taskbar Properties opens on its first tab')
+  await clickExpr(`${dialog('Taskbar Properties')}.querySelector('input[type="checkbox"]')`)
+  await app.key('Tab', ['Control'])
+  check(
+    (await selectedTab('Taskbar Properties')) === 'Start Menu Programs',
+    '3b',
+    'Ctrl+Tab from a control on the page turns to the next tab',
+  )
+  await shot('3b-taskbar-tabs', await dialogBox('Taskbar Properties'))
+  await clickExpr(`${dialog('Taskbar Properties')}.querySelector('[role="tab"][aria-selected="true"]')`)
+  await app.key('ArrowLeft')
+  const back = await selectedTab('Taskbar Properties')
+  const focusedTab = await app.eval(`document.activeElement.getAttribute('role') + ':' + document.activeElement.textContent.trim()`)
+  check(back === 'Taskbar Options' && focusedTab === 'tab:Taskbar Options', '3b', 'Left Arrow on a tab selects and focuses the previous tab', focusedTab)
+  await app.key('Escape')
+
+  await run('find')
+  await app.waitFor(`!!${topWindow}.querySelector('[role="tab"]')`)
+  const findTabs = await app.eval(`[...${topWindow}.querySelectorAll('[role="tab"]')].map(t => t.textContent.trim() + (t.getAttribute('aria-selected') === 'true' ? '*' : ''))`)
+  check(findTabs.join('|') === 'Name & Location*|Date Modified|Advanced', '3b', 'Find uses the shared property-sheet tabs', findTabs)
+  await shot('3b-find-tabs', await app.eval(`(()=>{const b=(${topWindow}).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:Math.min(b.height,260)}})()`))
+  await closeWindows()
+
+  await run('mspaint')
+  await app.waitFor(`!!document.querySelector('[data-window]')`)
+  const idle = await statusText()
+  await app.key('f', ['Alt'])
+  await app.waitFor(`!!document.querySelector('[role="menu"]')`)
+  const onNew = await statusText()
+  await app.key('ArrowDown')
+  const onOpen = await statusText()
+  await shot('3c-paint-menu-help', await app.eval(`(()=>{const b=(${topWindow}).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height}})()`))
+  await app.key('Escape')
+  await app.key('Escape')
+  await sleep(100)
+  const after = await statusText()
+  check(
+    idle === 'For Help, click Help Topics on the Help Menu.' &&
+      onNew === 'Creates a new document.' &&
+      onOpen === 'Opens an existing document.' &&
+      after === idle,
+    '3c',
+    'Paint status bar follows the keyboard-highlighted menu item and returns to idle',
+    [idle, onNew, onOpen, after],
+  )
+  await closeWindows()
+}
+
+const phases = { fileDialog, dialogs, about, kit }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {
