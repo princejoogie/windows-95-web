@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { icons } from '../../icons'
-import { Button, Checkbox, Dialog, GroupBox, Radio, Separator, TextBox } from '../../ui'
+import { AboutDialog, Button, Checkbox, Dialog, GroupBox, Radio, TextBox } from '../../ui'
 import { icon } from './art'
 import { type GameNumber, gameNumber } from './game'
 import type { Options, Statistics } from './preferences'
@@ -235,37 +234,5 @@ export function StatisticsDialog({
 }
 
 export function About({ onClose }: { onClose: () => void }) {
-  return (
-    <Dialog title="About FreeCell" onClose={onClose} className="w-[400px]">
-      <form
-        onSubmit={(event) => {
-          event.preventDefault()
-          onClose()
-        }}
-      >
-        <div className="flex items-center gap-4 px-5 py-3">
-          <img src={icons.windowsLogo} width="32" height="32" alt="" />
-          <div className="text-[24px]">Microsoft Windows 95</div>
-        </div>
-        <Separator className="mx-3" />
-        <div className="flex gap-4 p-5">
-          <img src={icon} width="32" height="32" className="shrink-0" alt="" />
-          <div>
-            Microsoft FreeCell
-            <br />
-            Version 4.00.950
-            <br />
-            <br />
-            Copyright © 1981-1995 Microsoft Corp.
-          </div>
-        </div>
-        <Separator className="mx-3" />
-        <div className="flex justify-end p-3">
-          <Button autoFocus isDefault type="submit">
-            OK
-          </Button>
-        </div>
-      </form>
-    </Dialog>
-  )
+  return <AboutDialog app="FreeCell" icon={icon} credit="by Jim Horne" onClose={onClose} />
 }

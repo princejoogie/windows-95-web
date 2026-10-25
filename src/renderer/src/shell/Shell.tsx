@@ -57,7 +57,6 @@ export function Shell() {
   const stacking = new Map(state.windows.map((window, index) => [window.id, index + 1]))
   const openApp = (id: string) => {
     if (!launch(id)) {
-      shellEvents.emit('error')
       setMissing(id)
     }
   }
@@ -113,7 +112,7 @@ export function Shell() {
   }, [])
   useEffect(() => {
     if (power === 'running') {
-      shellEvents.emit('startup')
+      shellEvents.emit({ type: 'startup' })
       const folder = startMenuFolder()
       if (folder) for (const node of children(fs.get(), folder)) openNode(node.id)
       return
@@ -214,7 +213,7 @@ export function Shell() {
         },
       )
       if (!closed) return
-      shellEvents.emit('shutdown')
+      shellEvents.emit({ type: 'shutdown' })
       if (choice === 'logoff') setDialog('logon')
       else if (choice === 'dos') {
         const app = findAppByExe('command.com')

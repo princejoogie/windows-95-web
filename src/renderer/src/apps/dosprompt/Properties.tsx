@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Checkbox, Dialog, GroupBox, Radio } from '../../ui'
+import { Button, Checkbox, Dialog, GroupBox, Radio, Tabs } from '../../ui'
 import { dosSmallIcon } from './icons'
 
 export const FONTS = [
@@ -24,43 +24,16 @@ export function Properties({
   onClose: () => void
 }) {
   const [draft, setDraft] = useState(settings)
-  const [tab, setTab] = useState('Font')
+  const [tab, setTab] = useState<'Font' | 'Screen'>('Font')
   const [full, setFull] = useState(false)
   return (
     <Dialog title="MS-DOS Prompt Properties" icon={dosSmallIcon} onClose={onClose} className="w-[340px]">
       <div className="p-[8px]">
-        <div
-          role="tablist"
-          aria-label="Properties"
-          className="flex"
-          onKeyDown={(event) => {
-            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-              event.preventDefault()
-              const next = tab === 'Font' ? 'Screen' : 'Font'
-              setTab(next)
-              event.currentTarget.querySelector<HTMLButtonElement>(`[data-tab="${next}"]`)?.focus()
-            }
-          }}
-        >
-          {['Font', 'Screen'].map((name) => (
-            <button
-              key={name}
-              type="button"
-              role="tab"
-              data-tab={name}
-              aria-selected={tab === name}
-              tabIndex={tab === name ? 0 : -1}
-              className={`px-[10px] h-[22px] bevel-raised ${tab === name ? 'relative top-px bg-face' : ''}`}
-              onClick={() => setTab(name)}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
-        <div
-          role="tabpanel"
-          aria-label={tab}
-          className="bevel-raised p-[12px] h-[196px] flex flex-col gap-[12px]"
+        <Tabs
+          tabs={['Font', 'Screen']}
+          active={tab}
+          onChange={setTab}
+          pageClassName="p-[12px] h-[196px] flex flex-col gap-[12px]"
         >
           {tab === 'Font' ? (
             <>
@@ -100,7 +73,7 @@ export function Properties({
               />
             </>
           )}
-        </div>
+        </Tabs>
         <div className="flex justify-end gap-[6px] pt-[10px]">
           <Button
             isDefault

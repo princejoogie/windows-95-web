@@ -30,18 +30,50 @@ export const snap = (point: Point): Point => {
 }
 
 const rowsOn = (desktop: Size) => Math.max(1, Math.floor((desktop.height - ORIGIN.y) / CELL.height))
+const cellKey = (point: Point) => {
+  const cell = cellAt(point)
+  return `${cell.column}:${cell.row}`
+}
 
-/** Saved spots first; everything else fills free cells top to bottom, then left to right. */
+/** The free grid cell nearest `point`, searched ring by ring outward. Columns run on to the right. */
+function nearestFree(point: Point, taken: ReadonlySet<string>, rows: number): Point {
+  const { column, row } = cellAt(point)
+  for (let ring = 0; ; ring++) {
+    let best: Point | null = null
+    let bestDistance = Number.POSITIVE_INFINITY
+    for (let c = column - ring; c <= column + ring; c++)
+      for (let r = row - ring; r <= row + ring; r++) {
+        if (Math.max(Math.abs(c - column), Math.abs(r - row)) !== ring) continue
+        if (c < 0 || r < 0 || r >= rows || taken.has(`${c}:${r}`)) continue
+        const distance = (c - column) ** 2 + (r - row) ** 2
+        if (distance < bestDistance) {
+          best = pointOf(c, r)
+          bestDistance = distance
+        }
+      }
+    if (best) return best
+  }
+}
+
+/** Where a new or pasted icon dropped at `point` goes: that cell, or the nearest one no icon holds. */
+export function freeSpot(point: Point, occupied: Iterable<Point>, desktop: Size): Point {
+  return nearestFree(point, new Set([...occupied].map(cellKey)), rowsOn(desktop))
+}
+
+/**
+ * Saved spots first; everything else fills free cells top to bottom, then left to right. Two icons never
+ * share a cell: a saved spot that another icon already holds moves to the nearest free cell.
+ */
 export function layout(keys: readonly string[], saved: Positions, desktop: Size): Map<string, Point> {
   const rows = rowsOn(desktop)
   const placed = new Map<string, Point>()
   const taken = new Set<string>()
   for (const key of keys) {
-    const point = saved[key]
-    if (!point) continue
+    const wanted = saved[key]
+    if (!wanted) continue
+    const point = taken.has(cellKey(wanted)) ? nearestFree(wanted, taken, rows) : wanted
     placed.set(key, point)
-    const cell = cellAt(point)
-    taken.add(`${cell.column}:${cell.row}`)
+    taken.add(cellKey(point))
   }
   let slot = 0
   for (const key of keys) {

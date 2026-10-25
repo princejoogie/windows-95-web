@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { useKeyDown } from '../../shell/context'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { Button, MenuBar, MessageBox, StatusBar, StatusPane } from '../../ui'
+import { AboutDialog, Button, MenuBar, MessageBox, StatusBar, StatusPane } from '../../ui'
 import { backImage, cardImage, cardName } from '../solitaire/cards'
 import { icon, smallIcon } from './art'
-import { AboutDialog, ComputerDialog, NetworkDialog, ScoreDialog } from './dialogs'
+import { ComputerDialog, NetworkDialog, ScoreDialog } from './dialogs'
 import {
   type Action,
   type Card,
@@ -418,7 +418,7 @@ function Hearts({ window }: AppProps) {
           }}
         />
       )}
-      {dialog === 'about' && <AboutDialog onClose={() => setDialog(null)} />}
+      {dialog === 'about' && <AboutDialog app="Hearts" icon={icon} onClose={() => setDialog(null)} />}
       {scoreOpen && game && (
         <ScoreDialog
           game={game}

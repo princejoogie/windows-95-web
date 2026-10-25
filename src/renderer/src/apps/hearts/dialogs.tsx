@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
-import { Button, Dialog, Radio, Separator, TextBox } from '../../ui'
-import { icon, windowsFlag } from './art'
+import { Button, Dialog, Radio, TextBox } from '../../ui'
+import { icon } from './art'
 import { four, type Game, SEATS, totals } from './game'
 import type { Preferences } from './preferences'
 
@@ -205,42 +205,6 @@ export function ScoreDialog({
         {over && <p className="pt-3 text-center">The game ends when a player reaches 100 points.</p>}
         <div className="flex justify-end gap-2 pt-3">
           {over && <Button onClick={onNew}>New Game</Button>}
-          <Button type="submit" isDefault>
-            OK
-          </Button>
-        </div>
-      </form>
-    </Dialog>
-  )
-}
-
-export function AboutDialog({ onClose }: { onClose: () => void }) {
-  return (
-    <Dialog title="About Hearts" onClose={onClose} className="w-[400px]">
-      <form
-        onSubmit={(event) => {
-          event.preventDefault()
-          onClose()
-        }}
-      >
-        <div className="flex items-center gap-4 px-5 py-3">
-          <img src={windowsFlag} width="40" height="32" alt="" />
-          <div className="text-[24px]">Microsoft Windows 95</div>
-        </div>
-        <Separator className="mx-3" />
-        <div className="flex gap-4 p-5">
-          <img src={icon} width="32" height="32" className="shrink-0" alt="" />
-          <div>
-            Microsoft Hearts
-            <br />
-            Version 4.00.950
-            <br />
-            <br />
-            Copyright © 1991-1995 Microsoft Corp.
-          </div>
-        </div>
-        <Separator className="mx-3" />
-        <div className="flex justify-end p-3">
           <Button type="submit" isDefault>
             OK
           </Button>

@@ -1,7 +1,6 @@
 import type { Dispatch } from 'react'
 import { useId, useState } from 'react'
-import { Button, Checkbox, Radio } from '../../ui'
-import { ModelessDialog } from '../notepad/ModelessDialog'
+import { Button, Checkbox, ModelessDialog, Radio } from '../../ui'
 import { type Action, type Calculator, decimalOnly, type Key } from './engine'
 
 const rows: readonly (readonly [string, Key | null][])[] = [

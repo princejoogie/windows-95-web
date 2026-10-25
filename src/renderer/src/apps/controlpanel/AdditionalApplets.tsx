@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { Button, Checkbox, ComboBox, Dialog, GroupBox, MessageBox, Radio, TextBox } from '../../ui'
-import { DeviceList } from './DeviceList'
+import { ListBox } from '../../ui/ListBox'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
 import { Wizard } from './Wizard'
 
@@ -25,7 +25,7 @@ export function PasswordsProperties({ onClose }: { onClose: () => void }) {
                 <p className="mt-3 mb-5">To change your Windows password, click Change Windows Password.</p>
                 <Button onClick={() => setPassword(true)}>Change Windows Password...</Button>
                 <p className="mt-6 mb-3">To change other passwords, select the password and click Change.</p>
-                <DeviceList
+                <ListBox
                   label="Other passwords"
                   items={[]}
                   value=""
@@ -237,7 +237,7 @@ export function MultimediaProperties({ onClose }: { onClose: () => void }) {
               <>
                 <GroupBox label="MIDI output" className="mt-3">
                   <Radio label="Single instrument" name="midi" defaultChecked />
-                  <DeviceList
+                  <ListBox
                     label="MIDI output devices"
                     items={['MIDI Mapper']}
                     value={settings.midi}
@@ -329,7 +329,7 @@ export function ModemsProperties({ onClose }: { onClose: () => void }) {
             content: (
               <>
                 <p className="mt-2 mb-3">The following modems are set up on this computer:</p>
-                <DeviceList
+                <ListBox
                   label="Installed modems"
                   items={[]}
                   value=""
@@ -352,13 +352,7 @@ export function ModemsProperties({ onClose }: { onClose: () => void }) {
             content: (
               <>
                 <p className="my-3">Select the port your modem is connected to.</p>
-                <DeviceList
-                  label="Modem ports"
-                  items={[]}
-                  value=""
-                  onChange={() => {}}
-                  className="h-[160px]"
-                />
+                <ListBox label="Modem ports" items={[]} value="" onChange={() => {}} className="h-[160px]" />
                 <div className="text-right mt-3">
                   <Button disabled>More Info...</Button>
                 </div>

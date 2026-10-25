@@ -1,52 +1,6 @@
 import { type ReactNode, useRef, useState } from 'react'
 import { Accel } from '../../ui'
 
-export function Tabs<T extends string>({
-  items,
-  value,
-  onChange,
-}: {
-  items: readonly T[]
-  value: T
-  onChange: (value: T) => void
-}) {
-  return (
-    <div role="tablist" className="classic-tabs">
-      {items.map((item, index) => (
-        <button
-          key={item}
-          type="button"
-          role="tab"
-          aria-selected={value === item}
-          tabIndex={value === item ? 0 : -1}
-          onClick={() => onChange(item)}
-          onKeyDown={(event) => {
-            const offset = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-            const next =
-              event.key === 'Home'
-                ? items[0]
-                : event.key === 'End'
-                  ? items.at(-1)
-                  : offset
-                    ? items[(index + offset + items.length) % items.length]
-                    : undefined
-            if (!next) return
-            event.preventDefault()
-            onChange(next)
-            const sibling =
-              event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role=tab]')[
-                items.indexOf(next)
-              ]
-            sibling?.focus()
-          }}
-        >
-          {item}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 export interface Command {
   readonly label: string
   readonly action: () => void

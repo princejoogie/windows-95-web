@@ -74,46 +74,6 @@
   max-height: calc(100vh - 32px);
 }
 
-.cp-tabs {
-  display: flex;
-  align-items: end;
-  padding-left: 2px;
-  min-height: 22px;
-}
-
-.cp-tabs button {
-  position: relative;
-  height: 20px;
-  padding: 2px 8px;
-  background: var(--color-face);
-  border-radius: 3px 3px 0 0;
-  box-shadow:
-    inset 1px 1px var(--color-hilight),
-    inset -1px 0 var(--color-dark),
-    inset -2px 1px var(--color-shadow);
-}
-
-.cp-tabs button[aria-selected="true"] {
-  height: 23px;
-  margin: 0 -2px -1px;
-  padding: 3px 10px 4px;
-  z-index: 1;
-}
-
-.cp-tabs button:focus-visible {
-  outline: 1px dotted var(--color-text);
-  outline-offset: -5px;
-}
-
-.cp-page {
-  min-height: 326px;
-  padding: 12px;
-  box-shadow:
-    inset 1px 1px var(--color-hilight),
-    inset -1px -1px var(--color-dark),
-    inset -2px -2px var(--color-shadow);
-}
-
 .cp-actions {
   display: flex;
   justify-content: flex-end;

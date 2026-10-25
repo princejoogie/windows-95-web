@@ -1,7 +1,7 @@
 import { useId, useState } from 'react'
 import { defaultSettings } from '../../settings/model'
 import { Button, Checkbox, ComboBox, Dialog, GroupBox, Radio, TextBox } from '../../ui'
-import { DeviceList } from './DeviceList'
+import { ListBox } from '../../ui/ListBox'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
 
 export function NetworkProperties({ onClose }: { onClose: () => void }) {
@@ -25,7 +25,7 @@ export function NetworkProperties({ onClose }: { onClose: () => void }) {
             content: (
               <>
                 <p className="mb-2">The following network components are installed:</p>
-                <DeviceList
+                <ListBox
                   label="Network components"
                   items={network.components}
                   value={selected}
@@ -161,7 +161,7 @@ export function NetworkProperties({ onClose }: { onClose: () => void }) {
             {dialog === 'add' ? (
               <>
                 <p className="mb-3">Select the network component you want to install.</p>
-                <DeviceList
+                <ListBox
                   label="Available network components"
                   items={defaultSettings.network.components.filter(
                     (name) => !network.components.includes(name),

@@ -6,8 +6,20 @@ import { icons } from '../../icons'
 import { useKeyDown } from '../../shell/context'
 import { launch, openNode, windowsStore } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { Accel, Button, Checkbox, Dialog, MessageBox, Radio, StatusBar, StatusPane, TextBox } from '../../ui'
-import { CommandMenu, Tabs } from '../help/controls'
+import {
+  AboutDialog,
+  Accel,
+  Button,
+  Checkbox,
+  Dialog,
+  MessageBox,
+  Radio,
+  StatusBar,
+  StatusPane,
+  Tabs,
+  TextBox,
+} from '../../ui'
+import { CommandMenu } from '../help/controls'
 import '../help/help.css'
 import { findIcon } from './icons'
 import {
@@ -311,8 +323,7 @@ function Find({ window: appWindow, args }: AppProps) {
         }}
       >
         <fieldset disabled={running} className="find-criteria">
-          <Tabs items={tabs} value={tab} onChange={setTab} />
-          <div role="tabpanel" aria-label={tab} className="classic-sheet">
+          <Tabs tabs={tabs} active={tab} onChange={setTab} pageClassName="h-[160px] px-[12px] py-[13px]">
             {tab === 'Name & Location' && (
               <>
                 <div className="find-form-row">
@@ -522,7 +533,7 @@ function Find({ window: appWindow, args }: AppProps) {
                 </div>
               </>
             )}
-          </div>
+          </Tabs>
         </fieldset>
         <div className="find-actions">
           <Button type="submit" isDefault disabled={running}>
@@ -725,24 +736,12 @@ function Find({ window: appWindow, args }: AppProps) {
         </Dialog>
       )}
       {about && (
-        <Dialog title="About Windows" onClose={() => setAbout(false)} className="w-[320px]">
-          <div className="flex gap-4 p-5">
-            <img src={findIcon} alt="" className="size-8" />
-            <div>
-              Microsoft Windows
-              <br />
-              Windows 95
-              <br />
-              Version 4.0
-              <br />
-              <br />
-              Find: All Files
-            </div>
-          </div>
-          <Button className="m-3 self-end" isDefault onClick={() => setAbout(false)}>
-            OK
-          </Button>
-        </Dialog>
+        <AboutDialog
+          app="Windows 95"
+          title="About Windows"
+          icon={icons.windowsLogo}
+          onClose={() => setAbout(false)}
+        />
       )}
       {message && (
         <MessageBox

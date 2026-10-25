@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { children, isInside, pathOf, resolvePath } from '../fs/fs'
 import { createNode, fs, useFs } from '../fs/store'
 import type { NodeId } from '../fs/types'
-import { Button, Checkbox, ComboBox, Dialog, GroupBox, MessageBox, TextBox } from '../ui'
+import { Button, Checkbox, ComboBox, Dialog, GroupBox, MessageBox, Tabs, TextBox } from '../ui'
 import { clearDocuments } from './recent'
 import { findAppByExe, getApp } from './registry'
 import { startMenuFolder } from './startup'
@@ -12,7 +12,7 @@ import { setTaskbarSettings, useTaskbarSettings } from './taskbarSettings'
 export function TaskbarProperties({ onClose }: { onClose: () => void }) {
   const settings = useTaskbarSettings()
   const [draft, setDraft] = useState(settings)
-  const [tab, setTab] = useState<'options' | 'programs'>('options')
+  const [tab, setTab] = useState<'Taskbar Options' | 'Start Menu Programs'>('Taskbar Options')
   const [manage, setManage] = useState<'add' | 'remove' | null>(null)
   const [command, setCommand] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -30,22 +30,13 @@ export function TaskbarProperties({ onClose }: { onClose: () => void }) {
   return (
     <Dialog title="Taskbar Properties" onClose={onClose} className="w-[390px]">
       <div className="p-[8px]">
-        <div role="tablist" className="flex pl-[2px]">
-          {(['options', 'programs'] as const).map((id) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={tab === id}
-              className={`px-[8px] h-[22px] bevel-raised ${tab === id ? 'relative top-px bg-face' : ''}`}
-              onClick={() => setTab(id)}
-            >
-              {id === 'options' ? 'Taskbar Options' : 'Start Menu Programs'}
-            </button>
-          ))}
-        </div>
-        <div className="bevel-raised p-[12px] min-h-[250px]">
-          {tab === 'options' ? (
+        <Tabs
+          tabs={['Taskbar Options', 'Start Menu Programs']}
+          active={tab}
+          onChange={setTab}
+          pageClassName="p-[12px] min-h-[250px]"
+        >
+          {tab === 'Taskbar Options' ? (
             <>
               <div
                 aria-label="Taskbar preview"
@@ -91,7 +82,7 @@ export function TaskbarProperties({ onClose }: { onClose: () => void }) {
               </GroupBox>
             </div>
           )}
-        </div>
+        </Tabs>
         <div className="flex justify-end gap-[6px] pt-[10px]">
           <Button
             isDefault
