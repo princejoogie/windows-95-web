@@ -1,9 +1,39 @@
 import { useReducer, useState } from 'react'
 import { icons } from '../../icons'
+import { pixelArt } from '../../icons/pixel'
 import { useKeyDown } from '../../shell/context'
+import { launch } from '../../shell/system'
 import type { AppManifest } from '../../shell/types'
 import { Button, MenuBar, MessageBox } from '../../ui'
-import { type Action, initialCalculator, type Key, keyboardAction, reduceCalculator } from './engine'
+import { AboutAccessory } from '../notepad/AboutAccessory'
+import {
+  type Action,
+  displayText,
+  initialCalculator,
+  type Key,
+  keyboardAction,
+  reduceCalculator,
+} from './engine'
+import { Scientific } from './Scientific'
+
+const radioDot = pixelArt([
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '......kkk.......',
+  '.....kkkkk......',
+  '.....kkkkk......',
+  '.....kkkkk......',
+  '......kkk.......',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+])
 
 const rows: readonly (readonly { label: string; action: Action }[])[] = [
   ['7', '8', '9', '/', 'sqrt'],
@@ -22,6 +52,7 @@ const memoryKeys: readonly Key[] = ['MC', 'MR', 'MS', 'M+']
 function Calculator() {
   const [state, dispatch] = useReducer(reduceCalculator, initialCalculator)
   const [message, setMessage] = useState<string | null>(null)
+  const [about, setAbout] = useState(false)
   const copy = () =>
     navigator.clipboard.writeText(state.display).catch(() => setMessage('The Clipboard is not available.'))
   const paste = () =>
@@ -30,7 +61,16 @@ function Calculator() {
       .then((text) => dispatch({ kind: 'paste', text }))
       .catch(() => setMessage('The Clipboard is not available.'))
   useKeyDown((event) => {
-    if (message || event.altKey || event.target instanceof HTMLInputElement) return
+    if (
+      message ||
+      about ||
+      event.altKey ||
+      (event.target instanceof Element &&
+        event.target.closest(
+          '[role="dialog"], [role="menu"], input:not([type="radio"]):not([type="checkbox"])',
+        ))
+    )
+      return
     if (event.ctrlKey || event.metaKey) {
       if (event.key.toLowerCase() === 'c') {
         event.preventDefault()
@@ -42,14 +82,14 @@ function Calculator() {
       }
       return
     }
-    const action = keyboardAction(event.key)
+    const action = keyboardAction(event.key, state.view === 'scientific', state.base)
     if (action) {
       event.preventDefault()
       dispatch(action)
     }
   })
   return (
-    <div className="w-[260px] bg-face pb-3">
+    <div className="calculator bg-face pb-3" style={{ width: state.view === 'scientific' ? 466 : 260 }}>
       <MenuBar
         menus={[
           {
@@ -59,13 +99,22 @@ function Calculator() {
               { label: '&Paste', shortcut: 'Ctrl+V', onSelect: paste },
             ],
           },
-          { label: '&View', items: [{ label: '&Standard', checked: true }] },
+          {
+            label: '&View',
+            items: (['scientific', 'standard'] as const).map((view) => ({
+              label: view === 'scientific' ? '&Scientific' : '&Standard',
+              ...(state.view === view ? { icon: radioDot } : {}),
+              onSelect: () => dispatch({ kind: 'view', view }),
+            })),
+          },
           {
             label: '&Help',
             items: [
+              { label: '&Help Topics', onSelect: () => launch('help', { book: 'calculator' }) },
+              'separator',
               {
                 label: '&About Calculator',
-                onSelect: () => setMessage('Calculator\nWindows 95\nStandard Calculator'),
+                onSelect: () => setAbout(true),
               },
             ],
           },
@@ -77,66 +126,65 @@ function Calculator() {
           className="bevel-sunken flex h-[27px] items-center justify-end overflow-hidden bg-white px-[5px] select-text"
           style={{ fontSize: state.entry === 'error' ? 11 : 13 }}
         >
-          {state.display}
-          {state.entry !== 'error' && !/[.e]/i.test(state.display) ? '.' : ''}
+          {displayText(state)}
         </output>
-        <div className="mt-[9px] flex gap-[9px]">
-          <div className="flex w-[34px] shrink-0 flex-col gap-[5px]">
-            <output
-              aria-label="Memory indicator"
-              className="bevel-sunken mb-[4px] flex h-[27px] items-center justify-center"
-            >
-              {state.memory !== 0 ? 'M' : ''}
-            </output>
-            {memoryKeys.map((key) => (
-              <Button
-                key={key}
-                className="min-w-0! h-[27px]! px-0! text-[#800000]"
-                onClick={() => dispatch({ kind: 'key', key })}
+        {state.view === 'scientific' ? (
+          <Scientific state={state} dispatch={dispatch} blocked={about || message !== null} />
+        ) : (
+          <div className="mt-[9px] flex gap-[9px]">
+            <div className="flex w-[34px] shrink-0 flex-col gap-[5px]">
+              <output
+                aria-label="Memory indicator"
+                className="bevel-sunken mb-[4px] flex h-[27px] items-center justify-center"
               >
-                {key}
-              </Button>
-            ))}
-          </div>
-          <div className="flex-1">
-            <div className="mb-[9px] grid grid-cols-3 gap-[5px]">
-              {(
-                [
-                  { label: 'Back', key: 'back' },
-                  { label: 'CE', key: 'clearEntry' },
-                  { label: 'C', key: 'clear' },
-                ] satisfies { label: string; key: Key }[]
-              ).map(({ label, key }) => (
+                {state.memory !== 0 ? 'M' : ''}
+              </output>
+              {memoryKeys.map((key) => (
                 <Button
                   key={key}
                   className="min-w-0! h-[27px]! px-0! text-[#800000]"
                   onClick={() => dispatch({ kind: 'key', key })}
                 >
-                  {label}
+                  {key}
                 </Button>
               ))}
             </div>
-            <div className="grid grid-cols-5 gap-[5px]">
-              {rows.flat().map(({ label, action }) => (
-                <Button
-                  key={label}
-                  className={`min-w-0! h-[27px]! px-0! ${/^[+*/=-]$/.test(label) ? 'text-[#800000]' : 'text-[#000080]'}`}
-                  onClick={() => dispatch(action)}
-                >
-                  {label}
-                </Button>
-              ))}
+            <div className="flex-1">
+              <div className="mb-[9px] grid grid-cols-3 gap-[5px]">
+                {(
+                  [
+                    { label: 'Back', key: 'back' },
+                    { label: 'CE', key: 'clearEntry' },
+                    { label: 'C', key: 'clear' },
+                  ] satisfies { label: string; key: Key }[]
+                ).map(({ label, key }) => (
+                  <Button
+                    key={key}
+                    className="min-w-0! h-[27px]! px-0! text-[#800000]"
+                    onClick={() => dispatch({ kind: 'key', key })}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+              <div className="grid grid-cols-5 gap-[5px]">
+                {rows.flat().map(({ label, action }) => (
+                  <Button
+                    key={label}
+                    className={`min-w-0! h-[27px]! px-0! ${/^[+*/=-]$/.test(label) ? 'text-[#800000]' : 'text-[#000080]'}`}
+                    onClick={() => dispatch(action)}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
+      {about && <AboutAccessory name="Calculator" icon={icons.calculator} onClose={() => setAbout(false)} />}
       {message && (
-        <MessageBox
-          title={message.startsWith('Calculator') ? 'About Calculator' : 'Calculator'}
-          message={message}
-          buttons={['OK']}
-          onClose={() => setMessage(null)}
-        />
+        <MessageBox title="Calculator" message={message} buttons={['OK']} onClose={() => setMessage(null)} />
       )}
     </div>
   )
