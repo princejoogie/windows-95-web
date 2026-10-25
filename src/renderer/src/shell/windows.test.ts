@@ -11,6 +11,29 @@ const id = (n: number) => n as WindowId
 const order = (state: WindowsState) => state.windows.map((w) => w.appId)
 
 describe('windowsReducer', () => {
+  it('undoes only windows that Minimize All minimized', () => {
+    const initial = run(open('a'), open('b'), { type: 'minimize', id: id(1) })
+    const minimized = windowsReducer(initial, { type: 'minimizeAll' })
+    expect(minimized.windows.every((window) => window.minimized)).toBe(true)
+    const restored = windowsReducer(minimized, { type: 'undoMinimizeAll' })
+    expect(restored.windows.map((window) => window.minimized)).toEqual([true, false])
+    expect(restored.minimizedAll).toEqual([])
+  })
+  it('tiles resizable clients inside the desktop and leaves fixed windows intact', () => {
+    const state = run(
+      open('fixed'),
+      { type: 'open', appId: 'a', title: 'a', args: {}, size: { width: 500, height: 320 } },
+      { type: 'open', appId: 'b', title: 'b', args: {}, size: { width: 500, height: 320 } },
+    )
+    const tiled = windowsReducer(state, {
+      type: 'arrange',
+      layout: 'vertical',
+      desktop: { width: 1024, height: 740 },
+    })
+    expect(tiled.windows[0]).toBe(state.windows[0])
+    expect(tiled.windows[1]).toMatchObject({ position: { x: 0, y: 0 }, size: { width: 504, height: 713 } })
+    expect(tiled.windows[2]).toMatchObject({ position: { x: 512, y: 0 }, size: { width: 504, height: 713 } })
+  })
   it('focuses each newly opened window on top and cascades it', () => {
     const state = run(open('calc'), open('notepad'))
     expect(order(state)).toEqual(['calc', 'notepad'])

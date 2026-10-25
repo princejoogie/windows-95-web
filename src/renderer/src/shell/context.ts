@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef } from 'react'
+import { menuIsActive } from '../ui/Menu'
 import type { WindowApi } from './types'
 
 export interface WindowContextValue {
@@ -26,7 +27,9 @@ export function useKeyDown(handler: (event: KeyboardEvent) => void): void {
   latest.current = handler
   useEffect(() => {
     if (!active) return
-    const listener = (event: KeyboardEvent) => latest.current(event)
+    const listener = (event: KeyboardEvent) => {
+      if (!menuIsActive() && !event.defaultPrevented) latest.current(event)
+    }
     document.addEventListener('keydown', listener)
     return () => document.removeEventListener('keydown', listener)
   }, [active])

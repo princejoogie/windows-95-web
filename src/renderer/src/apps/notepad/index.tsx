@@ -57,6 +57,12 @@ export function Notepad({ window: windowApi, args }: AppProps) {
   const [matchCase, setMatchCase] = useState(false)
   const [direction, setDirection] = useState<'up' | 'down'>('down')
   const editor = useRef<HTMLTextAreaElement>(null)
+  const closeResult = useRef<((closed: boolean) => void) | null>(null)
+  const cancel = () => {
+    setPrompt(null)
+    closeResult.current?.(false)
+    closeResult.current = null
+  }
   useEffect(() => {
     editor.current?.focus()
   }, [])
@@ -74,6 +80,8 @@ export function Notepad({ window: windowApi, args }: AppProps) {
         setPrompt({ kind: 'file', mode: 'open', next: null })
         break
       case 'close':
+        closeResult.current?.(true)
+        closeResult.current = null
         windowApi.close()
         break
     }
@@ -84,7 +92,15 @@ export function Notepad({ window: windowApi, args }: AppProps) {
     else act(next)
   }
 
-  useEffect(() => windowApi.onCloseRequest(() => request('close')))
+  useEffect(() =>
+    windowApi.onCloseRequest(
+      () =>
+        new Promise<boolean>((resolve) => {
+          closeResult.current = resolve
+          request('close')
+        }),
+    ),
+  )
 
   const save = (next: PendingAction | null = null) => {
     if (file?.kind !== 'file') {
@@ -200,10 +216,6 @@ export function Notepad({ window: windowApi, args }: AppProps) {
       event.preventDefault()
       timeDate()
     }
-    if (event.altKey && event.key === 'F4') {
-      event.preventDefault()
-      request('close')
-    }
   })
 
   return (
@@ -315,7 +327,7 @@ export function Notepad({ window: windowApi, args }: AppProps) {
           onClose={(answer) => {
             if (answer === 'Yes') save(prompt.next)
             else if (answer === 'No') act(prompt.next)
-            else setPrompt(null)
+            else cancel()
           }}
         />
       )}
@@ -327,17 +339,11 @@ export function Notepad({ window: windowApi, args }: AppProps) {
           filters={FILTERS}
           defaultExtension="txt"
           onSelect={acceptFile}
-          onCancel={() => setPrompt(null)}
+          onCancel={cancel}
         />
       )}
       {prompt?.kind === 'error' && (
-        <MessageBox
-          title="Notepad"
-          icon="info"
-          message={prompt.message}
-          buttons={['OK']}
-          onClose={() => setPrompt(null)}
-        />
+        <MessageBox title="Notepad" icon="info" message={prompt.message} buttons={['OK']} onClose={cancel} />
       )}
       {findOpen && (
         <ModelessDialog

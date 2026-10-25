@@ -1,6 +1,6 @@
 import { extension } from '../fs/fs'
 import type { ProgramSpec } from '../fs/types'
-import { programSpec } from './programs'
+import { matchesProgramName, programSpec } from './programs'
 import type { AppManifest } from './types'
 
 const modules = import.meta.glob<{ app: AppManifest }>('../apps/*/index.tsx', { eager: true })
@@ -19,11 +19,7 @@ export const programSpecs: readonly ProgramSpec[] = apps.map(programSpec)
 
 /** `calc`, `CALC.EXE`, and `calc.exe` all find Calculator. */
 export function findAppByExe(name: string): AppManifest | undefined {
-  const wanted = name
-    .trim()
-    .toLowerCase()
-    .replace(/\.exe$/, '')
-  return apps.find((app) => app.exe.toLowerCase().replace(/\.exe$/, '') === wanted)
+  return apps.find((app) => matchesProgramName(app.exe, name))
 }
 
 export function appForFile(name: string): AppManifest | undefined {

@@ -51,8 +51,13 @@ function FreeCell({ window: appWindow }: AppProps) {
   const [modal, setModal] = useState<Modal>({ kind: 'none' })
   const [look, setLook] = useState<'left' | 'right'>('left')
   const board = useRef<HTMLDivElement>(null)
+  const closeResult = useRef<((closed: boolean) => void) | null>(null)
   const position = game.position
-  const closeDialog = () => setModal({ kind: 'none' })
+  const closeDialog = () => {
+    setModal({ kind: 'none' })
+    closeResult.current?.(false)
+    closeResult.current = null
+  }
   const record = (won: boolean) => {
     const saved = loadPreferences()
     const next = { ...saved, statistics: recordResult(saved.statistics, won) }
@@ -62,6 +67,8 @@ function FreeCell({ window: appWindow }: AppProps) {
   }
   const perform = (pending: Pending) => {
     if (pending.kind === 'exit') {
+      closeResult.current?.(true)
+      closeResult.current = null
       appWindow.close()
       return
     }
@@ -74,7 +81,15 @@ function FreeCell({ window: appWindow }: AppProps) {
     else perform(pending)
   }
   const exit = () => request({ kind: 'exit' })
-  useEffect(() => appWindow.onCloseRequest(exit))
+  useEffect(() =>
+    appWindow.onCloseRequest(
+      () =>
+        new Promise<boolean>((resolve) => {
+          closeResult.current = resolve
+          exit()
+        }),
+    ),
+  )
   useEffect(() => {
     appWindow.setTitle(`FreeCell Game #${game.number}`)
   }, [appWindow, game.number])
