@@ -1,0 +1,4 @@
+ts	phase	decision	why	evidence	result
+2026-10-25T07:34:00Z	design	Use an immutable game reducer with a single undo snapshot	Keeps scoring and legal moves in one pure module; an event log adds replay machinery without a consumer	game.ts	implemented
+2026-10-25T07:35:00Z	rules	Keep facedown cards hidden until explicitly clicked	The unit brief requires the Windows 95 manual flip behavior	game.test.ts	41 repository tests pass
+2026-10-25T07:36:00Z	integration	Continue on app code while waiting for the shell commit	The shared branch still points to the nonbooting contract commit	7d914ac	full typecheck blocked by existing RunDialog.tsx syntax error; isolated rules typecheck passes
