@@ -12,8 +12,8 @@ const names = (criteria: Partial<SearchCriteria> = {}, drive: FsState = state, a
 
 describe('Find files', () => {
   it('matches partial names, wildcards, literal regex characters, and multiple patterns', () => {
-    expect(names({ name: 'readme' })).toEqual(['Readme.txt', 'Readme.txt'])
-    expect(names({ name: 'READ?E.*' })).toHaveLength(2)
+    expect(names({ name: 'readme' })).toEqual(['Readme.txt'])
+    expect(names({ name: 'READ?E.*' })).toHaveLength(1)
     expect(names({ name: '*.bat;*.sys' })).toEqual(['AUTOEXEC.BAT', 'CONFIG.SYS'])
     expect(names({ name: '*.bat;' })).toEqual(['AUTOEXEC.BAT'])
     expect(names({ name: '*.[' })).toEqual([])
@@ -22,7 +22,7 @@ describe('Find files', () => {
   })
   it('limits direct children and recursive descendants and excludes the search root', () => {
     expect(names({ folder: WINDOWS_DIR, recursive: false })).toEqual(['Desktop'])
-    expect(names({ folder: WINDOWS_DIR })).toEqual(['Desktop', 'Readme.txt'])
+    expect(names({ folder: WINDOWS_DIR })).toEqual(['Desktop'])
     expect(names({ folder: DOCUMENTS_DIR })).toEqual(['Readme.txt'])
     expect(names({ recursive: false })).not.toContain('Readme.txt')
   })
@@ -39,18 +39,13 @@ describe('Find files', () => {
     expect(names({ containing: 'prompt', caseSensitive: true })).toEqual([])
     expect(names({ fileType: 'folder' })).toEqual(['WINDOWS', 'Desktop', 'My Documents'])
     expect(names({ size: { kind: 'at-least', kb: 1 } })).toEqual([])
-    expect(names({ size: { kind: 'at-most', kb: 1 } })).toEqual([
-      'Readme.txt',
-      'Readme.txt',
-      'AUTOEXEC.BAT',
-      'CONFIG.SYS',
-    ])
+    expect(names({ size: { kind: 'at-most', kb: 1 } })).toEqual(['Readme.txt', 'AUTOEXEC.BAT', 'CONFIG.SYS'])
     const sample = Object.values(state.nodes).find((node) => node.kind === 'file')
     if (sample?.kind !== 'file') throw new Error('Seed file missing')
     expect(fileSize({ ...sample, content: 'é' })).toBe(2)
     const exact = fileSize(sample) / 1024
-    expect(names({ name: 'Readme', size: { kind: 'at-least', kb: exact } })).toHaveLength(2)
-    expect(names({ name: 'Readme', size: { kind: 'at-most', kb: exact } })).toHaveLength(2)
+    expect(names({ name: 'Readme', size: { kind: 'at-least', kb: exact } })).toHaveLength(1)
+    expect(names({ name: 'Readme', size: { kind: 'at-most', kb: exact } })).toHaveLength(1)
   })
   it('includes the entire ending date and excludes the following day', () => {
     expect(names({ modified: { kind: 'between', from: '2026-10-25', to: '2026-10-25' } })).toContain(
