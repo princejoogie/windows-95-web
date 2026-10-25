@@ -553,7 +553,7 @@ export function importSystemAssets({
     emit(file, readFileSync(path))
     sounds.push(name)
   }
-  emit('assets.css', `${css.join('\n')}\n`)
+  emit('assets.css', css.length ? `${css.join('\n')}\n` : '')
   const imported = fonts.length + Object.keys(cursors).length + sounds.length
   const message = imported
     ? `System assets: ${fonts.length} fonts, ${Object.keys(cursors).length} cursors, ${sounds.length} sounds${errors.length ? `; ${errors.join('; ')}` : ''}.`

@@ -5,12 +5,11 @@
   font-family: "MS Sans Serif Fallback";
   src: url("../assets/fonts/micross.ttf") format("truetype");
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 400;
 }
 
 body {
   font-kerning: none;
-  font-synthesis: none;
   -webkit-font-smoothing: none;
 }
 
