@@ -753,7 +753,39 @@ async function options() {
   await shot('22-options-applied')
 }
 
-const phases = { panes, explorer, sizes, deletion, bin, shared, tree, drive, options }
+async function icons() {
+  await fresh()
+  await openOnDesktop('My Computer')
+  await openIn(windowNamed('My Computer'), '(C:)', '(C:)')
+  const c = windowNamed('(C:)')
+  const iconOf = (scope, name) => app.eval(`${itemIn(scope, name)}.querySelector('img').src`)
+  await openIn(c, 'My Documents', 'My Documents')
+  const readme = await iconOf(windowNamed('My Documents'), 'Readme.txt')
+  const autoexec = await iconOf(c, 'AUTOEXEC.BAT')
+  const config = await iconOf(c, 'CONFIG.SYS')
+  check(
+    new Set([readme, autoexec, config]).size === 3,
+    '27',
+    'AUTOEXEC.BAT, CONFIG.SYS, and Readme.txt each have their own type icon',
+  )
+  await clickExpr(taskButton('(C:)'))
+  await sleep(400)
+  await shot('27-c-drive-icons', await boxOf(c))
+  await openIn(c, 'WINDOWS', 'WINDOWS')
+  const win = windowNamed('WINDOWS')
+  await openMenu('View', 'Details', win)
+  const programs = await app.eval(
+    `Object.fromEntries(['CALC.EXE', 'NOTEPAD.EXE', 'WINMINE.EXE'].map(n => [n, [...${win}.querySelectorAll('[role="option"]')].find(o => o.getAttribute('aria-label') === n)?.querySelector('img').src]))`,
+  )
+  check(
+    new Set(Object.values(programs)).size === 3 && !Object.values(programs).includes(autoexec),
+    '27',
+    "CALC.EXE, NOTEPAD.EXE, and WINMINE.EXE show their programs' icons",
+  )
+  await shot('27-windows-programs', await boxOf(win))
+}
+
+const phases = { panes, explorer, sizes, deletion, bin, shared, tree, drive, options, icons }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {

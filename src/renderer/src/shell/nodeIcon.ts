@@ -1,7 +1,9 @@
+import { extension } from '../fs/fs'
 import { fsStore } from '../fs/store'
 import type { FsNode } from '../fs/types'
 import { icons } from '../icons'
 import { resolveShortcut } from './clipboard'
+import { fileTypeIcons } from './fileTypeIcons'
 import { getApp } from './registry'
 
 export interface NodeIcon {
@@ -29,6 +31,6 @@ export function nodeIcon(node: FsNode): NodeIcon {
       return { icon, overlay: icons.shortcutArrow }
     }
     case 'file':
-      return { icon: icons.document }
+      return { icon: fileTypeIcons[extension(node.name)] ?? icons.document }
   }
 }
