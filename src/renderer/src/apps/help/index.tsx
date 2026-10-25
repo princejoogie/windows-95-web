@@ -196,7 +196,7 @@ function HelpTopics({
         )}
       </div>
       <div className="flex justify-end gap-2 pt-3">
-        <Button isDefault disabled={tab === 'Find' && !findTopic} onClick={display}>
+        <Button data-help-display isDefault disabled={tab === 'Find' && !findTopic} onClick={display}>
           <Accel
             label={tab === 'Contents' && selectedRow && 'topics' in selectedRow.entry ? '&Open' : '&Display'}
           />
@@ -284,7 +284,10 @@ function TopicBody({
 function Help({ args, window: appWindow }: AppProps) {
   const book = books.find((entry) => entry.id === args.book) ?? help
   const topics = useMemo(() => topicsOf(book), [book])
-  const [history, setHistory] = useState<readonly HelpTopic[]>([])
+  const [navigation, setNavigation] = useState<{ back: readonly HelpTopic[]; visited: readonly HelpTopic[] }>(
+    { back: [], visited: [] },
+  )
+  const history = navigation.back
   const [showTopics, setShowTopics] = useState(true)
   const [popup, setPopup] = useState<HelpTopic | null>(null)
   const [dialog, setDialog] = useState<'history' | 'about' | null>(null)
@@ -299,7 +302,10 @@ function Help({ args, window: appWindow }: AppProps) {
   const root = useRef<HTMLDivElement>(null)
   const popupRef = useRef<HTMLDivElement>(null)
   const openTopic = (next: HelpTopic) => {
-    setHistory((previous) => (previous.at(-1)?.id === next.id ? previous : [...previous, next]))
+    setNavigation((previous) => ({
+      back: previous.back.at(-1)?.id === next.id ? previous.back : [...previous.back, next],
+      visited: [...previous.visited.filter((entry) => entry.id !== next.id), next],
+    }))
     setShowTopics(false)
     setPopup(null)
     setDialog(null)
@@ -343,19 +349,28 @@ function Help({ args, window: appWindow }: AppProps) {
       setShowTopics(true)
     } else if (event.altKey && event.key === 'ArrowLeft' && !showTopics && history.length > 1) {
       event.preventDefault()
-      setHistory((previous) => previous.slice(0, -1))
+      setNavigation((previous) => ({ ...previous, back: previous.back.slice(0, -1) }))
     } else if (event.altKey && event.key.toLowerCase() === 'o' && !showTopics) {
       event.preventDefault()
       root.current?.querySelector<HTMLButtonElement>('[aria-haspopup=menu]')?.click()
     } else if (event.altKey && ['d', 'o'].includes(event.key.toLowerCase()) && showTopics) {
       event.preventDefault()
-      root.current?.querySelector<HTMLButtonElement>('.help-browser button[class*=outline-offset]')?.click()
+      root.current?.querySelector<HTMLButtonElement>('[data-help-display]')?.click()
     }
   })
   const copy = () => {
     if (topic)
       void navigator.clipboard
-        .writeText(`${topic.title}\n\n${topic.body}`)
+        .writeText(
+          [
+            topic.title,
+            ...topic.body.split(/\n\s*\n/).map((paragraph) =>
+              parseParagraph(paragraph)
+                .map((part) => part.text)
+                .join(''),
+            ),
+          ].join('\n\n'),
+        )
         .catch(() => setMessage('The Clipboard is not available.'))
   }
   const printTopic = () => {
@@ -380,7 +395,9 @@ function Help({ args, window: appWindow }: AppProps) {
               <Button onClick={() => setShowTopics(true)}>Help Topics</Button>
               <Button
                 disabled={history.length < 2}
-                onClick={() => setHistory((previous) => previous.slice(0, -1))}
+                onClick={() =>
+                  setNavigation((previous) => ({ ...previous, back: previous.back.slice(0, -1) }))
+                }
               >
                 Back
               </Button>
@@ -447,7 +464,7 @@ function Help({ args, window: appWindow }: AppProps) {
               if (event.key === 'Enter') jump(event.currentTarget.value)
             }}
           >
-            {[...new Map(history.map((entry) => [entry.id, entry])).values()].reverse().map((entry) => (
+            {[...navigation.visited].reverse().map((entry) => (
               <option key={entry.id} value={entry.id}>
                 {entry.title}
               </option>

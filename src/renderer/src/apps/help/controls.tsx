@@ -78,6 +78,19 @@ export function CommandMenu({
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false)
       }}
+      onKeyDown={(event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+        const bar = root.current?.closest('[role=menubar]')
+        if (!bar || !button.current) return
+        const buttons = [...bar.querySelectorAll<HTMLButtonElement>('.classic-menu-button')]
+        const index = buttons.indexOf(button.current)
+        const next =
+          buttons[(index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length]
+        event.preventDefault()
+        setOpen(false)
+        next?.focus()
+        if (open) next?.click()
+      }}
     >
       <button
         ref={button}
@@ -122,6 +135,10 @@ export function CommandMenu({
               buttons[
                 (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length
               ]?.focus()
+            } else if (event.key === 'Home' || event.key === 'End') {
+              event.preventDefault()
+              const edge = event.key === 'Home' ? buttons[0] : buttons.at(-1)
+              edge?.focus()
             } else if (event.key.length === 1) {
               const match = commands.find(
                 (item) =>
