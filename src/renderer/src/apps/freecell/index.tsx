@@ -3,7 +3,8 @@ import { useKeyDown } from '../../shell/context'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
 import { playSound } from '../../system/sound'
-import { MessageBox } from '../../ui'
+import { MenuBar, MessageBox } from '../../ui'
+import { menuIsActive } from '../../ui/Menu'
 import { cardImage, cardName, slotImage } from '../solitaire/cards'
 import { icon, kingLeft, kingRight, smallIcon } from './art'
 import { About, MoveColumn, OptionsDialog, SelectGame, StatisticsDialog } from './Dialogs'
@@ -22,7 +23,6 @@ import {
   type Target,
   undo,
 } from './game'
-import { Menu } from './Menu'
 import { EMPTY_STATISTICS, loadPreferences, recordResult, savePreferences } from './preferences'
 import './freecell.css'
 
@@ -161,6 +161,17 @@ function FreeCell({ window: appWindow }: AppProps) {
     setSelection(null)
     closeDialog()
   }
+  useEffect(() => {
+    if (!appWindow.focused || modal.kind !== 'none') return
+    const key = (event: KeyboardEvent) => {
+      if (event.key !== 'F10' || event.altKey || event.ctrlKey || event.shiftKey || menuIsActive()) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      undoMove()
+    }
+    window.addEventListener('keydown', key, true)
+    return () => window.removeEventListener('keydown', key, true)
+  })
   useKeyDown((event) => {
     if (event.defaultPrevented || modal.kind !== 'none') return
     const shortcuts: Record<string, () => unknown> = {
@@ -169,7 +180,6 @@ function FreeCell({ window: appWindow }: AppProps) {
       f3: () => setModal({ kind: 'select' }),
       f4: () => setModal({ kind: 'statistics' }),
       f5: () => setModal({ kind: 'options' }),
-      f10: undoMove,
     }
     const action = shortcuts[event.key.toLowerCase()]
     if (action && !event.altKey && !event.ctrlKey) {
@@ -191,8 +201,7 @@ function FreeCell({ window: appWindow }: AppProps) {
       data-moves={position.moves}
       data-phase={game.phase}
     >
-      <Menu
-        enabled={modal.kind === 'none'}
+      <MenuBar
         menus={[
           {
             label: '&Game',

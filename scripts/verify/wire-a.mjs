@@ -405,6 +405,47 @@ try {
       await clickText('Cancel')
     }
   }
+  if (item === 'freecell') {
+    await run('freecell')
+    await c.key('g', ['Alt'])
+    await check(
+      'Alt+G opens the shared Game menu with the original entries',
+      '[...document.querySelectorAll("[role=menuitem]")].map(el=>el.textContent).join("|").includes("New GameF2|Select Game...F3|Restart Game|Statistics...F4|Options...F5|UndoF10|Exit")',
+      'freecell-game-menu',
+    )
+    await c.key('s')
+    await check(
+      'Game menu S accelerator opens Select Game',
+      `!!document.querySelector('[role="dialog"][aria-label="Game Number"]')`,
+      'freecell-select-game',
+    )
+    await clickText('Cancel')
+    await c.key('Alt')
+    await c.key('ArrowRight')
+    await c.key('ArrowDown')
+    await check(
+      'Alt and arrows move to the shared Help menu',
+      '[...document.querySelectorAll("[role=menuitem]")].some(el=>el.textContent.includes("Help Topics"))',
+      'freecell-help-menu',
+    )
+    await c.key('Escape')
+    await c.key('Escape')
+    await c.key('F5')
+    await check('F5 still opens Options', `!!document.querySelector('[role="dialog"][aria-label="Options"]')`)
+    await clickText('Cancel')
+    await c.clickOn('[data-column="0"] [data-index="6"]')
+    await c.clickOn('[data-cell="0"]')
+    await check(
+      'A card can move to a free cell',
+      'Number(document.querySelector(".freecell").dataset.moves)>0',
+    )
+    await c.key('F10')
+    await check(
+      'F10 keeps the original Undo command',
+      'Number(document.querySelector(".freecell").dataset.moves)===0 && !document.querySelector("[role=menu]")',
+      'freecell-undo',
+    )
+  }
   writeFileSync(join(proof, `${item}.json`), `${JSON.stringify({ port, item, checks }, null, 2)}\n`)
 } catch (error) {
   console.log(await c.eval('document.body.innerText'))
