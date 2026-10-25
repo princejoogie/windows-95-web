@@ -129,7 +129,7 @@ function Calculator() {
           {displayText(state)}
         </output>
         {state.view === 'scientific' ? (
-          <Scientific state={state} dispatch={dispatch} />
+          <Scientific state={state} dispatch={dispatch} blocked={about || message !== null} />
         ) : (
           <div className="mt-[9px] flex gap-[9px]">
             <div className="flex w-[34px] shrink-0 flex-col gap-[5px]">

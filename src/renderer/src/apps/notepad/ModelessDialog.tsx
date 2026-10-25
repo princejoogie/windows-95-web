@@ -7,11 +7,13 @@ export function ModelessDialog({
   title,
   children,
   onClose,
+  blocked = false,
   className = '',
 }: {
   title: string
   children: ReactNode
   onClose: () => void
+  blocked?: boolean
   className?: string
 }) {
   const owner = useContext(WindowContext)
@@ -29,6 +31,7 @@ export function ModelessDialog({
       role="dialog"
       aria-label={title}
       aria-modal="false"
+      inert={blocked}
       className={`absolute left-1/2 top-[32px] z-30 pointer-events-auto p-[3px] bg-face bevel-window ${className}`}
       style={{ transform: `translate(calc(-50% + ${offset.x}px), ${offset.y}px)` }}
       onFocusCapture={() => setFocused(true)}
@@ -61,7 +64,7 @@ export function ModelessDialog({
     >
       <TitleBar
         title={title}
-        active={owner.api.focused && focused}
+        active={owner.api.focused && focused && !blocked}
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId)
           drag.current = { x: event.clientX, y: event.clientY, from: offset }

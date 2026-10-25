@@ -208,6 +208,7 @@ describe('Windows scientific calculator', () => {
     expect(removed.samples.map((sample) => sample.value)).toEqual([2, 4, 4, 5, 5, 7, 9])
     expect(reduceCalculator(data, { kind: 'statistics', command: 'clear' }).samples).toHaveLength(0)
     expect(key(data, 'clear').samples).toHaveLength(8)
+    expect(reduceCalculator(data, { kind: 'statistics', command: 'load', id: 3 }).display).toBe('4')
   })
   it('reports invalid function inputs and recovers with C or CE', () => {
     for (const [value, operation] of [

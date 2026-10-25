@@ -26,7 +26,7 @@ export const help = {
         {
           id: 'statistics',
           title: 'Statistics',
-          body: 'Click Sta to open the Statistics Box. Enter each number in Calculator, then click Dat or Add. The box shows the data and its count. Select a value and click CD to delete it, or CAD to clear all data. RET closes the box without discarding data.\n\nAve calculates the mean, Sum the sum, and s the sample standard deviation. Inv with Ave or Sum uses the squares of the data. Inv with s calculates the population standard deviation.',
+          body: 'Click Sta to open the Statistics Box. Enter each number in Calculator, then click Dat. The box shows the data and its count. Select a value and click LOAD to recall it in Calculator, CD to delete it, or CAD to clear all data. RET closes the box without discarding data.\n\nAve calculates the mean, Sum the sum, and s the sample standard deviation. Inv with Ave or Sum uses the squares of the data. Inv with s calculates the population standard deviation.',
           keywords: ['average', 'sum', 'deviation', 'data'],
         },
       ],

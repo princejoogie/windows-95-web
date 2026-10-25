@@ -72,6 +72,7 @@ export type Action =
   | { kind: 'toggle'; option: 'inverse' | 'hyperbolic' }
   | { kind: 'statistics'; command: 'clear' }
   | { kind: 'statistics'; command: 'delete'; id: number }
+  | { kind: 'statistics'; command: 'load'; id: number }
 interface Term {
   left: number
   operator: Operator
@@ -322,11 +323,16 @@ export function reduceCalculator(state: Calculator, action: Action): Calculator 
     return { ...initialCalculator, view: action.view, memory: state.memory, samples: state.samples }
   if (action.kind === 'angle') return { ...state, angle: action.angle }
   if (action.kind === 'toggle') return { ...state, [action.option]: !state[action.option] }
-  if (action.kind === 'statistics')
+  if (action.kind === 'statistics') {
+    if (action.command === 'load') {
+      const sample = state.samples.find((sample) => sample.id === action.id)
+      return sample ? result(state, sample.value) : state
+    }
     return {
       ...state,
       samples: action.command === 'clear' ? [] : state.samples.filter((sample) => sample.id !== action.id),
     }
+  }
   if (action.kind === 'base' || action.kind === 'word') {
     if (state.entry === 'error') return state
     const next = action.kind === 'base' ? { ...state, base: action.base } : { ...state, bits: action.bits }

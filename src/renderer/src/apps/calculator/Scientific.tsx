@@ -72,7 +72,15 @@ const rows: readonly (readonly [string, Key | null][])[] = [
   ],
 ]
 
-export function Scientific({ state, dispatch }: { state: Calculator; dispatch: Dispatch<Action> }) {
+export function Scientific({
+  state,
+  dispatch,
+  blocked,
+}: {
+  state: Calculator
+  dispatch: Dispatch<Action>
+  blocked: boolean
+}) {
   const [statistics, setStatistics] = useState(false)
   const [selected, setSelected] = useState(0)
   const selection = state.samples.some((sample) => sample.id === selected)
@@ -202,12 +210,17 @@ export function Scientific({ state, dispatch }: { state: Calculator; dispatch: D
         )}
       </div>
       {statistics && (
-        <ModelessDialog title="Statistics Box" onClose={() => setStatistics(false)} className="w-[255px]">
-          <div className="p-[10px] flex flex-col gap-[8px]">
+        <ModelessDialog
+          title="Statistics Box"
+          blocked={blocked}
+          onClose={() => setStatistics(false)}
+          className="w-[255px]"
+        >
+          <div className="p-[10px] grid grid-cols-[1fr_75px] gap-[8px]">
             <select
               aria-label="Statistical data"
               size={6}
-              className="bevel-sunken bg-white h-[100px] outline-none"
+              className="bevel-sunken bg-white h-[110px] outline-none"
               value={selection}
               onChange={(event) => setSelected(Number(event.target.value))}
             >
@@ -217,8 +230,14 @@ export function Scientific({ state, dispatch }: { state: Calculator; dispatch: D
                 </option>
               ))}
             </select>
-            <p>Count = {state.samples.length}</p>
-            <div className="grid grid-cols-2 gap-[6px]">
+            <div className="flex flex-col gap-[6px]">
+              <Button onClick={() => setStatistics(false)}>RET</Button>
+              <Button
+                disabled={!state.samples.length}
+                onClick={() => dispatch({ kind: 'statistics', command: 'load', id: selection })}
+              >
+                LOAD
+              </Button>
               <Button
                 disabled={!state.samples.length}
                 onClick={() => dispatch({ kind: 'statistics', command: 'delete', id: selection })}
@@ -226,9 +245,8 @@ export function Scientific({ state, dispatch }: { state: Calculator; dispatch: D
                 CD
               </Button>
               <Button onClick={() => dispatch({ kind: 'statistics', command: 'clear' })}>CAD</Button>
-              <Button onClick={() => dispatch({ kind: 'key', key: 'Dat' })}>Add</Button>
-              <Button onClick={() => setStatistics(false)}>RET</Button>
             </div>
+            <p>Count = {state.samples.length}</p>
           </div>
         </ModelessDialog>
       )}
