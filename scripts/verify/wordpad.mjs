@@ -684,10 +684,19 @@ try {
   await menu('File', 'Exit')
   await until('!__w95.window("Document - WordPad")')
 
-  // Explorer opens .doc files with WordPad.
-  await clickText('My Computer', 'button, div, span').catch(() => {})
-  const myDocs = await evaluate(`(__w95.fsNodes().find((n) => n.name === 'Letter.doc') ?? {}).parent`)
-  await check('Letter.doc lives in My Documents', !!myDocs)
+  // Start > Documents opens Letter.doc with WordPad, since WordPad owns .doc, .rtf, and .wri.
+  await clickText('Start', 'button')
+  await hoverText('Documents')
+  await until('!!__w95.find("Letter.doc", "[role=menuitem]")')
+  await clickText('Letter.doc', '[role=menuitem]')
+  await until('!!__w95.window("Letter - WordPad")')
+  await check(
+    'Start > Documents > Letter.doc opens in WordPad',
+    (await editorText()).includes('expense sheets'),
+    'wordpad-from-documents',
+  )
+  await menu('File', 'Exit')
+  await until('!__w95.window("Letter - WordPad")')
   writeFileSync(join(proof, 'live-checks.json'), JSON.stringify(checks, null, 2))
   console.log(`\n${checks.length} checks passed`)
 } catch (error) {
