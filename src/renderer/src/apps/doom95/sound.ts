@@ -175,6 +175,7 @@ export class SoundBoard {
   private ctx: AudioContext | null = null
   private noise: AudioBuffer | null = null
   private master: GainNode | null = null
+  private gain = 0.35
 
   /** Call from a key or mouse handler, where browsers allow audio to start. */
   unlock(): void {
@@ -184,13 +185,19 @@ export class SoundBoard {
       const data = noise.getChannelData(0)
       for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
       const master = ctx.createGain()
-      master.gain.value = 0.35
+      master.gain.value = this.gain
       master.connect(ctx.destination)
       this.ctx = ctx
       this.noise = noise
       this.master = master
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume()
+  }
+
+  /** Sets the master level, which the Options page's Sound Volume controls. */
+  setGain(gain: number): void {
+    this.gain = gain
+    if (this.master) this.master.gain.value = gain
   }
 
   /** `volume` from 0 to 1, `pan` from -1 (left) to 1 (right). */

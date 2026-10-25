@@ -1,8 +1,27 @@
 import { createBitmap } from './art'
+import { drawAutomap } from './automap'
+import {
+  BACK,
+  codeOf,
+  FIRE,
+  FORWARD,
+  RUN,
+  readControls,
+  SLOTS,
+  STRAFE_LEFT,
+  STRAFE_ON,
+  STRAFE_RIGHT,
+  TURN_LEFT,
+  TURN_RIGHT,
+  USE,
+} from './controls'
 import type { WeaponId } from './defs'
 import { TICK, type TickInput } from './game'
 import { buildStatusBackground, drawStatusBar } from './hud'
-import { type Assets, buildLut, renderView, SCREEN_H, SCREEN_W } from './render'
+import { toFramebuffer } from './menus'
+import { loadOptions, masterGain, mouseScale, storeOptions } from './options'
+import { type Assets, buildLut, renderView, SCREEN_H, SCREEN_W, VIEW_H } from './render'
+import { loadSlots, storeSlots } from './savegame'
 import {
   buildBackdrop,
   drawFinale,
@@ -14,30 +33,29 @@ import {
   drawTitle,
 } from './screens'
 import {
+  automapCommand,
   type Command,
   command,
   createSession,
+  type MenuKey,
+  menuKey,
+  menuPointer,
+  panAutomap,
   type Session,
   type SessionEffect,
   tickSession,
+  togglePause,
+  typeChar,
 } from './session'
 import { type AnySound, SoundBoard } from './sound'
 import { buildSprites } from './sprites'
 import { buildTextures } from './textures'
+import { say } from './world'
 
-const MOUSE_SENSITIVITY = 0.0032
 const SAMPLES = 600
+/** Automap scroll speed in screen pixels per second, so it feels the same at every zoom. */
+const PAN_SPEED = 160
 
-const FORWARD = ['KeyW', 'ArrowUp']
-const BACK = ['KeyS', 'ArrowDown']
-const STRAFE_LEFT = ['KeyA', 'Comma']
-const STRAFE_RIGHT = ['KeyD', 'Period']
-const TURN_LEFT = ['ArrowLeft']
-const TURN_RIGHT = ['ArrowRight']
-const RUN = ['ShiftLeft', 'ShiftRight']
-const FIRE = ['ControlLeft', 'ControlRight']
-const USE = ['Space', 'KeyE']
-const SLOTS: Readonly<Record<string, WeaponId>> = { Digit1: 'fist', Digit2: 'pistol', Digit3: 'shotgun' }
 /** Keys the game owns while it has focus, so the page never scrolls or acts on them. */
 const GAME_KEYS = new Set([
   ...FORWARD,
@@ -46,41 +64,52 @@ const GAME_KEYS = new Set([
   ...STRAFE_RIGHT,
   ...TURN_LEFT,
   ...TURN_RIGHT,
+  ...STRAFE_ON,
+  ...RUN,
   ...USE,
   ...FIRE,
   'Enter',
   'Escape',
   'Backquote',
+  'Pause',
+  'Tab',
   ...Object.keys(SLOTS),
 ])
+
+const ARROWS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
 
 const MENU_KEYS: Readonly<Record<string, Command>> = {
   ArrowUp: 'up',
   ArrowDown: 'down',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
   Enter: 'confirm',
+  NumpadEnter: 'confirm',
   Space: 'confirm',
   KeyE: 'confirm',
   Escape: 'back',
-  Backspace: 'back',
+  Backspace: 'erase',
   KeyY: 'yes',
+  KeyN: 'no',
 }
 
-const NAMED_KEYS: Readonly<Record<string, string>> = {
-  ' ': 'Space',
-  Control: 'ControlLeft',
-  Shift: 'ShiftLeft',
-  ',': 'Comma',
-  '.': 'Period',
-  '`': 'Backquote',
+/** Menu keys that act again while held, for sliders, the cursor, and erasing a save name. */
+const REPEATING = new Set([...ARROWS, 'Backspace'])
+
+const FUNCTION_KEYS: Readonly<Record<string, MenuKey>> = {
+  F1: 'help',
+  F2: 'save',
+  F3: 'load',
+  F4: 'options',
+  F10: 'quit',
 }
 
-/** The physical key. Some synthetic and remote-desktop input leaves `code` empty, so derive it. */
-function codeOf(event: KeyboardEvent): string {
-  if (event.code) return event.code
-  const { key } = event
-  if (/^[a-z]$/i.test(key)) return `Key${key.toUpperCase()}`
-  if (/^[0-9]$/.test(key)) return `Digit${key}`
-  return NAMED_KEYS[key] ?? key
+const AUTOMAP_KEYS: Readonly<Record<string, 'follow' | 'zoomIn' | 'zoomOut'>> = {
+  KeyF: 'follow',
+  Equal: 'zoomIn',
+  NumpadAdd: 'zoomIn',
+  Minus: 'zoomOut',
+  NumpadSubtract: 'zoomOut',
 }
 
 let shared: Assets | null = null
@@ -106,7 +135,7 @@ export class DoomRuntime {
   private readonly bar = buildStatusBackground()
   private readonly backdrop = buildBackdrop()
   private readonly sound = new SoundBoard()
-  private readonly session: Session = createSession((Date.now() & 0xffff) + 1)
+  private readonly session: Session = createSession((Date.now() & 0xffff) + 1, loadOptions(), loadSlots())
   private readonly held = new Set<string>()
   private mouseTurn = 0
   private mouseFire = false
@@ -132,6 +161,7 @@ export class DoomRuntime {
     if (!ctx) throw new Error('Canvas 2D is unavailable')
     this.ctx = ctx
     this.image = ctx.createImageData(SCREEN_W, SCREEN_H)
+    this.sound.setGain(masterGain(this.session.options))
     // Dev builds expose the session so proof scripts can read where things are. Input still goes through keys.
     if (import.meta.env.DEV) Object.assign(canvas, { doom: this.session })
     this.draw()
@@ -144,6 +174,8 @@ export class DoomRuntime {
 
   start(): void {
     if (this.raf) return
+    // Another Doom window may have saved or changed options since this one last had focus.
+    this.session.slots = loadSlots()
     this.last = performance.now()
     this.accumulator = 0
     this.raf = requestAnimationFrame(this.loop)
@@ -154,9 +186,8 @@ export class DoomRuntime {
     if (!this.raf) return
     cancelAnimationFrame(this.raf)
     this.raf = 0
-    this.held.clear()
-    this.mouseFire = false
-    if (document.pointerLockElement === this.canvas) document.exitPointerLock()
+    this.releaseKeys()
+    this.releaseMouse()
     this.draw(true)
     this.present()
   }
@@ -183,16 +214,28 @@ export class DoomRuntime {
     this.raf = requestAnimationFrame(this.loop)
   }
 
-  /** Builds one tick's controls, consuming the one-shot presses and mouse motion. */
+  /**
+   * Builds one tick's controls, consuming the one-shot presses and mouse motion. With the automap up and
+   * follow mode off, the arrows scroll the map instead of moving the player, as in Doom.
+   */
   private input(): TickInput {
-    const down = (codes: readonly string[]) => (codes.some((code) => this.held.has(code)) ? 1 : 0)
+    const { automap } = this.session
+    let held: ReadonlySet<string> = this.held
+    if (automap.open && !automap.follow) {
+      const on = (code: string) => (this.held.has(code) ? 1 : 0)
+      const step = (PAN_SPEED / automap.zoom) * TICK
+      panAutomap(
+        this.session,
+        (on('ArrowRight') - on('ArrowLeft')) * step,
+        (on('ArrowDown') - on('ArrowUp')) * step,
+      )
+      held = new Set([...this.held].filter((code) => !ARROWS.has(code)))
+    }
+    const controls = readControls(held)
     const input: TickInput = {
-      forward: down(FORWARD) - down(BACK),
-      strafe: down(STRAFE_RIGHT) - down(STRAFE_LEFT),
-      turn: down(TURN_RIGHT) - down(TURN_LEFT),
+      ...controls,
       mouseTurn: this.mouseTurn,
-      run: down(RUN) === 1,
-      fire: down(FIRE) === 1 || this.mouseFire,
+      fire: controls.fire || this.mouseFire,
       use: this.useQueued,
       weapon: this.weaponQueued,
     }
@@ -217,26 +260,46 @@ export class DoomRuntime {
   }
 
   private apply(effects: readonly SessionEffect[]): void {
+    const { session } = this
     for (const effect of effects) {
       if (effect === 'quit') this.onQuit()
-      else this.sound.play(effect as AnySound)
+      else if (effect === 'storeSlots') {
+        if (!storeSlots(session.slots) && session.world) say(session.world, 'The game could not be saved.')
+      } else if (effect === 'storeOptions') {
+        storeOptions(session.options)
+        this.sound.setGain(masterGain(session.options))
+      } else this.sound.play(effect as AnySound)
     }
+    if (session.menu) this.releaseMouse()
   }
 
   /** Returns whether the key belongs to the game, so the caller can prevent its default. */
   keyDown(event: KeyboardEvent): boolean {
     this.sound.unlock()
     const code = codeOf(event)
+    const { session } = this
     if (code === 'Backquote') {
       this.showStats = !this.showStats
       return true
     }
-    const { session } = this
-    const playing = session.screen.kind === 'playing' && !session.menu
-    if (!playing) {
-      if (event.repeat) return GAME_KEYS.has(code)
+    const menuKeyFor = FUNCTION_KEYS[code]
+    if (menuKeyFor) {
+      if (!event.repeat) {
+        const effects = menuKey(session, menuKeyFor)
+        if (effects.length) this.releaseKeys()
+        this.apply(effects)
+      }
+      return true
+    }
+    if (session.menu || session.screen.kind !== 'playing') {
       if (code === 'Escape' && performance.now() - this.lockLostAt < 150) return true
+      if (session.menu?.typing != null && event.key.length === 1 && typeChar(session, event.key)) return true
+      if (event.repeat && !REPEATING.has(code)) return true
       this.apply(command(session, MENU_KEYS[code] ?? 'any'))
+      return true
+    }
+    if (code === 'Pause') {
+      if (!event.repeat && togglePause(session)) this.releaseKeys()
       return true
     }
     if (code === 'Escape') {
@@ -245,30 +308,49 @@ export class DoomRuntime {
       this.apply(command(session, 'back'))
       return true
     }
+    if (code === 'Tab') {
+      if (!event.repeat) automapCommand(session, 'toggle')
+      return true
+    }
+    const mapKey = session.automap.open ? AUTOMAP_KEYS[code] : undefined
+    if (mapKey) {
+      if (!event.repeat) automapCommand(session, mapKey)
+      return true
+    }
     if (!event.repeat) {
       if (USE.includes(code)) this.useQueued = true
       const slot = SLOTS[code]
       if (slot) this.weaponQueued = slot
     }
     this.held.add(code)
-    return GAME_KEYS.has(code) || RUN.includes(code)
+    return GAME_KEYS.has(code)
   }
 
   keyUp(event: KeyboardEvent): void {
     this.held.delete(codeOf(event))
   }
 
-  /** Clears held keys, for when the window loses focus and key-ups go elsewhere. */
+  /** Clears held keys, for when the window loses focus and key-ups go elsewhere, and on pause. */
   releaseKeys(): void {
     this.held.clear()
     this.mouseFire = false
+    this.mouseTurn = 0
+    this.useQueued = false
   }
 
-  mouseDown(button: number): void {
+  private point(clientX: number, clientY: number) {
+    return toFramebuffer(this.canvas.getBoundingClientRect(), clientX, clientY, SCREEN_W, SCREEN_H)
+  }
+
+  private get inMenus(): boolean {
+    return this.session.menu !== null || this.session.screen.kind !== 'playing'
+  }
+
+  mouseDown(button: number, clientX: number, clientY: number): void {
     this.sound.unlock()
-    const { session } = this
-    if (session.screen.kind !== 'playing' || session.menu) {
-      if (button === 0) this.apply(command(session, session.menu ? 'confirm' : 'any'))
+    if (this.inMenus) {
+      const { x, y } = this.point(clientX, clientY)
+      this.apply(menuPointer(this.session, 'down', x, y, button))
       return
     }
     if (document.pointerLockElement !== this.canvas) {
@@ -279,12 +361,22 @@ export class DoomRuntime {
     if (button === 2) this.useQueued = true
   }
 
-  mouseUp(button: number): void {
+  mouseUp(button: number, clientX: number, clientY: number): void {
     if (button === 0) this.mouseFire = false
+    if (!this.session.menu || document.pointerLockElement === this.canvas) return
+    const { x, y } = this.point(clientX, clientY)
+    this.apply(menuPointer(this.session, 'up', x, y, button))
   }
 
-  mouseMove(dx: number): void {
-    if (document.pointerLockElement === this.canvas) this.mouseTurn += dx * MOUSE_SENSITIVITY
+  /** Turns with the locked mouse in play, and moves the menu selection with the free pointer. */
+  mouseMove(event: MouseEvent): void {
+    if (document.pointerLockElement === this.canvas) {
+      this.mouseTurn += event.movementX * mouseScale(this.session.options)
+      return
+    }
+    if (!this.session.menu || event.target !== this.canvas) return
+    const { x, y } = this.point(event.clientX, event.clientY)
+    this.apply(menuPointer(this.session, 'move', x, y))
   }
 
   /** Esc releases pointer lock before the page sees the key, so losing the lock opens the menu. */
@@ -300,21 +392,24 @@ export class DoomRuntime {
     if (document.pointerLockElement === this.canvas) document.exitPointerLock()
   }
 
-  private draw(paused = false): void {
+  private draw(inactive = false): void {
     const { session, frame, assets } = this
-    const { screen, world } = session
+    const { screen, world, automap } = session
+    const viewH = session.options.statusBar || automap.open ? VIEW_H : SCREEN_H
     if (screen.kind === 'title') {
       if (session.menu) frame.pixels.set(this.backdrop.pixels)
       else drawTitle(frame, this.backdrop, this.clock)
     } else if (screen.kind === 'intermission') drawIntermission(frame, this.backdrop, screen)
-    else if (screen.kind === 'finale') drawFinale(frame, this.backdrop, screen.time)
+    else if (screen.kind === 'finale')
+      drawFinale(frame, this.backdrop, screen, session.episode, session.skill)
     else if (world) {
-      renderView(frame, world, assets, this.zbuf)
-      drawStatusBar(frame, this.bar, world, assets.sprites)
-      drawMessage(frame, world)
+      if (automap.open) drawAutomap(frame, world, automap, viewH)
+      else renderView(frame, world, assets, this.zbuf, viewH)
+      if (viewH === VIEW_H) drawStatusBar(frame, this.bar, world, assets.sprites)
+      drawMessage(frame, world, viewH)
+      if ((inactive || session.paused) && !session.menu) drawPaused(frame, viewH)
     }
-    if (session.menu) drawMenu(frame, session.menu, session.skill, this.clock)
-    if (paused && screen.kind === 'playing' && !session.menu) drawPaused(frame)
+    drawMenu(frame, session, this.clock)
     if (this.showStats) drawStats(frame, this.statsLines())
   }
 
@@ -340,21 +435,30 @@ export class DoomRuntime {
     this.ctx.putImageData(this.image, 0, 0)
   }
 
+  /** Publishes the frame timing and what is on screen as data attributes, for the proof scripts. */
   private record(interval: number, work: number): void {
     const i = this.frames % SAMPLES
     this.intervals[i] = interval
     this.work[i] = work
     this.frames++
     const { canvas, session } = this
-    const world = session.world
-    canvas.dataset.frame = String(this.frames)
-    canvas.dataset.screen = session.menu ? `menu-${session.menu.page}` : session.screen.kind
+    const { world, menu, automap } = session
+    const data = canvas.dataset
+    data.frame = String(this.frames)
+    data.screen = menu ? `menu-${menu.page}` : session.screen.kind
+    data.cursor = menu ? String(menu.cursor) : ''
+    data.typing = menu?.typing ?? ''
+    data.paused = String(session.paused)
+    data.automap = automap.open ? (automap.follow ? 'follow' : 'free') : 'off'
+    data.options = JSON.stringify(session.options)
+    data.slots = session.slots.map((save) => save?.name ?? '').join('|')
     if (world) {
-      canvas.dataset.level = String(session.level + 1)
-      canvas.dataset.kills = `${world.stats.kills}/${world.stats.totalKills}`
-      canvas.dataset.player = `${world.player.x.toFixed(2)},${world.player.y.toFixed(2)},${world.player.angle.toFixed(3)}`
-      canvas.dataset.hp = String(world.player.hp)
-      canvas.dataset.message = world.message?.text ?? ''
+      data.level = String(session.level + 1)
+      data.kills = `${world.stats.kills}/${world.stats.totalKills}`
+      data.player = `${world.player.x.toFixed(2)},${world.player.y.toFixed(2)},${world.player.angle.toFixed(3)}`
+      data.time = world.time.toFixed(3)
+      data.hp = String(world.player.hp)
+      data.message = world.message?.text ?? ''
     }
     if (this.frames % 30 !== 0) return
     const n = Math.min(this.frames, SAMPLES)
@@ -367,10 +471,10 @@ export class DoomRuntime {
     const [p50, p95] = pick(this.intervals)
     const [work50, work95] = pick(this.work)
     this.timing = { p50, p95, work50, work95 }
-    canvas.dataset.frameP50 = p50.toFixed(2)
-    canvas.dataset.frameP95 = p95.toFixed(2)
-    canvas.dataset.workP50 = work50.toFixed(2)
-    canvas.dataset.workP95 = work95.toFixed(2)
-    canvas.dataset.samples = String(n)
+    data.frameP50 = p50.toFixed(2)
+    data.frameP95 = p95.toFixed(2)
+    data.workP50 = work50.toFixed(2)
+    data.workP95 = work95.toFixed(2)
+    data.samples = String(n)
   }
 }

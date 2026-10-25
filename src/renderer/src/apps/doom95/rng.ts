@@ -1,16 +1,20 @@
-/** Returns a float in [0, 1). */
-export type Rng = () => number
+/** Returns a float in [0, 1). `state` is the generator's position, which a save game records. */
+export interface Rng {
+  (): number
+  state: number
+}
 
 /** A seeded mulberry32 generator, so a level plays the same way from the same seed. */
 export function createRng(seed: number): Rng {
-  let state = seed >>> 0
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0
-    let t = state
+  const rng = (() => {
+    rng.state = (rng.state + 0x6d2b79f5) >>> 0
+    let t = rng.state
     t = Math.imul(t ^ (t >>> 15), t | 1)
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
+  }) as Rng
+  rng.state = seed >>> 0
+  return rng
 }
 
 /** An integer in [min, max]. */
