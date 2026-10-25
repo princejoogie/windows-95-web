@@ -343,6 +343,11 @@ export interface MenuBarMenu {
   readonly label: string
   readonly items: readonly MenuEntry[]
 }
+let altTapGeneration = 0
+export function cancelMenuAltTap(): void {
+  altTapGeneration++
+}
+
 export function MenuBar({
   menus,
   onHelp,
@@ -378,14 +383,14 @@ export function MenuBar({
       setState({ kind: 'closed' })
       return
     }
-    let alt = false
+    let alt: number | null = null
     const keyDown = (event: KeyboardEvent) => {
       // Alt arms the bar only as a tap. Any other key in between, such as Space for the system menu, cancels it.
-      if (event.key !== 'Alt') alt = false
+      if (event.key !== 'Alt') alt = null
       if (menuIsActive() || (event.target instanceof Element && event.target.closest('[role="dialog"]')))
         return
       if (event.key === 'Alt') {
-        alt = true
+        alt = altTapGeneration
         return
       }
       if (event.altKey) {
@@ -402,8 +407,13 @@ export function MenuBar({
       }
     }
     const keyUp = (event: KeyboardEvent) => {
-      if (event.key === 'Alt' && alt && !menuIsActive()) {
-        alt = false
+      if (
+        event.key === 'Alt' &&
+        alt === altTapGeneration &&
+        !menuIsActive() &&
+        !document.activeElement?.closest('[role="dialog"]')
+      ) {
+        alt = null
         event.preventDefault()
         setState({ kind: 'bar-armed', title: 0 })
       }

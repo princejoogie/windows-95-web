@@ -9,7 +9,7 @@ import { connectSystemSounds } from '../settings/sounds'
 import { beginSystemCursor } from '../system/cursors'
 import { Button, Dialog, MessageBox, TextBox } from '../ui'
 import { requestActiveDialogClose } from '../ui/Dialog'
-import { menuIsActive } from '../ui/Menu'
+import { cancelMenuAltTap, menuIsActive } from '../ui/Menu'
 import { TooltipLayer } from '../ui/Tooltip'
 import { closeSession, requestWindowClose } from './closeRequests'
 import { ShellDialogHost } from './context'
@@ -86,6 +86,7 @@ export function Shell() {
   const hostAction = useRef<(event: HostEvent) => void>(() => {})
   hostAction.current = (event) => {
     if (power !== 'running') return
+    if (event.type !== 'alt-release') cancelMenuAltTap()
     switch (event.type) {
       case 'host-close':
         setDialog('shutdown')
