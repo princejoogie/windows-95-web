@@ -5,29 +5,29 @@ import { DESKTOP_DIR, DOCUMENTS_DIR, type NodeId, RECYCLED_DIR, ROOT } from '../
 import { icons } from '../../icons'
 import { clipboard, planPaste, planShortcuts } from '../../shell/clipboard'
 import { useKeyDown } from '../../shell/context'
+import { DeleteConfirmation } from '../../shell/DeleteConfirmation'
+import { useNaming } from '../../shell/folderOptions'
 import { nodeIcon } from '../../shell/nodeIcon'
-import { apps } from '../../shell/registry'
 import { launch, openNode, windowsStore } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
 import {
+  AboutDialog,
   Accel,
   Button,
   Checkbox,
   ComboBox,
   ContextMenu,
   Dialog,
+  ListBox,
   MenuBar,
   MessageBox,
   PropertiesSheet,
   Radio,
   StatusBar,
   StatusPane,
+  Tabs,
   TextBox,
 } from '../../ui'
-import { AboutExplorer, DeleteConfirmation } from '../explorer/dialogs'
-import { displayName } from '../explorer/model'
-import { options } from '../explorer/preferences'
-import { Tabs } from '../help/controls'
 import '../help/help.css'
 import { findIcon } from './icons'
 import {
@@ -264,7 +264,7 @@ function Find({ window: appWindow, args }: AppProps) {
     if (plan.ok) plan.actions.forEach(fsStore.dispatch)
     else setMessage(plan.message)
   }
-  const registered = new Set(apps.flatMap((app) => app.fileTypes ?? []))
+  const naming = useNaming()
   const lookIn = [
     { key: DOCUMENTS_DIR, label: 'Document Folders', icon: icons.small.folderClosed },
     { key: 'computer', label: 'My Computer', icon: icons.myComputer },
@@ -420,8 +420,7 @@ function Find({ window: appWindow, args }: AppProps) {
         }}
       >
         <fieldset disabled={running} className="find-criteria">
-          <Tabs items={tabs} value={tab} onChange={setTab} />
-          <div role="tabpanel" aria-label={tab} className="classic-sheet">
+          <Tabs tabs={tabs} active={tab} onChange={setTab} pageClassName="h-[160px] px-[12px] py-[13px]">
             {tab === 'Name & Location' && (
               <>
                 <div className="find-form-row">
@@ -638,7 +637,7 @@ function Find({ window: appWindow, args }: AppProps) {
                 </div>
               </>
             )}
-          </div>
+          </Tabs>
         </fieldset>
         <div className="find-actions">
           <Button type="submit" isDefault disabled={running}>
@@ -756,7 +755,7 @@ function Find({ window: appWindow, args }: AppProps) {
                   <td>
                     <span className="flex items-center gap-1">
                       <img src={nodeIcon(result.node).icon} alt="" />
-                      {displayName(result.node, options.get().hideExtensions, registered)}
+                      {naming.label(result.node)}
                     </span>
                   </td>
                   {details && (
@@ -787,19 +786,17 @@ function Find({ window: appWindow, args }: AppProps) {
       {browse !== null && (
         <Dialog title="Browse for Folder" onClose={() => setBrowse(null)} className="w-[330px]">
           <p className="p-3">Select the folder to search.</p>
-          <ComboBox
-            aria-label="Folders"
-            className="mx-3"
+          <ListBox
+            label="Folders"
+            className="mx-3 h-[160px]"
             value={browse}
-            onChange={(key) => {
-              const folder = folders.find((node) => node.id === key)
-              if (folder) setBrowse(folder.id)
+            onChange={setBrowse}
+            onPick={(folder) => {
+              update({ folder })
+              setBrowse(null)
             }}
-            options={folders.map((folder) => ({
-              key: folder.id,
-              label: pathOf(state, folder.id),
-              icon: nodeIcon(folder).icon,
-            }))}
+            items={folders.map((folder) => folder.id)}
+            render={(folder) => pathOf(state, folder)}
           />
           <div className="flex justify-end gap-2 p-3">
             <Button
@@ -816,7 +813,14 @@ function Find({ window: appWindow, args }: AppProps) {
         </Dialog>
       )}
       {properties && <PropertiesSheet id={properties.node.id} onClose={() => setProperties(null)} />}
-      {about && <AboutExplorer onClose={() => setAbout(false)} />}
+      {about && (
+        <AboutDialog
+          app="Windows 95"
+          title="About Windows 95"
+          icon={icons.windowsLogo}
+          onClose={() => setAbout(false)}
+        />
+      )}
       {confirmReset && (
         <MessageBox
           title="Find: All Files"

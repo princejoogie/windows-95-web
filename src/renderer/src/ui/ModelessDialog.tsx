@@ -1,7 +1,7 @@
 import { type ReactNode, useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { WindowContext } from '../../shell/context'
-import { TitleBar, TitleButton } from '../../ui'
+import { WindowContext } from '../shell/context'
+import { TitleBar, TitleButton } from './TitleBar'
 
 export function ModelessDialog({
   title,
@@ -21,6 +21,12 @@ export function ModelessDialog({
   const [focused, setFocused] = useState(true)
   const dialog = useRef<HTMLDivElement>(null)
   const drag = useRef<{ x: number; y: number; from: { x: number; y: number } } | null>(null)
+  const signal = owner?.setDialogFocused
+  // While focus is in here, the owner's caption goes inactive, as Windows 95 draws a focused modeless dialog.
+  useEffect(() => {
+    signal?.(focused)
+    return () => signal?.(false)
+  }, [signal, focused])
   useEffect(() => {
     dialog.current?.querySelector<HTMLElement>('input,select,button:not([aria-label="Close"])')?.focus()
   }, [])

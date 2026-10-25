@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { emptyDrive } from '../fs/fs'
-import { DOCUMENTS_DIR, ROOT } from '../fs/types'
+import { emptyDrive, fsReducer } from '../fs/fs'
+import { DOCUMENTS_DIR, type NodeId, ROOT, WINDOWS_DIR } from '../fs/types'
 import { chooseFile, matchesFileType } from './fileChoice'
 
 describe('common file dialog', () => {
@@ -34,6 +34,29 @@ describe('common file dialog', () => {
     for (const name of ['C:\\Missing\\note.txt', 'missing.txt', 'bad?.txt']) {
       expect(chooseFile(state, ROOT, name, 'open').kind).toBe('error')
     }
+  })
+  it('accepts installed programs only when the dialog picks programs', () => {
+    const withCalc = fsReducer(state, {
+      type: 'create',
+      node: {
+        kind: 'program',
+        id: 'calc' as NodeId,
+        name: 'CALC.EXE',
+        parent: WINDOWS_DIR,
+        app: 'calc',
+        modified: 0,
+      },
+    })
+    expect(chooseFile(withCalc, WINDOWS_DIR, 'calc.exe', 'open')).toEqual({
+      kind: 'error',
+      message: 'This item is not a document.',
+    })
+    expect(chooseFile(withCalc, WINDOWS_DIR, 'calc.exe', 'open', '', ['file', 'program'])).toEqual({
+      kind: 'existing',
+      id: 'calc',
+      parent: WINDOWS_DIR,
+      name: 'CALC.EXE',
+    })
   })
   it('filters extensions case-insensitively and supports all files', () => {
     expect(matchesFileType('NOTE.TXT', { label: 'Text', extensions: ['txt'] })).toBe(true)

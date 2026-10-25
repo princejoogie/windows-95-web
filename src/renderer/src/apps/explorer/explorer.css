@@ -118,26 +118,6 @@
 .explorer-details .explorer-items {
   min-height: calc(100% - 20px);
 }
-.explorer-tabs {
-  display: flex;
-  align-items: end;
-  height: 22px;
-  padding-left: 2px;
-}
-.explorer-tabs > button {
-  height: 19px;
-  padding: 2px 8px;
-  box-shadow:
-    inset 1px 1px #fff,
-    inset -1px 0 #000,
-    inset -2px 0 #808080;
-}
-.explorer-tabs > button[aria-selected="true"] {
-  height: 22px;
-  position: relative;
-  z-index: 1;
-  background: var(--color-face);
-}
 .explorer-icon-dither {
   position: absolute;
   inset: 0;

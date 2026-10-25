@@ -1,7 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import { emptyDrive, fsReducer } from '../fs/fs'
-import { DOCUMENTS_DIR, type FsNode, type NodeId, RECYCLED_DIR, ROOT } from '../fs/types'
-import { attributesOf, dosName, dosNames, formatSize, isHidden } from './properties'
+import {
+  DESKTOP_DIR,
+  DOCUMENTS_DIR,
+  type FsNode,
+  type NodeId,
+  RECYCLED_DIR,
+  ROOT,
+  WINDOWS_DIR,
+} from '../fs/types'
+import {
+  attributesOf,
+  dosName,
+  dosNames,
+  formatShortDate,
+  formatSize,
+  isHidden,
+  shortcutInfo,
+} from './properties'
 
 describe('MS-DOS names', () => {
   it('uppercases names that already fit 8.3', () => {
@@ -74,5 +90,62 @@ describe('sizes', () => {
     expect(formatSize(422)).toBe('422 bytes')
     expect(formatSize(1201)).toBe('1.17KB (1,201 bytes)')
     expect(formatSize(30 * 1024)).toBe('30.0KB (30,720 bytes)')
+  })
+})
+
+describe('Shortcut tab', () => {
+  const nodes: FsNode[] = [
+    {
+      kind: 'program',
+      id: 'calc' as NodeId,
+      name: 'CALC.EXE',
+      parent: WINDOWS_DIR,
+      app: 'calc',
+      modified: 0,
+    },
+    {
+      kind: 'shortcut',
+      id: 'toCalc' as NodeId,
+      name: 'Calculator',
+      parent: DESKTOP_DIR,
+      app: 'calc',
+      modified: 0,
+    },
+    { kind: 'file', id: 'note' as NodeId, name: 'Note.txt', parent: DOCUMENTS_DIR, content: '', modified: 0 },
+    {
+      kind: 'shortcut',
+      id: 'toNote' as NodeId,
+      name: 'Shortcut to Note',
+      parent: DESKTOP_DIR,
+      target: 'note' as NodeId,
+      modified: 0,
+    },
+  ]
+  const state = nodes.reduce((acc, node) => fsReducer(acc, { type: 'create', node }), emptyDrive(0))
+  it('shows an app shortcut as its installed program, started in the program folder', () => {
+    expect(shortcutInfo(state, state.nodes['toCalc' as NodeId] as FsNode)).toEqual({
+      type: 'Application',
+      location: 'WINDOWS',
+      target: 'C:\\WINDOWS\\CALC.EXE',
+      startIn: 'C:\\WINDOWS',
+      folder: WINDOWS_DIR,
+    })
+  })
+  it('shows a document shortcut with its document type and folder', () => {
+    expect(shortcutInfo(state, state.nodes['toNote' as NodeId] as FsNode)).toMatchObject({
+      type: 'Text Document',
+      location: 'My Documents',
+      target: 'C:\\My Documents\\Note.txt',
+      folder: DOCUMENTS_DIR,
+    })
+  })
+  it('has nothing for a node that is not a shortcut', () => {
+    expect(shortcutInfo(state, state.nodes['note' as NodeId] as FsNode)).toBeNull()
+  })
+})
+
+describe('short dates', () => {
+  it('formats M/d/yy h:mm AM as Explorer does', () => {
+    expect(formatShortDate(new Date(2026, 0, 5, 0, 7).getTime())).toBe('1/5/26 12:07 AM')
   })
 })

@@ -1,7 +1,6 @@
 import type { Dispatch } from 'react'
 import { useId, useState } from 'react'
-import { Button, Checkbox, ComboBox, GroupBox, Radio } from '../../ui'
-import { ModelessDialog } from '../notepad/ModelessDialog'
+import { Button, Checkbox, GroupBox, ListBox, ModelessDialog, Radio } from '../../ui'
 import { type Action, type Calculator, decimalOnly, type Key } from './engine'
 
 const rows: readonly (readonly [string, Key | null][])[] = [
@@ -220,14 +219,13 @@ export function Scientific({
           className="w-[255px]"
         >
           <div className="p-[10px] grid grid-cols-[1fr_75px] gap-[8px]">
-            <ComboBox
-              aria-label="Statistical data"
-              value={String(selection)}
-              onChange={(value) => setSelected(Number(value))}
-              options={state.samples.map((sample) => ({
-                key: String(sample.id),
-                label: String(sample.value),
-              }))}
+            <ListBox
+              label="Statistical data"
+              className="h-[110px]"
+              value={selection}
+              onChange={setSelected}
+              items={state.samples.map((sample) => sample.id)}
+              render={(id) => state.samples.find((sample) => sample.id === id)?.value ?? ''}
             />
             <div className="flex flex-col gap-[6px]">
               <Button onClick={() => setStatistics(false)}>RET</Button>

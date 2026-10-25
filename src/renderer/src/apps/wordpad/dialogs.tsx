@@ -1,8 +1,7 @@
-import { type CSSProperties, type ReactNode, useId, useState } from 'react'
-import { Button, Checkbox, ComboBox, Dialog, GroupBox, Radio, Separator, TextBox } from '../../ui'
+import { type ReactNode, useId, useState } from 'react'
+import { Button, Checkbox, ComboBox, Dialog, GroupBox, ListBox, Radio, Tabs, TextBox } from '../../ui'
 import { FONT_SIZES, FONTS, scriptsFor } from './fonts'
 import { runCss } from './html'
-import { wordpadIcon } from './icons'
 import type { Alignment, ParagraphStyle, RunStyle } from './model'
 import {
   DOCUMENT_TYPES,
@@ -23,110 +22,6 @@ import { COLORS } from './Toolbar'
 
 function Buttons({ children }: { children: ReactNode }) {
   return <div className="flex flex-col gap-[6px]">{children}</div>
-}
-
-function ListBox<T extends string | number>({
-  label,
-  items,
-  value,
-  onChange,
-  onPick,
-  render,
-  className = '',
-  style,
-}: {
-  label: string
-  items: readonly T[]
-  value: T | null
-  onChange: (value: T) => void
-  onPick?: (value: T) => void
-  render?: (value: T) => ReactNode
-  className?: string
-  style?: (value: T) => CSSProperties | undefined
-}) {
-  return (
-    <div
-      role="listbox"
-      aria-label={label}
-      className={`overflow-y-auto bg-white bevel-sunken p-[2px] ${className}`}
-      tabIndex={0}
-      onKeyDown={(event) => {
-        const index = value === null ? -1 : items.indexOf(value)
-        if (event.key === 'ArrowDown' && index < items.length - 1) {
-          event.preventDefault()
-          const next = items[index + 1]
-          if (next !== undefined) onChange(next)
-        }
-        if (event.key === 'ArrowUp' && index > 0) {
-          event.preventDefault()
-          const next = items[index - 1]
-          if (next !== undefined) onChange(next)
-        }
-      }}
-    >
-      {items.map((item) => (
-        <button
-          key={item}
-          type="button"
-          role="option"
-          aria-selected={item === value}
-          tabIndex={-1}
-          className={`block h-[16px] w-full truncate px-[2px] text-left leading-[16px] outline-none ${
-            item === value ? 'bg-select text-white' : ''
-          }`}
-          style={style?.(item)}
-          ref={(el) => {
-            if (el && item === value) el.scrollIntoView({ block: 'nearest' })
-          }}
-          onClick={() => onChange(item)}
-          onDoubleClick={() => onPick?.(item)}
-        >
-          {render ? render(item) : String(item)}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function Tabs({
-  tabs,
-  active,
-  onChange,
-  children,
-}: {
-  tabs: readonly string[]
-  active: string
-  onChange: (tab: string) => void
-  children: ReactNode
-}) {
-  return (
-    <div className="flex flex-col">
-      <div role="tablist" className="flex items-end pl-[2px]">
-        {tabs.map((tab) => {
-          const on = tab === active
-          return (
-            <button
-              key={tab}
-              type="button"
-              role="tab"
-              aria-selected={on}
-              className={`relative px-[8px] outline-none ${
-                on
-                  ? 'z-10 -mb-px h-[22px] bg-face shadow-[inset_1px_1px_#fff,inset_-1px_0_#000,inset_2px_2px_#dfdfdf,inset_-2px_0_#808080]'
-                  : 'h-[20px] bg-face shadow-[inset_1px_1px_#fff,inset_-1px_0_#000,inset_2px_2px_#dfdfdf,inset_-2px_0_#808080]'
-              }`}
-              onClick={() => onChange(tab)}
-            >
-              {tab}
-            </button>
-          )
-        })}
-      </div>
-      <div role="tabpanel" className="bevel-raised bg-face p-[12px]">
-        {children}
-      </div>
-    </div>
-  )
 }
 
 export function NewDialog({
@@ -1134,39 +1029,6 @@ export function PrintDialog({ onPrint, onClose }: { onPrint: () => void; onClose
           <Button onClick={onClose}>Cancel</Button>
         </div>
       </form>
-    </Dialog>
-  )
-}
-
-export function AboutWordPad({ onClose }: { onClose: () => void }) {
-  return (
-    <Dialog title="About WordPad" onClose={onClose} className="w-[375px]">
-      <div className="flex gap-[18px] p-[14px]">
-        <img src={wordpadIcon} alt="" className="size-8" />
-        <div className="flex flex-1 flex-col gap-[10px]">
-          <div>
-            <p>Microsoft Windows 95</p>
-            <p>WordPad</p>
-            <p>Copyright © 1981-1995 Microsoft Corp.</p>
-          </div>
-          <Separator />
-          <div>
-            <p>This product is licensed to:</p>
-            <p className="pl-[12px]">Windows 95 User</p>
-            <p className="pl-[12px]">Personal Computer</p>
-          </div>
-          <Separator />
-          <div>
-            <p>Physical memory available to Windows: 32,000 KB</p>
-            <p>System resources: 85% free</p>
-          </div>
-          <div className="flex justify-end">
-            <Button isDefault autoFocus onClick={onClose}>
-              OK
-            </Button>
-          </div>
-        </div>
-      </div>
     </Dialog>
   )
 }

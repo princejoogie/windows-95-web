@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { emptyDrive, fileSize } from '../../fs/fs'
 import { type FsNode, ROOT } from '../../fs/types'
-import { bytesOf } from '../../ui/properties'
+import { displayName, renamedName } from '../../shell/naming'
+import { bytesOf, formatShortDate as formatDate } from '../../ui/properties'
 import { bytes } from '../dosprompt/directory'
-import { displayName, formatDate, renamedName } from './model'
 
 describe('Windows 95 file lengths', () => {
   it.each([

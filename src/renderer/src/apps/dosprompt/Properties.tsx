@@ -1,6 +1,5 @@
 import { useId, useState } from 'react'
-import { Button, Checkbox, ComboBox, Dialog, GroupBox, Radio, TextBox } from '../../ui'
-import { Tabs } from '../help/controls'
+import { Button, Checkbox, ComboBox, Dialog, GroupBox, Radio, Tabs, TextBox } from '../../ui'
 import { dosSmallIcon } from './icons'
 
 export const FONTS = [
@@ -37,11 +36,11 @@ export function Properties({
   return (
     <Dialog title="MS-DOS Prompt Properties" icon={dosSmallIcon} onClose={onClose} className="w-[390px]">
       <div className="p-[8px]">
-        <Tabs items={tabs} value={tab} onChange={setTab} />
-        <div
-          role="tabpanel"
-          aria-label={tab}
-          className="bevel-raised p-[12px] h-[252px] flex flex-col gap-[12px]"
+        <Tabs
+          tabs={tabs}
+          active={tab}
+          onChange={setTab}
+          pageClassName="bevel-raised p-[12px] h-[252px] flex flex-col gap-[12px]"
         >
           {tab === 'Program' && (
             <>
@@ -162,7 +161,7 @@ export function Properties({
               </GroupBox>
             </>
           )}
-        </div>
+        </Tabs>
         <div className="flex justify-end gap-[6px] pt-[10px]">
           <Button
             isDefault

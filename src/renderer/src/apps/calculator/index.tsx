@@ -4,8 +4,7 @@ import { pixelArt } from '../../icons/pixel'
 import { useKeyDown } from '../../shell/context'
 import { launch } from '../../shell/system'
 import type { AppManifest } from '../../shell/types'
-import { Button, MenuBar, MessageBox } from '../../ui'
-import { AboutAccessory } from '../notepad/AboutAccessory'
+import { AboutDialog, Button, MenuBar, MessageBox } from '../../ui'
 import {
   type Action,
   displayText,
@@ -182,7 +181,7 @@ function Calculator() {
           </div>
         )}
       </div>
-      {about && <AboutAccessory name="Calculator" icon={icons.calculator} onClose={() => setAbout(false)} />}
+      {about && <AboutDialog app="Calculator" icon={icons.calculator} onClose={() => setAbout(false)} />}
       {message && (
         <MessageBox title="Calculator" message={message} buttons={['OK']} onClose={() => setMessage(null)} />
       )}

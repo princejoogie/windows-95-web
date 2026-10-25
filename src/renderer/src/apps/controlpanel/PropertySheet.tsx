@@ -1,8 +1,9 @@
-import { type ReactNode, useId, useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { changedSettings, type Settings } from '../../settings/model'
 import { settingsStore } from '../../settings/store'
 import { Button } from '../../ui/Button'
 import { Dialog } from '../../ui/Dialog'
+import { Tabs } from '../../ui/Tabs'
 
 export function useSettingsDraft() {
   const [baseline, setBaseline] = useState(settingsStore.get)
@@ -33,8 +34,8 @@ export function PropertySheet({
   initialTab?: number
   width?: number
 }) {
-  const [tab, setTab] = useState(initialTab)
-  const id = useId()
+  const labels = tabs.map((item) => item.label)
+  const [tab, setTab] = useState(labels[initialTab] ?? '')
   const save = () => {
     state.apply()
     onClose()
@@ -49,61 +50,17 @@ export function PropertySheet({
           save()
         }}
         onKeyDown={(event) => {
-          if (event.ctrlKey && event.key === 'Tab') {
-            event.preventDefault()
-            const next = (tab + (event.shiftKey ? tabs.length - 1 : 1)) % tabs.length
-            setTab(next)
-            document.getElementById(`${id}-tab-${next}`)?.focus()
-          }
-          if (event.altKey && event.key.length === 1) {
-            const next = tabs.findIndex((item) => item.label[0]?.toLowerCase() === event.key.toLowerCase())
-            if (next < 0) return
-            event.preventDefault()
-            setTab(next)
-            document.getElementById(`${id}-tab-${next}`)?.focus()
-          }
+          if (!event.altKey || event.key.length !== 1) return
+          const next = labels.find((label) => label[0]?.toLowerCase() === event.key.toLowerCase())
+          if (!next) return
+          event.preventDefault()
+          setTab(next)
+          event.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[labels.indexOf(next)]?.focus()
         }}
       >
-        <div role="tablist" aria-label={`${title} tabs`} className="cp-tabs">
-          {tabs.map((item, index) => (
-            <button
-              key={item.label}
-              type="button"
-              role="tab"
-              id={`${id}-tab-${index}`}
-              aria-controls={`${id}-panel-${index}`}
-              aria-selected={tab === index}
-              tabIndex={tab === index ? 0 : -1}
-              onClick={() => setTab(index)}
-              onKeyDown={(event) => {
-                const next =
-                  event.key === 'ArrowRight'
-                    ? (tab + 1) % tabs.length
-                    : event.key === 'ArrowLeft'
-                      ? (tab + tabs.length - 1) % tabs.length
-                      : event.key === 'Home'
-                        ? 0
-                        : event.key === 'End'
-                          ? tabs.length - 1
-                          : null
-                if (next === null) return
-                event.preventDefault()
-                setTab(next)
-                document.getElementById(`${id}-tab-${next}`)?.focus()
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-        <div
-          role="tabpanel"
-          id={`${id}-panel-${tab}`}
-          aria-labelledby={`${id}-tab-${tab}`}
-          className="cp-page"
-        >
-          {tabs[tab]?.content}
-        </div>
+        <Tabs tabs={labels} active={tab} onChange={setTab} pageClassName="min-h-[326px] p-[12px]">
+          {tabs.find((item) => item.label === tab)?.content}
+        </Tabs>
         <div className="cp-actions">
           <Button type="submit" isDefault>
             OK

@@ -1,9 +1,9 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useKeyDown } from '../../shell/context'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { Accel, Button, ComboBox, Dialog, MessageBox, Radio, TextBox } from '../../ui'
+import { AboutDialog, Accel, Button, Dialog, ListBox, MessageBox, Radio, Tabs, TextBox } from '../../ui'
 import { type HelpBook, type HelpTopic, indexOf, parseParagraph, searchTopics, topicsOf } from './books'
-import { CommandMenu, Tabs } from './controls'
+import { CommandMenu } from './controls'
 import { help } from './help'
 import { bookClosed, bookOpen, helpIcon, pageIcon } from './icons'
 import './help.css'
@@ -87,14 +87,15 @@ function HelpTopics({
   return (
     <div className="help-browser">
       <Tabs
-        items={tabs}
-        value={tab}
+        tabs={tabs}
+        active={tab}
         onChange={(next) => {
           setTab(next)
           if (next === 'Find' && !setup) setWizard('welcome')
         }}
-      />
-      <div className="classic-sheet" role="tabpanel" aria-label={tab}>
+        className="flex-1 min-h-0"
+        pageClassName="flex-1 min-h-0 flex flex-col p-[13px]"
+      >
         <p className="mb-3">
           {tab === 'Contents'
             ? 'Click a book, and then click Open. Or click another tab.'
@@ -189,13 +190,12 @@ function HelpTopics({
             {tab === 'Find' && (
               <>
                 <p className="my-2">2 Select some matching words to narrow your search</p>
-                <ComboBox
-                  aria-label="Matching words"
+                <ListBox
+                  label="Matching words"
+                  className="h-[48px] shrink-0"
                   value={matchingWord}
-                  options={[
-                    { key: '', label: '(All matching words)' },
-                    ...words.map((word) => ({ key: word, label: word })),
-                  ]}
+                  items={['', ...words]}
+                  render={(word) => word || '(All matching words)'}
                   onChange={setMatchingWord}
                 />
               </>
@@ -205,14 +205,15 @@ function HelpTopics({
                 ? 'Click the index entry you want, and then click Display.'
                 : '3 Click a topic, then click Display'}
             </p>
-            <ComboBox
-              aria-label={tab === 'Index' ? 'Index entries' : 'Matching topics'}
+            <ListBox
+              label={tab === 'Index' ? 'Index entries' : 'Matching topics'}
+              className="flex-1 min-h-[48px]"
               value={tab === 'Index' ? (currentIndex?.keyword ?? '') : (findTopic?.id ?? '')}
               onChange={(value) => (tab === 'Index' ? setIndexChoice(value) : setFindChoice(value))}
-              options={
-                tab === 'Index'
-                  ? index.map((entry) => ({ key: entry.keyword, label: entry.keyword }))
-                  : results.map((topic) => ({ key: topic.id, label: topic.title }))
+              onPick={() => display()}
+              items={tab === 'Index' ? index.map((entry) => entry.keyword) : results.map((topic) => topic.id)}
+              render={(value) =>
+                tab === 'Index' ? value : results.find((topic) => topic.id === value)?.title
               }
             />
             {tab === 'Find' && (
@@ -237,7 +238,7 @@ function HelpTopics({
             )}
           </>
         )}
-      </div>
+      </Tabs>
       <div className="flex justify-end gap-2 pt-3">
         <Button data-help-display isDefault disabled={tab === 'Find' && !findTopic} onClick={display}>
           <Accel
@@ -250,12 +251,17 @@ function HelpTopics({
       {disambiguate && (
         <Dialog title="Topics Found" onClose={() => setDisambiguate(null)} className="w-[330px]">
           <p className="p-3">Select a topic, then click Display.</p>
-          <ComboBox
-            aria-label="Topics for keyword"
-            className="mx-3"
+          <ListBox
+            label="Topics for keyword"
+            className="mx-3 h-[110px]"
             value={selected || disambiguate[0]?.id || ''}
             onChange={setSelected}
-            options={disambiguate.map((topic) => ({ key: topic.id, label: topic.title }))}
+            items={disambiguate.map((topic) => topic.id)}
+            render={(id) => disambiguate.find((topic) => topic.id === id)?.title}
+            onPick={(id) => {
+              const topic = disambiguate.find((entry) => entry.id === id)
+              if (topic) onDisplay(topic)
+            }}
           />
           <div className="flex justify-end gap-2 p-3">
             <Button
@@ -558,14 +564,14 @@ function Help({ args, window: appWindow }: AppProps) {
       {dialog === 'history' && (
         <Dialog title="History" onClose={() => setDialog(null)} className="w-[340px]">
           <p className="p-3">Select a topic, then click Display.</p>
-          <ComboBox
-            aria-label="Topics visited"
-            className="mx-3"
+          <ListBox
+            label="Topics visited"
+            className="mx-3 h-[130px]"
             value={historyChoice || navigation.visited.at(-1)?.id || ''}
             onChange={setHistoryChoice}
-            options={[...navigation.visited]
-              .reverse()
-              .map((entry) => ({ key: entry.id, label: entry.title }))}
+            items={[...navigation.visited].reverse().map((entry) => entry.id)}
+            render={(id) => navigation.visited.find((entry) => entry.id === id)?.title}
+            onPick={jump}
           />
           <Button
             className="m-3 self-end"
@@ -579,24 +585,7 @@ function Help({ args, window: appWindow }: AppProps) {
         </Dialog>
       )}
       {dialog === 'about' && (
-        <Dialog title="About Windows Help" onClose={() => setDialog(null)} className="w-[320px]">
-          <div className="flex gap-4 p-5">
-            <img src={helpIcon} alt="" className="size-8" />
-            <div>
-              Microsoft Windows
-              <br />
-              Windows Help
-              <br />
-              Version 4.0
-              <br />
-              <br />
-              Windows 95 desktop rebuild
-            </div>
-          </div>
-          <Button className="m-3 self-end" isDefault onClick={() => setDialog(null)}>
-            OK
-          </Button>
-        </Dialog>
+        <AboutDialog app="Windows Help" icon={helpIcon} onClose={() => setDialog(null)} />
       )}
       {message && (
         <MessageBox

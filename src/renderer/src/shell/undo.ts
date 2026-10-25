@@ -1,6 +1,6 @@
-import { type FsAction, fsReducer, isInside, validateName } from '../../fs/fs'
-import { type FsNode, type FsState, RECYCLED_DIR } from '../../fs/types'
-import { createStore } from '../../lib/store'
+import { type FsAction, fsReducer, isInside, validateName } from '../fs/fs'
+import { type FsNode, type FsState, RECYCLED_DIR } from '../fs/types'
+import { createStore } from '../lib/store'
 
 interface Change {
   readonly before: FsNode
@@ -56,3 +56,22 @@ export function remember(before: FsState, after: FsState, label: string): void {
   const entry = undoEntry(before, after, label)
   if (entry) history.dispatch([...history.get(), entry].slice(-20))
 }
+
+/** Undoes the newest entry. Returns the message Windows shows when it can't, or `null` when it worked. */
+export function undoLast(
+  state: FsState,
+  dispatch: (action: FsAction) => void,
+  at = Date.now(),
+): string | null {
+  const entry = history.get().at(-1)
+  if (!entry) return null
+  const plan = planUndo(state, entry, at)
+  if (!plan.ok) return plan.message
+  for (const action of plan.actions) dispatch(action)
+  history.dispatch(history.get().slice(0, -1))
+  return null
+}
+
+/** `&Undo Delete`, as the Edit and context menus name the newest entry. */
+export const undoLabel = (entries: readonly UndoEntry[]): string =>
+  `&Undo${entries.at(-1) ? ` ${entries.at(-1)?.label}` : ''}`

@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react'
 import { type MessageBoxIcon, messageBoxIcons } from '../icons/messagebox'
+import { shellEvents } from '../shell/events'
 import { Button } from './Button'
 import { Dialog } from './Dialog'
 import { Accel, accelKey } from './text'
@@ -37,6 +39,13 @@ export function escapeAnswer<B extends string>(buttons: readonly B[]): B | null 
 /** The standard Windows alert: an icon, a message, and a row of buttons. */
 export function MessageBox<B extends string>({ title, message, icon, buttons, onClose }: MessageBoxProps<B>) {
   const dismiss = escapeAnswer(buttons)
+  // A box sounds once when it appears, as MessageBeep does for its icon. The ref survives StrictMode's remount.
+  const announced = useRef(false)
+  useEffect(() => {
+    if (announced.current) return
+    announced.current = true
+    shellEvents.emit({ type: icon ?? 'default-beep' })
+  }, [icon])
   return (
     <Dialog title={title} {...(dismiss === null ? {} : { onClose: () => onClose(dismiss) })}>
       <form

@@ -15,14 +15,16 @@ windowsStore.subscribe(() => {
   const next = windowsStore.get()
   for (const window of next.windows) {
     const before = previous.windows.find((entry) => entry.id === window.id)
-    if (!before) shellEvents.emit('open')
+    if (!before) shellEvents.emit({ type: 'open' })
     else {
-      if (before.minimized !== window.minimized) shellEvents.emit(window.minimized ? 'minimize' : 'restore')
-      if (before.maximized !== window.maximized) shellEvents.emit(window.maximized ? 'maximize' : 'restore')
+      if (before.minimized !== window.minimized)
+        shellEvents.emit(window.minimized ? { type: 'minimize' } : { type: 'restore', direction: 'up' })
+      if (before.maximized !== window.maximized)
+        shellEvents.emit(window.maximized ? { type: 'maximize' } : { type: 'restore', direction: 'down' })
     }
   }
   for (const window of previous.windows)
-    if (!next.windows.some((entry) => entry.id === window.id)) shellEvents.emit('close')
+    if (!next.windows.some((entry) => entry.id === window.id)) shellEvents.emit({ type: 'close' })
   previous = next
 })
 
