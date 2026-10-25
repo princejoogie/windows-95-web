@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { children, emptyDrive, fsReducer } from '../../fs/fs'
+import { children, emptyDrive, fsReducer, validateName } from '../../fs/fs'
 import { DOCUMENTS_DIR, ROOT, WINDOWS_DIR } from '../../fs/types'
 import { cellValue, columns, emptySelection, selectNode, sizeOf, visibleNodes } from './model'
 
@@ -52,6 +52,31 @@ describe('Explorer view model', () => {
     expect(visibleNodes(recycled, { kind: 'recycle' }, sort).map((n) => n.id)).toEqual([readme.id])
     expect(cellValue(recycled, readme, 'original')).toBe('C:\\My Documents')
     expect(cellValue(recycled, readme, 'deleted')).toBe(new Date(2000).toLocaleString('en-US'))
+  })
+})
+
+describe('Explorer file lifecycle', () => {
+  it('shows a move, rejects a duplicate rename, and updates lists after restore and empty', () => {
+    const [readme] = children(state, DOCUMENTS_DIR)
+    if (!readme) throw new Error('Missing seeded document')
+    const moved = fsReducer(state, { type: 'move', id: readme.id, parent: ROOT, at: 2 })
+    expect(visibleNodes(moved, { kind: 'folder', id: DOCUMENTS_DIR }, sort)).toEqual([])
+    expect(validateName(moved, ROOT, 'config.sys', readme.id)).toContain('already exists')
+    const failed = fsReducer(moved, { type: 'rename', id: readme.id, name: 'config.sys', at: 3 })
+    expect(failed.nodes[readme.id]?.name).toBe('Readme.txt')
+    const recycled = fsReducer(moved, { type: 'recycle', id: readme.id, at: 4 })
+    expect(visibleNodes(recycled, { kind: 'folder', id: ROOT }, sort).some((n) => n.id === readme.id)).toBe(
+      false,
+    )
+    expect(cellValue(recycled, readme, 'original')).toBe('C:\\')
+    const restored = fsReducer(recycled, { type: 'restore', id: readme.id, at: 5 })
+    expect(visibleNodes(restored, { kind: 'recycle' }, sort)).toEqual([])
+    expect(visibleNodes(restored, { kind: 'folder', id: ROOT }, sort).some((n) => n.id === readme.id)).toBe(
+      true,
+    )
+    const emptied = fsReducer(recycled, { type: 'emptyRecycleBin' })
+    expect(visibleNodes(emptied, { kind: 'recycle' }, sort)).toEqual([])
+    expect(emptied.nodes[readme.id]).toBeUndefined()
   })
 })
 

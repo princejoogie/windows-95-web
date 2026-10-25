@@ -1,0 +1,147 @@
+.explorer-files {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: white;
+  padding: 2px;
+}
+.explorer-items {
+  min-height: 100%;
+  outline: none;
+  align-content: start;
+}
+.explorer-item {
+  display: flex;
+  align-items: center;
+  outline: none;
+  cursor: default;
+}
+.explorer-name {
+  padding: 1px 2px;
+  overflow-wrap: anywhere;
+}
+.explorer-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+.explorer-icon > img {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.explorer-icon > .explorer-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 8px;
+  height: 8px;
+}
+:where(.explorer-item.selected) .explorer-name {
+  background: var(--color-select);
+  color: white;
+  outline: 1px dotted black;
+}
+:where(.explorer-item.cut) .explorer-icon {
+  opacity: 0.5;
+}
+.explorer-large .explorer-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 75px);
+  gap: 5px 0;
+}
+.explorer-large .explorer-item {
+  flex-direction: column;
+  width: 75px;
+  min-height: 68px;
+  padding-top: 5px;
+  text-align: center;
+  gap: 4px;
+}
+.explorer-large .explorer-icon {
+  width: 32px;
+  height: 32px;
+}
+.explorer-large .explorer-name {
+  max-width: 73px;
+}
+.explorer-small .explorer-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 160px);
+}
+.explorer-small .explorer-item,
+.explorer-list .explorer-item {
+  gap: 3px;
+  height: 22px;
+  padding: 2px;
+}
+.explorer-small .explorer-name,
+.explorer-list .explorer-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.explorer-list .explorer-items {
+  display: flex;
+  flex-flow: column wrap;
+  height: 100%;
+  align-content: flex-start;
+}
+.explorer-list .explorer-item {
+  width: 160px;
+}
+.explorer-head {
+  display: flex;
+  position: sticky;
+  top: -2px;
+  z-index: 1;
+  height: 20px;
+  background: var(--color-face);
+}
+.explorer-head button {
+  flex-shrink: 0;
+  text-align: left;
+  padding: 0 5px;
+}
+.explorer-details .explorer-item {
+  width: max-content;
+  height: 20px;
+}
+.explorer-cell {
+  display: block;
+  flex-shrink: 0;
+  padding: 1px 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.explorer-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.explorer-details .selected {
+  background: var(--color-select);
+  color: white;
+}
+.explorer-rename {
+  min-width: 0;
+  width: 100%;
+  background: white;
+  color: black;
+  border: 1px solid black;
+  padding: 0 2px;
+  outline: none;
+  user-select: text;
+}
+.explorer-properties {
+  display: grid;
+  grid-template-columns: 65px minmax(160px, 280px);
+  gap: 10px;
+  padding: 15px;
+  user-select: text;
+}
+.explorer-properties dd {
+  overflow-wrap: anywhere;
+}
