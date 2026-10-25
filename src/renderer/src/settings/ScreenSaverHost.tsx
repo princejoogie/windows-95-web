@@ -12,18 +12,22 @@ function wave(time: number, phase: number): number {
 }
 
 function flag(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
-  const gap = Math.max(1, size / 12)
-  const half = size / 2 - gap
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(x - 1, y - 1, size + 2, size + 2)
-  for (const [dx, dy, color] of [
-    [0, 0, PALETTE.r],
-    [1, 0, PALETTE.l],
-    [0, 1, PALETTE.b],
-    [1, 1, PALETTE.y],
-  ] as const) {
-    ctx.fillStyle = color
-    ctx.fillRect(x + dx * (half + gap), y + dy * (half + gap), half, half)
+  const panes = [PALETTE.r, PALETTE.l, PALETTE.b, PALETTE.y]
+  const unit = size / 18
+  for (let row = 0; row < 16; row++) {
+    const shift = Math.floor(row / 4)
+    for (let column = 0; column < 18; column++) {
+      if (column < 4) {
+        if ((row + column) % 3 === 0) {
+          ctx.fillStyle = panes[row < 8 ? 0 : 2] ?? '#ffffff'
+          ctx.fillRect(x + (column + shift) * unit, y + row * unit, unit, unit)
+        }
+        continue
+      }
+      if (row === 7 || row === 8 || column === 10) continue
+      ctx.fillStyle = panes[(row < 8 ? 0 : 2) + (column > 10 ? 1 : 0)] ?? '#ffffff'
+      ctx.fillRect(x + (column + shift) * unit, y + (row + Math.sin(column / 3)) * unit, unit, unit)
+    }
   }
 }
 

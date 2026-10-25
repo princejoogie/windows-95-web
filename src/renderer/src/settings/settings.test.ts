@@ -64,6 +64,10 @@ describe('Windows desktop backgrounds', () => {
   })
 
   it('centers or tiles wallpaper over a repeating pattern at its native size', () => {
+    expect(desktopBackground({ ...defaultSettings, pattern: 'Bricks' })['--desktop-repeat']).toBe('repeat')
+    expect(desktopBackground({ ...defaultSettings, pattern: 'Bricks' })['--desktop-position']).toBe(
+      'left top',
+    )
     const settings = {
       ...defaultSettings,
       wallpaper: 'Setup',

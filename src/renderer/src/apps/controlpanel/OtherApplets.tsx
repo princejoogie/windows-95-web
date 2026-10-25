@@ -494,12 +494,12 @@ export function AddRemovePrograms({ onClose }: { onClose: () => void }) {
 const fonts = [
   {
     name: 'MS Sans Serif',
-    family: '"MS Sans Serif", sans-serif',
+    family: '"MS Sans Serif Bitmap", "MS Sans Serif", sans-serif',
     description: 'System dialog and menu font',
   },
   {
     name: 'Fixedsys',
-    family: '"Fixedsys", "Courier New", monospace',
+    family: '"Fixedsys Bitmap", "Fixedsys", "Courier New", monospace',
     description: 'Fixed width system font',
   },
   { name: 'Arial', family: 'Arial, sans-serif', description: 'TrueType sans serif' },

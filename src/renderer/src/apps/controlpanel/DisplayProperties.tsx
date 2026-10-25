@@ -1,4 +1,4 @@
-import { type ReactNode, useId, useState } from 'react'
+import { type ReactNode, useEffect, useId, useState } from 'react'
 import { PALETTE } from '../../icons/pixel'
 import { desktopBackground, patternNames, wallpaperNames } from '../../settings/backgrounds'
 import { type Settings, saverNames } from '../../settings/model'
@@ -36,6 +36,7 @@ export function ColorPicker({
 }) {
   const [open, setOpen] = useState(false)
   const [custom, setCustom] = useState(value)
+  useEffect(() => setCustom(value), [value])
   const id = useId()
   return (
     <span className="relative inline-block">

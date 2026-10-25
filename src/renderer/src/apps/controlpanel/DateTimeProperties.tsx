@@ -70,6 +70,8 @@ export function DateTimeProperties({ onClose }: { onClose: () => void }) {
     return () => clearInterval(timer)
   }, [])
   const parts = clockParts(now + draft.clockOffset, draft.timeZone)
+  const [yearInput, setYearInput] = useState(String(parts.year))
+  useEffect(() => setYearInput(String(parts.year)), [parts.year])
   const update = (patch: Partial<typeof parts>) => {
     const current = Date.now()
     change({
@@ -120,8 +122,9 @@ export function DateTimeProperties({ onClose }: { onClose: () => void }) {
                       min={1900}
                       max={2099}
                       className="w-[60px]"
-                      value={parts.year}
+                      value={yearInput}
                       onChange={(event) => {
+                        setYearInput(event.currentTarget.value)
                         const year = event.currentTarget.valueAsNumber
                         if (year >= 1900 && year <= 2099)
                           update({
@@ -129,6 +132,7 @@ export function DateTimeProperties({ onClose }: { onClose: () => void }) {
                             day: Math.min(parts.day, new Date(Date.UTC(year, parts.month, 0)).getUTCDate()),
                           })
                       }}
+                      onBlur={() => setYearInput(String(parts.year))}
                     />
                   </div>
                   <fieldset className="cp-calendar bevel-sunken" aria-label="Calendar">

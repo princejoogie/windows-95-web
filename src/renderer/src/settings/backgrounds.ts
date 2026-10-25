@@ -62,10 +62,13 @@ function setupWallpaper(): string {
         }
         if (fx < 0 && fx > -30 && fy >= 0 && fy < 64 && (x + y) % 6 < 3) return 'k'
       }
-      return (Math.floor(x / 4) + Math.floor(y / 4)) % 2 ? 'C' : 'B'
+      return '.'
     }).join(''),
   )
-  return pixelArt(rows)
+  const foreground = decodeURIComponent(pixelArt(rows).split(',')[1] ?? '')
+  const background =
+    '<defs><pattern id="setup" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#008080"/><path d="M0 0h4v4H0zM4 4h4v4H4z" fill="#000080"/></pattern></defs><rect width="320" height="200" fill="url(#setup)"/>'
+  return `data:image/svg+xml,${encodeURIComponent(foreground.replace('shape-rendering="crispEdges">', `shape-rendering="crispEdges">${background}`))}`
 }
 
 export const wallpapers: Record<WallpaperName, { image: string; width: number; height: number }> = {
@@ -90,8 +93,10 @@ export function desktopBackground(settings: BackgroundSettings): Record<string, 
   const wallpaper = settings.wallpaper ? wallpapers[settings.wallpaper] : null
   return {
     '--desktop-image': wallpaper ? `url("${wallpaper.image}"), ${pattern}` : pattern,
-    '--desktop-repeat': `${settings.wallpaperMode === 'tile' ? 'repeat' : 'no-repeat'}, repeat`,
-    '--desktop-position': 'center center, left top',
+    '--desktop-repeat': wallpaper
+      ? `${settings.wallpaperMode === 'tile' ? 'repeat' : 'no-repeat'}, repeat`
+      : 'repeat',
+    '--desktop-position': wallpaper ? 'center center, left top' : 'left top',
     '--desktop-size': wallpaper ? `${wallpaper.width}px ${wallpaper.height}px, 8px 8px` : '8px 8px',
   }
 }
