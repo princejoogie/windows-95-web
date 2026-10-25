@@ -15,6 +15,7 @@ import { TooltipLayer } from '../ui/Tooltip'
 import { closeSession, requestWindowClose } from './closeRequests'
 import { ShellDialogHost } from './context'
 import { Desktop } from './Desktop'
+import { DosSession } from './DosSession'
 import { shellEvents } from './events'
 import { PowerScreens } from './PowerScreens'
 import { RunDialog } from './RunDialog'
@@ -35,7 +36,7 @@ import { animateWindow, CaptionZoom } from './transitions'
 import type { Size, WindowId } from './types'
 import { Window } from './Window'
 
-type Power = 'booting' | 'running' | 'shutting-down' | 'restarting' | 'off'
+type Power = 'booting' | 'running' | 'dos' | 'shutting-down' | 'restarting' | 'off'
 type ShellDialog = 'run' | 'shutdown' | 'taskbar' | 'datetime' | 'logon' | 'msn' | null
 type Switch = { order: readonly WindowId[]; selected: WindowId }
 
@@ -43,7 +44,7 @@ export function Shell() {
   useEffect(connectSystemSounds, [])
   useEffect(connectRecycleLimit, [])
   const [power, setPower] = useState<Power>('booting')
-  useEffect(() => (power === 'running' ? undefined : beginSystemCursor('wait')), [power])
+  useEffect(() => (power === 'running' || power === 'dos' ? undefined : beginSystemCursor('wait')), [power])
   const [startOpen, setStartOpen] = useState(false)
   const [dialog, setDialog] = useState<ShellDialog>(null)
   const [missing, setMissing] = useState<string | null>(null)
@@ -152,6 +153,7 @@ export function Shell() {
     installStartMenu(apps)
   }, [])
   useEffect(() => {
+    if (power === 'dos') return
     if (power === 'running') {
       shellEvents.emit({ type: 'startup' })
       const folder = startMenuFolder()
@@ -300,14 +302,13 @@ export function Shell() {
       shellEvents.emit({ type: 'shutdown' })
       if (choice === 'logoff') setDialog('logon')
       else if (choice === 'dos') {
-        const app = findAppByExe('command.com')
-        const id = app && launch(app.id)
-        if (id) windowsStore.dispatch({ type: 'toggleMaximize', id })
+        setPower('dos')
       } else setPower(choice === 'restart' ? 'restarting' : 'shutting-down')
     } finally {
       closing.current = false
     }
   }
+  if (power === 'dos') return <DosSession onWindows={() => setPower('booting')} />
   if (power !== 'running')
     return (
       <PowerScreens

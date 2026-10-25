@@ -382,8 +382,22 @@ const shell = async () => {
 
 const power = async () => {
   await app.send('Page.reload')
-  await sleep(600)
+  await sleep(150)
+  await shot('13-starting-windows')
+  await sleep(450)
   await shot('13-boot')
+  const band = await read(
+    `document.querySelector('canvas').getContext('2d').getImageData(0,472,640,8).data.toString()`,
+  )
+  await sleep(150)
+  check(
+    13,
+    'boot lower band animates',
+    band !==
+      (await read(
+        `document.querySelector('canvas').getContext('2d').getImageData(0,472,640,8).data.toString()`,
+      )),
+  )
   await app.waitFor(`!!document.querySelector('[data-desktop]')`)
   await startItem('Shut Down...')
   await app.clickOn('input[value="dos"]')
@@ -426,12 +440,143 @@ const power = async () => {
   await shot('13-safe-off')
 }
 
+const regressions = async () => {
+  await run('audit-missing')
+  await read(
+    `globalThis.beepCount=0;const start=AudioBufferSourceNode.prototype.start;AudioBufferSourceNode.prototype.start=function(...args){beepCount++;return start.apply(this,args)}`,
+  )
+  await app.clickOn('[role="dialog"][aria-label="Run"] [data-dialog-caption] button[aria-label="Close"]')
+  await sleep(120)
+  check(2, 'blocked nested owner gives modal sound feedback', await read('beepCount>0'))
+  await app.clickOn('[data-start-button]')
+  check(
+    2,
+    'taskbar and Start remain usable outside the blocked Run owner',
+    await exists('[aria-label="Start menu"]'),
+  )
+  await shot('02-taskbar-usable')
+  await reset()
+  await app.clickOn('[data-start-button]')
+  await clickText('Run...')
+  await app.key('Tab', ['Shift'])
+  const last = await read('document.activeElement.textContent')
+  await app.key('Tab')
+  check(
+    3,
+    'dialog Tab and Shift+Tab wrap within Run',
+    last === 'Browse...' && (await read(`document.activeElement.id==='run-command'`)),
+  )
+  await app.key('b', ['Alt'])
+  await app.key('o', ['Alt'])
+  check(
+    4,
+    'nested Browse mnemonic stays within Browse',
+    await read(`document.activeElement.closest('[role="dialog"]')?.getAttribute('aria-label')==='Browse'`),
+  )
+  await reset()
+  for (const item of ['mycomputer', 'network']) {
+    await app.clickOn(`[data-desktop-item="app:${item}"]`, { button: 'right' })
+    const enabled = await read(
+      `[...document.querySelectorAll('[role="menuitem"]')].find(e=>e.textContent==='Properties')?.getAttribute('aria-disabled')!=='true'`,
+    )
+    await clickText('Properties')
+    check(
+      8,
+      `${item} context Properties is enabled and opens its sheet`,
+      enabled && (await exists('[role="dialog"]')),
+    )
+    await app.key('Escape')
+  }
+  await reset()
+  await app.clickOn('[data-desktop-item="app:mycomputer"]')
+  await app.key('a', ['Control'])
+  const selected = await read(`document.querySelectorAll('[data-desktop-item][aria-selected="true"]').length`)
+  await app.clickOn('[data-desktop-item="app:mycomputer"]', { button: 'right' })
+  check(
+    10,
+    'right click preserves the selected icon group',
+    selected > 1 &&
+      selected ===
+        (await read(`document.querySelectorAll('[data-desktop-item][aria-selected="true"]').length`)),
+  )
+  await app.key('Escape')
+  const before = await read(
+    `[...document.querySelectorAll('[data-desktop-item]')].map(e=>({id:e.dataset.desktopItem,x:e.offsetLeft,y:e.offsetTop}))`,
+  )
+  const from = await app.center('[data-desktop-item="app:mycomputer"] [data-icon]')
+  await app.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    x: from[0],
+    y: from[1],
+    button: 'left',
+    buttons: 1,
+    clickCount: 1,
+  })
+  await app.send('Input.dispatchMouseEvent', {
+    type: 'mouseMoved',
+    x: from[0] + 12,
+    y: from[1] + 10,
+    button: 'none',
+    buttons: 1,
+  })
+  await app.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    x: from[0] + 12,
+    y: from[1] + 10,
+    button: 'left',
+    buttons: 0,
+    clickCount: 1,
+  })
+  await sleep(100)
+  const after = await read(
+    `[...document.querySelectorAll('[data-desktop-item]')].map(e=>({id:e.dataset.desktopItem,x:e.offsetLeft,y:e.offsetTop}))`,
+  )
+  check(
+    10,
+    'dragging a selected icon still moves the group',
+    after.every((p, i) => p.x === before[i].x + 12 && p.y === before[i].y + 10),
+    { before, after },
+  )
+  await shot('10-group-drag')
+  await reset()
+  await run('notepad')
+  await app.type('Keep this draft')
+  await app.click(700, 450)
+  await startItem('Shut Down...')
+  await clickText('Yes')
+  check(
+    'regression',
+    'shutdown still asks about an unsaved document',
+    await read(`document.body.innerText.includes('Do you want to save')`),
+  )
+  await clickText('Cancel')
+  check(
+    'regression',
+    'Cancel still preserves the unsaved draft',
+    await read(`document.querySelector('textarea').value==='Keep this draft'`),
+  )
+  await shot('shutdown-draft-preserved')
+}
+
 try {
   await reset()
   if (phase === 'dialogs') await dialogs()
   if (phase === 'modeless') await modeless()
   if (phase === 'shell') await shell()
   if (phase === 'power') await power()
+  if (phase === 'regressions') await regressions()
+  if (phase === 'existing') {
+    const labels = await read(
+      `[...document.querySelectorAll('[data-desktop-item]')].map(e=>e.getAttribute('aria-label'))`,
+    )
+    check(
+      14,
+      'existing users retain their stored Minesweeper and Solitaire shortcuts',
+      ['Minesweeper', 'Solitaire'].every((label) => labels.includes(label)),
+      labels,
+    )
+    await shot('14-existing-shortcuts')
+  }
 } finally {
   writeFileSync(
     join(proof, `${baseline ? 'before' : 'after'}-${phase}.json`),
