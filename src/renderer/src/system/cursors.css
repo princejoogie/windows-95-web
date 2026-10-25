@@ -63,3 +63,13 @@ textarea,
 [style*="cursor: nesw-resize"] {
   cursor: var(--cursor-nesw-resize, nesw-resize) !important;
 }
+
+html[data-system-cursor="busy"],
+html[data-system-cursor="busy"] * {
+  cursor: var(--cursor-progress, progress);
+}
+
+html[data-system-cursor="wait"],
+html[data-system-cursor="wait"] * {
+  cursor: var(--cursor-wait, wait);
+}

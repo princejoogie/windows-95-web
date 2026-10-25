@@ -12,7 +12,7 @@ const checks = []
 
 async function check(name, expression, screenshot) {
   const actual = await c.eval(expression)
-  assert.ok(actual, `${name}: ${JSON.stringify(actual)}`)
+  assert.ok(Array.isArray(actual) ? actual.length > 0 : actual, `${name}: ${JSON.stringify(actual)}`)
   checks.push({ name, expression, actual, screenshot: screenshot ?? null })
   console.log(`PASS ${name}`)
   if (screenshot) await c.shot(join(proof, `${screenshot}.png`))
@@ -69,6 +69,14 @@ const audioProbe = `(() => {
   }
 })()`
 
+const cursorProbe = `(() => {
+  window.__cursors = []
+  new MutationObserver(() => {
+    const root = document.documentElement
+    if (root) window.__cursors.push({kind: root.dataset.systemCursor ?? 'arrow', cursor: getComputedStyle(document.body ?? root).cursor, windows: document.querySelectorAll('[data-window]').length})
+  }).observe(document, {subtree: true, attributes: true, attributeFilter: ['data-system-cursor']})
+})()`
+
 async function hear(name, label) {
   await c.waitFor(`window.__audio?.some(entry => entry.name === ${JSON.stringify(name)})`)
   await check(
@@ -81,6 +89,7 @@ async function hear(name, label) {
 try {
   await c.send('Page.enable')
   if (item === 'sounds') await c.send('Page.addScriptToEvaluateOnNewDocument', { source: audioProbe })
+  if (item === 'cursors') await c.send('Page.addScriptToEvaluateOnNewDocument', { source: cursorProbe })
   await c.send('Page.reload')
   await sleep(100)
   await c.waitFor('!!document.querySelector("[data-start-button]")')
@@ -198,6 +207,27 @@ try {
     await c.key('F4', ['Alt'])
     await shutdown()
     await hear('chimes', 'Logoff plays the chimes exit buffer')
+  }
+  if (item === 'cursors') {
+    await check(
+      'Boot uses the real wait cursor',
+      'window.__cursors.filter(entry => entry.kind === "wait" && entry.cursor.includes("wait_r"))',
+    )
+    await run('notepad')
+    await check(
+      'Launch uses the real arrow-with-hourglass cursor',
+      'window.__cursors.filter(entry => entry.kind === "busy" && entry.cursor.includes("busy_r"))',
+    )
+    await c.waitFor('!document.documentElement.dataset.systemCursor')
+    await check(
+      'Cursor returns to the real arrow after painting',
+      'getComputedStyle(document.body).cursor.includes("arrow_r")',
+      'cursor-ready',
+    )
+    await check(
+      'Taskbar resize cursor uses the exported value',
+      '[...document.querySelectorAll("[style]")].some(el => el.style.cursor.includes("var(--cursor-ns-resize"))',
+    )
   }
   writeFileSync(join(proof, `${item}.json`), `${JSON.stringify({ port, item, checks }, null, 2)}\n`)
 } catch (error) {

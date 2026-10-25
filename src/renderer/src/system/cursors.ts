@@ -23,3 +23,30 @@ export const cursorClassNames = {
   nwse: 'system-cursor-nwse',
   nesw: 'system-cursor-nesw',
 } as const
+
+const activeCursors = new Map<symbol, 'busy' | 'wait'>()
+
+export function beginSystemCursor(cursor: 'busy' | 'wait'): () => void {
+  const token = Symbol(cursor)
+  const update = () => {
+    const values = [...activeCursors.values()]
+    const current = values.includes('wait') ? 'wait' : values.at(-1)
+    if (current) document.documentElement.dataset.systemCursor = current
+    else delete document.documentElement.dataset.systemCursor
+  }
+  activeCursors.set(token, cursor)
+  update()
+  return () => {
+    activeCursors.delete(token)
+    update()
+  }
+}
+
+export async function withWaitCursor<T>(operation: () => Promise<T>): Promise<T> {
+  const done = beginSystemCursor('wait')
+  try {
+    return await operation()
+  } finally {
+    done()
+  }
+}

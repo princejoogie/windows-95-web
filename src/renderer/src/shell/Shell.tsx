@@ -4,6 +4,7 @@ import { DateTimeProperties } from '../apps/controlpanel/DateTimeProperties'
 import { children } from '../fs/fs'
 import { fs, installPrograms } from '../fs/store'
 import { connectSystemSounds } from '../settings/sounds'
+import { beginSystemCursor } from '../system/cursors'
 import { Button, Dialog, MessageBox, TextBox } from '../ui'
 import { requestActiveDialogClose } from '../ui/Dialog'
 import { menuIsActive } from '../ui/Menu'
@@ -36,6 +37,7 @@ type Switch = { order: readonly WindowId[]; selected: WindowId }
 export function Shell() {
   useEffect(connectSystemSounds, [])
   const [power, setPower] = useState<Power>('booting')
+  useEffect(() => (power === 'running' ? undefined : beginSystemCursor('wait')), [power])
   const [startOpen, setStartOpen] = useState(false)
   const [dialog, setDialog] = useState<ShellDialog>(null)
   const [missing, setMissing] = useState<string | null>(null)
