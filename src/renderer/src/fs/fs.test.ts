@@ -29,7 +29,7 @@ describe('file system', () => {
     const state = fresh()
     expect(resolvePath(state, 'c:\\windows\\calc.exe')).toMatchObject({ kind: 'program', app: 'calc' })
     expect(resolvePath(state, 'C:\\Games\\Doom\\DOOM95.EXE')).toMatchObject({ kind: 'program', app: 'doom' })
-    expect(names(state, DESKTOP_DIR)).toEqual(['Doom 95', 'Readme.txt'])
+    expect(names(state, DESKTOP_DIR)).toEqual(['Doom 95'])
     expect(pathOf(state, DOCUMENTS_DIR)).toBe('C:\\My Documents')
     expect(pathOf(state, ROOT)).toBe('C:\\')
   })
@@ -45,7 +45,7 @@ describe('file system', () => {
   it('does not bring back a desktop shortcut the user deleted', () => {
     const state = run(fresh(), { type: 'purge', id: 'lnk:doom' as NodeId })
     const next = fsReducer(state, { type: 'installPrograms', programs, shortcuts: false, at })
-    expect(names(next, DESKTOP_DIR)).toEqual(['Readme.txt'])
+    expect(names(next, DESKTOP_DIR)).toEqual([])
   })
 
   it('lists folders before files, by name, ignoring case', () => {

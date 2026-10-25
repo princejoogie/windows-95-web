@@ -27,10 +27,6 @@
   },
   "overrides": [
     {
-      "includes": ["src/renderer/src/icons/**"],
-      "formatter": { "enabled": false }
-    },
-    {
       "includes": ["src/renderer/**", "src/shared/**"],
       "linter": {
         "rules": {

@@ -65,7 +65,6 @@ export function TitleButton({
     <button
       type="button"
       aria-label={label}
-      title={label}
       disabled={disabled}
       className="group grid place-items-center w-[16px] h-[14px] bg-face bevel-raised enabled:active:bevel-pressed outline-none"
       onPointerDown={(event) => event.stopPropagation()}

@@ -16,7 +16,7 @@ export const app: AppManifest = {
   exe: 'RECYCLE.EXE',
   installDir: 'C:\\WINDOWS',
   desktop: {
-    order: 1,
+    order: 2,
     icon: (state) => (children(state, RECYCLED_DIR).length ? icons.binFull : icons.binEmpty),
     onDrop: (ids) => {
       for (const id of ids) fs.recycle(id)
