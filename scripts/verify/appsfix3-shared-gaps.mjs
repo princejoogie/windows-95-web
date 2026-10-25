@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { clickText, connect, reset, run } from './appsfix3-cdp.mjs'
@@ -22,8 +23,11 @@ try {
   await clickText(d, '[role=dialog] button', 'Cancel')
   await d.key('o', { ctrl: true })
   await clickText(d, '[role=dialog] button', 'No')
-  await d.type('missing.txt')
+  await d.clickSel('[role=dialog] input')
+  await d.key('a', { ctrl: true })
+  await d.type('C:\\My Documents\\missing.txt')
   await d.key('Enter')
+  assert.ok(await d.evaluate('document.body.textContent.includes("Cannot find the file")'))
   gaps.missingFile = await d.evaluate(
     'Array.from(document.querySelectorAll("[role=dialog]")).map(e=>e.innerText)',
   )

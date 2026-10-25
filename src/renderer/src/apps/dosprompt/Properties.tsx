@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { Button, Checkbox, ComboBox, Dialog, GroupBox, Radio, Tabs, TextBox } from '../../ui'
+import { Button, Checkbox, ComboBox, Dialog, GroupBox, ListBox, Radio, Tabs, TextBox } from '../../ui'
 import { dosSmallIcon } from './icons'
 
 export const FONTS = [
@@ -75,16 +75,15 @@ export function Properties({
           {tab === 'Font' && (
             <>
               <div className="flex gap-3">
-                <GroupBox label="Font size" className="w-[110px] flex flex-col gap-2">
-                  {[3, 0, 1, 2].map((index) => (
-                    <Radio
-                      key={index}
-                      name="dos-font"
-                      label={FONTS[index]?.label}
-                      checked={draft.font === index}
-                      onChange={() => setDraft({ ...draft, font: index })}
-                    />
-                  ))}
+                <GroupBox label="Font size" className="w-[110px]">
+                  <ListBox
+                    label="Font size"
+                    className="h-[90px]"
+                    items={[3, 0, 1, 2]}
+                    value={draft.font}
+                    onChange={(font) => setDraft({ ...draft, font })}
+                    render={(font) => FONTS[font]?.label}
+                  />
                 </GroupBox>
                 <GroupBox label="Window preview" className="flex-1">
                   <div className="bevel-window bg-face p-[3px] h-[90px]">
