@@ -13,6 +13,8 @@ interface DialogProps {
   className?: string
 }
 
+const modalStacks = new WeakMap<HTMLElement, symbol[]>()
+
 /**
  * A modal dialog. Inside an app it covers and blocks its own window only, and stays above it. Outside
  * an app it renders in the shell's dialog layer. Escape closes it; drag the title bar to move it.
@@ -24,19 +26,52 @@ export function Dialog({ title, children, onClose, icon, dim, className = '' }: 
   const shellHost = useContext(ShellDialogHost)
   const host = owner ? owner.dialogHost : shellHost
   const active = owner ? owner.api.focused : true
+  const dialogRef = useRef<HTMLDivElement>(null)
 
   const latestClose = useRef(onClose)
   latestClose.current = onClose
   useEffect(() => {
-    if (!active) return
+    if (!active || !host) return
+    const token = Symbol()
+    const stack = modalStacks.get(host) ?? []
+    modalStacks.set(host, stack)
+    stack.push(token)
+    const previous = document.activeElement
+    const dialog = dialogRef.current
+    const focusable = () =>
+      Array.from(
+        dialog?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]',
+        ) ?? [],
+      ).filter((element) => element.getClientRects().length > 0)
+    if (dialog && !dialog.contains(document.activeElement)) focusable()[0]?.focus()
     const onEscape = (event: KeyboardEvent) => {
+      if (stack.at(-1) !== token) return
+      if (event.key === 'Tab') {
+        const elements = focusable()
+        const first = elements[0]
+        const last = elements.at(-1)
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault()
+          last?.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first?.focus()
+        }
+      }
       if (event.key !== 'Escape' || !latestClose.current) return
+      event.preventDefault()
       event.stopImmediatePropagation()
       latestClose.current()
     }
     document.addEventListener('keydown', onEscape, true)
-    return () => document.removeEventListener('keydown', onEscape, true)
-  }, [active])
+    return () => {
+      document.removeEventListener('keydown', onEscape, true)
+      const index = stack.indexOf(token)
+      if (index !== -1) stack.splice(index, 1)
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true })
+    }
+  }, [active, host])
 
   if (!host) return null
 
@@ -46,8 +81,11 @@ export function Dialog({ title, children, onClose, icon, dim, className = '' }: 
         <div className="absolute inset-0 bg-[repeating-conic-gradient(#000_0_25%,transparent_0_50%)] bg-size-[2px_2px]" />
       )}
       <div
+        ref={dialogRef}
         role="dialog"
         aria-label={title}
+        aria-modal="true"
+        onKeyDown={(event) => event.stopPropagation()}
         className={`absolute left-1/2 top-1/2 flex flex-col p-[3px] bg-face bevel-window ${className}`}
         style={{ transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))` }}
       >

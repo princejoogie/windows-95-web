@@ -1,5 +1,6 @@
 export { Button } from './Button'
 export { Dialog } from './Dialog'
+export { FileDialog, type FileDialogProps, type FileDialogResult, type FileTypeFilter } from './FileDialog'
 export { Checkbox, GroupBox, Radio, Separator, StatusBar, StatusPane, TextArea, TextBox } from './fields'
 export { ContextMenu, MenuBar, type MenuBarMenu, type MenuEntry, MenuList } from './Menu'
 export { MessageBox } from './MessageBox'
