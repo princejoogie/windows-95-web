@@ -171,10 +171,117 @@ try {
   log(
     'Board and window dimensions',
     await evaluate(
-      `(() => { const board=document.querySelector('.mine-board'); const win=board.closest('[data-window-id]'); const size=e=>{const r=e.getBoundingClientRect();return {width:r.width,height:r.height}};return {board:size(board),window:win?size(win):null}; })()`,
+      `(() => { const board=document.querySelector('.mine-board'); const win=board.closest('[data-window]'); const size=e=>{const r=e.getBoundingClientRect();return {width:r.width,height:r.height}};return {board:size(board),window:win?size(win):null}; })()`,
     ),
   )
-  if (mode === 'rules') await menu('Game', 'Exit')
+  if (mode !== 'rules') {
+    await check(
+      'Finding 13: cell numbers are pixel sprites',
+      `[...document.querySelectorAll('.mine-open')].every(e=>!e.textContent.trim() && e.querySelector('img'))`,
+    )
+    await check(
+      'Finding 13: all LED digits are 13 by 23',
+      `[...document.querySelectorAll('.mine-counter img')].every(e=>e.naturalWidth===13 && e.naturalHeight===23 && e.width===13 && e.height===23)`,
+    )
+    await check(
+      'Finding 13: 41 by 25 wells and 26 by 26 face',
+      `[...document.querySelectorAll('.mine-counter')].every(e=>e.offsetWidth===41 && e.offsetHeight===25) && document.querySelector('.mine-face').offsetWidth===26 && document.querySelector('.mine-face').offsetHeight===26`,
+    )
+    await check(
+      'Finding 13: sprites sit on whole pixels',
+      `[...document.querySelectorAll('.mine-frame img')].every(e=>{const r=e.getBoundingClientRect();return Number.isInteger(r.x)&&Number.isInteger(r.y)})`,
+    )
+    await key('F2')
+    for (let index = 0; index < 11; index++) await click(cell(index), 'right')
+    await check(
+      'Negative counter',
+      `document.querySelector('output').getAttribute('aria-label')==='Mines left: -1'`,
+    )
+    await shot('after-negative-counter')
+    await click(cell(0), 'right')
+    await check(
+      'Question mark is a sprite',
+      `document.querySelector('[data-cell="0"]').getAttribute('aria-label').endsWith('question') && !!document.querySelector('[data-cell="0"] img')`,
+    )
+    await shot('after-question')
+    const colorFlag = await evaluate(`document.querySelector('[data-cell="1"] img').src`)
+    await menu('Game', 'Color')
+    assert.notEqual(await evaluate(`document.querySelector('[data-cell="1"] img').src`), colorFlag)
+    await check(
+      'Finding 13: monochrome uses separate art without a filter',
+      `document.querySelector('.minesweeper').classList.contains('mine-monochrome') && getComputedStyle(document.querySelector('.mine-frame')).filter==='none'`,
+    )
+    await shot('after-monochrome')
+    await menu('Game', 'Color')
+    await key('F2')
+    const at = await point(cell(27))
+    await mouse('mousePressed', at, 'left', 1)
+    await check(
+      'Surprised face while held',
+      `document.querySelector('.mine-face').getAttribute('aria-label').includes('surprised')`,
+    )
+    await shot('after-surprised')
+    await mouse('mouseReleased', at)
+    let game = await state()
+    const wrong = game.cells.findIndex((c) => !c.mine && c.cover === 'hidden')
+    assert(wrong >= 0)
+    await click(cell(wrong), 'right')
+    await click(cell(game.cells.findIndex((c) => c.mine)))
+    assert.equal((await state()).phase.kind, 'lost')
+    await check(
+      'Loss shows red mine, crossed mine, and dead face',
+      `document.querySelectorAll('.mine-exploded img').length===1 && !!document.querySelector('[aria-label$="wrong flag"] img') && document.querySelector('.mine-face').getAttribute('aria-label').includes('dead')`,
+    )
+    await shot('after-loss')
+    await menu('Game', 'Color')
+    await shot('after-monochrome-loss')
+    await menu('Game', 'Color')
+    await key('F2')
+    await click(cell(27))
+    game = await state()
+    const adjacent = (index) =>
+      game.cells.flatMap((_, n) =>
+        Math.abs((n % 8) - (index % 8)) <= 1 &&
+        Math.abs(Math.floor(n / 8) - Math.floor(index / 8)) <= 1 &&
+        n !== index
+          ? [n]
+          : [],
+      )
+    const chordIndex = game.cells.findIndex(
+      (c, i) =>
+        c.cover === 'open' &&
+        c.adjacent > 0 &&
+        adjacent(i).some((n) => !game.cells[n].mine && game.cells[n].cover === 'hidden'),
+    )
+    if (chordIndex >= 0) {
+      for (const n of adjacent(chordIndex).filter((n) => game.cells[n].mine)) await click(cell(n), 'right')
+      const before = game.cells.filter((c) => c.cover === 'open').length
+      await click(cell(chordIndex), 'middle')
+      game = await state()
+      assert(game.cells.filter((c) => c.cover === 'open').length > before)
+      assert.notEqual(game.phase.kind, 'lost')
+      log('Chording opens safe neighbors', true)
+      await shot('after-chord')
+    }
+    for (let index = 0; index < game.cells.length; index++) {
+      if (!game.cells[index].mine && game.cells[index].cover !== 'open') await click(cell(index))
+    }
+    assert.equal((await state()).phase.kind, 'won')
+    if (await evaluate(`!!document.querySelector('input[aria-label="Name"]')`)) {
+      await fill('Name', 'Minesfix')
+      await textClick('OK')
+    }
+    await check(
+      'Win shows sunglasses and ten flags',
+      `document.querySelector('.mine-face').getAttribute('aria-label').includes('sunglasses') && document.querySelectorAll('.mine-cell[aria-label$="flag"]').length===10`,
+    )
+    await shot('after-win')
+    const wonTime = (await state()).elapsedMs
+    await pause(1100)
+    assert.equal((await state()).elapsedMs, wonTime)
+    log('Win freezes time', true)
+  }
+  await menu('Game', 'Exit')
 } finally {
   socket.close()
 }

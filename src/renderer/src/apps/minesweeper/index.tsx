@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { useKeyDown } from '../../shell/context'
 import type { AppManifest, AppProps } from '../../shell/types'
 import { Button, MenuBar, TextBox } from '../../ui'
-import { faces, flagIcon, largeMineIcon, mineIcon, wrongFlagIcon } from './art'
+import { artwork, largeMineIcon, mineIcon } from './art'
 import {
   advanceTime,
   type BoardSize,
@@ -30,50 +30,26 @@ type AppDialog =
   | { kind: 'about' }
   | { kind: 'record'; level: Exclude<Level, 'custom'>; seconds: number }
 
-const segments: Record<string, string> = {
-  '0': 'abcdef',
-  '1': 'bc',
-  '2': 'abdeg',
-  '3': 'abcdg',
-  '4': 'bcfg',
-  '5': 'acdfg',
-  '6': 'acdefg',
-  '7': 'abc',
-  '8': 'abcdefg',
-  '9': 'abcdfg',
-  '-': 'g',
-}
-const segmentShapes = {
-  a: '2,0 10,0 8,2 4,2',
-  b: '10,1 10,10 8,8 8,3',
-  c: '10,12 10,21 8,19 8,14',
-  d: '2,22 10,22 8,20 4,20',
-  e: '1,12 3,14 3,19 1,21',
-  f: '1,1 3,3 3,8 1,10',
-  g: '2,11 4,10 8,10 10,11 8,12 4,12',
-}
-
-function Counter({ value, label }: { value: number; label: string }) {
+function Counter({
+  value,
+  label,
+  digits,
+}: {
+  value: number
+  label: string
+  digits: Readonly<Record<string, string>>
+}) {
   return (
     <output aria-label={`${label}: ${value}`} className="mine-counter">
       {[...counterDigits(value)].map((digit, index) => (
-        <svg
+        <img
           // biome-ignore lint/suspicious/noArrayIndexKey: each fixed display position owns its digit
           key={index}
-          width="12"
+          width="13"
           height="23"
-          viewBox="0 0 12 23"
-          aria-hidden="true"
-          shapeRendering="crispEdges"
-        >
-          {Object.entries(segmentShapes).map(([segment, points]) => (
-            <polygon
-              key={segment}
-              points={points}
-              fill={segments[digit]?.includes(segment) ? '#ff0000' : '#800000'}
-            />
-          ))}
-        </svg>
+          src={digits[digit]}
+          alt=""
+        />
       ))}
     </output>
   )
@@ -262,6 +238,7 @@ function Minesweeper({ window: appWindow }: AppProps) {
     game.phase.kind === 'won' ? 'win' : game.phase.kind === 'lost' ? 'dead' : held ? 'surprised' : 'smile'
   const pressed = held?.chord ? neighbors(game.size, held.index) : held ? [held.index] : []
   const closeDialog = () => setDialog({ kind: 'none' })
+  const art = preferences.color ? artwork.color : artwork.monochrome
 
   return (
     <div className={`minesweeper ${preferences.color ? '' : 'mine-monochrome'}`}>
@@ -307,16 +284,16 @@ function Minesweeper({ window: appWindow }: AppProps) {
       />
       <div className="mine-frame">
         <div className="mine-panel">
-          <Counter value={minesLeft(game)} label="Mines left" />
+          <Counter value={minesLeft(game)} label="Mines left" digits={art.digits} />
           <button
             type="button"
             className="mine-face"
             aria-label={`New game, ${face === 'win' ? 'sunglasses' : face} face`}
             onClick={() => newGame()}
           >
-            <img src={faces[face]} alt="" width="16" height="16" />
+            <img src={art.faces[face]} alt="" width="17" height="17" />
           </button>
-          <Counter value={seconds(game)} label="Time" />
+          <Counter value={seconds(game)} label="Time" digits={art.digits} />
         </div>
         <fieldset
           ref={board}
@@ -399,15 +376,15 @@ function Minesweeper({ window: appWindow }: AppProps) {
                 }}
               >
                 {wrongFlag ? (
-                  <img src={wrongFlagIcon} alt="" />
+                  <img src={art.wrong} alt="" />
                 ) : showMine ? (
-                  <img src={mineIcon} alt="" />
+                  <img src={exploded ? art.exploded : art.mine} alt="" />
                 ) : cell.cover === 'flag' ? (
-                  <img src={flagIcon} alt="" />
+                  <img src={art.flag} alt="" />
                 ) : cell.cover === 'question' ? (
-                  '?'
+                  <img src={art.question} alt="" />
                 ) : cell.cover === 'open' && cell.adjacent > 0 ? (
-                  cell.adjacent
+                  <img src={art.numbers[cell.adjacent - 1]} alt="" />
                 ) : (
                   ''
                 )}
