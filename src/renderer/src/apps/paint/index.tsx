@@ -776,11 +776,8 @@ function Paint({ window: windowApi, args }: AppProps) {
           mode={dialog.mode}
           initialFolder={node?.parent ?? DOCUMENTS_DIR}
           initialName={dialog.mode === 'save' ? (node?.name ?? 'untitled.bmp') : ''}
-          filters={
-            dialog.mode === 'open'
-              ? OPEN_FILTERS
-              : [...SAVE_TYPES].sort((a, b) => Number(b.depth === depth) - Number(a.depth === depth))
-          }
+          filters={dialog.mode === 'open' ? OPEN_FILTERS : SAVE_TYPES}
+          initialFilter={dialog.mode === 'open' ? 0 : SAVE_TYPES.findIndex((type) => type.depth === depth)}
           defaultExtension="bmp"
           onSelect={choose}
           onCancel={cancelClose}

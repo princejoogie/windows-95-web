@@ -8,7 +8,13 @@ import { Button } from './Button'
 import { ComboBox, type ComboOption } from './ComboBox'
 import { Dialog } from './Dialog'
 import { TextBox } from './fields'
-import { chooseFile, type FileDialogResult, type FileTypeFilter } from './fileChoice'
+import {
+  chooseFile,
+  DOCUMENTS,
+  type FileDialogResult,
+  type FileTypeFilter,
+  type Pickable,
+} from './fileChoice'
 import { toolbarGlyphs } from './fileDialogArt'
 import {
   folderOf,
@@ -24,10 +30,11 @@ import {
 import { MessageBox } from './MessageBox'
 import { bytesOf, typeName } from './properties'
 import { Accel } from './text'
+import { useWhatsThis } from './WhatsThis'
 
-export type { FileDialogResult, FileTypeFilter } from './fileChoice'
+export type { FileDialogResult, FileTypeFilter, Pickable } from './fileChoice'
 
-const ALL_FILES: readonly FileTypeFilter[] = [{ label: 'All Files (*.*)', extensions: ['*'] }]
+const ALL_FILES: FileTypeFilter = { label: 'All Files (*.*)', extensions: ['*'] }
 const ROW = 16
 const TYPE_AHEAD_MS = 1000
 
@@ -39,8 +46,12 @@ export interface FileDialogProps {
   readonly initialFolder?: NodeId
   readonly initialName?: string
   readonly filters?: readonly FileTypeFilter[]
+  /** Index into `filters` of the type selected when the dialog opens. */
+  readonly initialFilter?: number
   readonly defaultExtension?: string
-  readonly onSelect: (result: FileDialogResult) => void
+  /** Node kinds the list shows and the dialog returns. Run's Browse adds installed programs. */
+  readonly pickable?: readonly Pickable[]
+  readonly onSelect: (result: FileDialogResult, filter: FileTypeFilter) => void
   readonly onCancel: () => void
 }
 
@@ -79,21 +90,52 @@ const shortDate = (at: number) =>
 /** Windows rounds sizes in Details up to whole kilobytes. */
 const sizeCell = (bytes: number) => `${Math.max(1, Math.ceil(bytes / 1024))}KB`
 
+/** The What's This text for each control. Reconstructed wording, in the style of Windows 95's common dialog help. */
+const HELP = {
+  open: {
+    lookIn:
+      'Shows the location of the current folder. To see how it fits in the hierarchy on your computer, click the arrow. To see the contents of another folder, click it in the list.',
+    list: 'Lists the folders and files in the current folder. To open a folder, double-click it. To open a file, click it, and then click Open.',
+    name: 'Type or select the name of the file you want to open.',
+    type: 'Lists the types of files to display.',
+    ok: 'Opens the selected file.',
+  },
+  save: {
+    lookIn:
+      'Shows the location where the file will be saved. To see how it fits in the hierarchy on your computer, click the arrow. To save in another folder, click it in the list.',
+    list: 'Lists the folders and files in the current folder. To save in a folder, double-click it. To replace a file, click it, and then click Save.',
+    name: 'Type a name for the file. You can use long filenames.',
+    type: 'Lists the formats you can save this file in.',
+    ok: 'Saves the file with the name you typed, in the folder shown in the Save in box.',
+  },
+} as const
+
+const TOOL_HELP = {
+  up: 'Moves up one level in the folder hierarchy.',
+  newFolder: 'Creates a new folder in the current folder.',
+  list: 'Displays the items in this folder as a list of names.',
+  details: 'Displays the name, size, type, and modification date of each item in this folder.',
+  cancel: 'Closes this dialog box without saving any changes you have made.',
+} as const
+
 function ToolButton({
   glyph,
   label,
+  help,
   pressed,
   disabled,
   onClick,
 }: {
   glyph: string
   label: string
+  help: string
   pressed?: boolean | undefined
   disabled?: boolean
   onClick: () => void
 }) {
   return (
     <Button
+      data-help={help}
       className="min-w-0! w-[23px]! h-[22px]! px-0! grid place-items-center"
       title={label}
       aria-label={label}
@@ -114,15 +156,17 @@ export function FileDialog({
   title = mode === 'open' ? 'Open' : 'Save As',
   initialFolder = DOCUMENTS_DIR,
   initialName = '',
-  filters = ALL_FILES,
+  filters = [ALL_FILES],
+  initialFilter = 0,
   defaultExtension = '',
+  pickable = DOCUMENTS,
   onSelect,
   onCancel,
 }: FileDialogProps) {
   const state = useFs((s) => s)
   const [place, setPlace] = useState<Place>(() => placeOf(initialFolder))
   const [name, setName] = useState(initialName)
-  const [filterIndex, setFilterIndex] = useState(0)
+  const [filterIndex, setFilterIndex] = useState(initialFilter)
   const [cursor, setCursor] = useState<string | null>(null)
   const [listFocused, setListFocused] = useState(false)
   const [view, setView] = useState<View>('list')
@@ -132,8 +176,8 @@ export function FileDialog({
   const listRef = useRef<HTMLDivElement>(null)
   const typed = useRef({ text: '', at: 0 })
   const id = useId()
-  const filter = filters[filterIndex] ?? ALL_FILES[0]
-  const entries = useMemo(() => (filter ? listEntries(state, place, filter) : []), [state, place, filter])
+  const filter = filters[filterIndex] ?? filters[0] ?? ALL_FILES
+  const entries = useMemo(() => listEntries(state, place, filter, pickable), [state, place, filter, pickable])
   const rows = useMemo(() => lookInRows(state, place), [state, place])
   const lookIn: ComboOption[] = rows.map((row) => ({
     key: row.key,
@@ -142,6 +186,8 @@ export function FileDialog({
     icon: rowIcon(row, state.nodes),
   }))
   const parent = parentPlace(state, place)
+  const whatsThis = useWhatsThis()
+  const help = HELP[mode]
   const at = entries.findIndex((entry) => entry.key === cursor)
   const current = entries[at]
 
@@ -159,7 +205,7 @@ export function FileDialog({
   }
 
   const submit = (input = name) => {
-    const choice = chooseFile(fs.get(), folderOf(place), input, mode, defaultExtension)
+    const choice = chooseFile(fs.get(), folderOf(place), input, mode, defaultExtension, pickable)
     switch (choice.kind) {
       case 'folder':
         enter(placeOf(choice.id))
@@ -170,10 +216,10 @@ export function FileDialog({
         break
       case 'existing':
         if (mode === 'save') setOverwrite(choice)
-        else onSelect(choice)
+        else onSelect(choice, filter)
         break
       case 'new':
-        onSelect(choice)
+        onSelect(choice, filter)
         break
     }
   }
@@ -314,9 +360,9 @@ export function FileDialog({
 
   return (
     <>
-      <Dialog title={title} onClose={onCancel} className="w-[430px] max-w-full">
+      <Dialog title={title} onClose={onCancel} onHelp={whatsThis.arm} className="w-[430px]">
         <form
-          className="flex flex-col gap-[6px] px-[8px] pt-[8px] pb-[10px]"
+          className="relative flex flex-col gap-[6px] px-[8px] pt-[8px] pb-[10px]"
           onSubmit={(event) => {
             event.preventDefault()
             if (renaming) return
@@ -330,6 +376,7 @@ export function FileDialog({
               <Accel label={mode === 'open' ? 'Look &in:' : 'Save &in:'} />
             </label>
             <ComboBox
+              data-help={help.lookIn}
               id={`${id}-folder`}
               className="w-[200px]"
               options={lookIn}
@@ -343,12 +390,14 @@ export function FileDialog({
               <ToolButton
                 glyph={toolbarGlyphs.up}
                 label="Up One Level"
+                help={TOOL_HELP.up}
                 disabled={!parent}
                 onClick={() => parent && enter(parent)}
               />
               <ToolButton
                 glyph={toolbarGlyphs.newFolder}
                 label="Create New Folder"
+                help={TOOL_HELP.newFolder}
                 disabled={place.kind === 'computer'}
                 onClick={newFolder}
               />
@@ -356,12 +405,14 @@ export function FileDialog({
               <ToolButton
                 glyph={toolbarGlyphs.list}
                 label="List"
+                help={TOOL_HELP.list}
                 pressed={view === 'list'}
                 onClick={() => setView('list')}
               />
               <ToolButton
                 glyph={toolbarGlyphs.details}
                 label="Details"
+                help={TOOL_HELP.details}
                 pressed={view === 'details'}
                 onClick={() => setView('details')}
               />
@@ -371,6 +422,7 @@ export function FileDialog({
             ref={listRef}
             role="listbox"
             aria-label="Folder contents"
+            data-help={help.list}
             tabIndex={0}
             className={`h-[136px] bg-white bevel-sunken p-[2px] outline-none ${view === 'list' ? 'overflow-x-auto overflow-y-hidden' : 'overflow-auto'}`}
             onFocus={(event) => {
@@ -425,6 +477,7 @@ export function FileDialog({
                   <Accel label="File &name:" />
                 </label>
                 <TextBox
+                  data-help={help.name}
                   id={`${id}-name`}
                   autoFocus
                   className="flex-1 min-w-0"
@@ -438,6 +491,7 @@ export function FileDialog({
                   <Accel label={mode === 'save' ? 'Save as &type:' : 'Files of &type:'} />
                 </label>
                 <ComboBox
+                  data-help={help.type}
                   id={`${id}-type`}
                   className="flex-1 min-w-0"
                   options={filters.map((entry, index) => ({ key: String(index), label: entry.label }))}
@@ -450,12 +504,15 @@ export function FileDialog({
               </div>
             </div>
             <div className="flex flex-col gap-[6px]">
-              <Button type="submit" isDefault disabled={!name.trim() && !current}>
+              <Button type="submit" isDefault disabled={!name.trim() && !current} data-help={help.ok}>
                 <Accel label={mode === 'open' ? '&Open' : '&Save'} />
               </Button>
-              <Button onClick={onCancel}>Cancel</Button>
+              <Button onClick={onCancel} data-help={TOOL_HELP.cancel}>
+                Cancel
+              </Button>
             </div>
           </div>
+          {whatsThis.layer}
         </form>
       </Dialog>
       {error && (
@@ -474,7 +531,7 @@ export function FileDialog({
           message={`${overwrite.name} already exists.\nDo you want to replace it?`}
           buttons={['Yes', 'No']}
           onClose={(answer) => {
-            if (answer === 'Yes') onSelect(overwrite)
+            if (answer === 'Yes') onSelect(overwrite, filter)
             setOverwrite(null)
           }}
         />

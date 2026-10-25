@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { emptyDrive, fsReducer } from '../fs/fs'
 import { DESKTOP_DIR, DOCUMENTS_DIR, type FsState, type NodeId, ROOT, WINDOWS_DIR } from '../fs/types'
-import { listEntries, lookInRows, parentPlace, placeOf } from './fileDialogModel'
+import { type ListEntry, listEntries, lookInRows, type Place, parentPlace, placeOf } from './fileDialogModel'
 
 const at = 0
 const all = { label: 'All Files (*.*)', extensions: ['*'] }
@@ -12,6 +12,8 @@ function withFiles(): FsState {
     { kind: 'file', id: 'bmp', name: 'Picture.bmp', parent: DOCUMENTS_DIR, content: '', modified: at },
     { kind: 'folder', id: 'sub', name: 'Letters', parent: DOCUMENTS_DIR, modified: at },
     { kind: 'file', id: 'desk', name: 'Note.txt', parent: DESKTOP_DIR, content: '', modified: at },
+    { kind: 'program', id: 'calc', name: 'CALC.EXE', parent: WINDOWS_DIR, app: 'calc', modified: at },
+    { kind: 'file', id: 'ini', name: 'WIN.INI', parent: WINDOWS_DIR, content: '', modified: at },
   ].reduce((state, node) => fsReducer(state, { type: 'create', node: node as never }), emptyDrive(at))
 }
 
@@ -60,6 +62,17 @@ describe('file list', () => {
       (entry) => entry.label,
     )
     expect(labels).toEqual(['Letters', 'Readme.txt'])
+  })
+
+  it('lists programs beside documents only when the dialog picks programs', () => {
+    const state = withFiles()
+    const windows: Place = { kind: 'folder', id: WINDOWS_DIR }
+    const programs = { label: 'Programs', extensions: ['exe', 'com', 'pif', 'bat'] }
+    const files = (entries: ListEntry[]) =>
+      entries.filter((entry) => entry.kind === 'file').map((entry) => entry.label)
+    expect(files(listEntries(state, windows, all))).toEqual(['WIN.INI'])
+    expect(files(listEntries(state, windows, programs, ['file', 'program']))).toEqual(['CALC.EXE'])
+    expect(files(listEntries(state, windows, all, ['file', 'program']))).toEqual(['CALC.EXE', 'WIN.INI'])
   })
 
   it('shows My Computer and the desktop files on the Desktop, and drives in My Computer', () => {

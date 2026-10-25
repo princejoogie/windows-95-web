@@ -1,10 +1,18 @@
 import { extension, findChild, pathOf, resolvePath, validateName } from '../fs/fs'
-import type { FsState, NodeId } from '../fs/types'
+import type { FsNode, FsState, NodeId } from '../fs/types'
 
 export interface FileTypeFilter {
   readonly label: string
   readonly extensions: readonly string[]
 }
+
+/** What a dialog may hand back: documents, plus installed programs for Run's Browse. */
+export type Pickable = Extract<FsNode['kind'], 'file' | 'program'>
+
+export const DOCUMENTS: readonly Pickable[] = ['file']
+
+export const isPickable = (node: FsNode, pickable: readonly Pickable[]): boolean =>
+  pickable.some((kind) => kind === node.kind)
 
 export type FileDialogResult =
   | { readonly kind: 'existing'; readonly id: NodeId; readonly parent: NodeId; readonly name: string }
@@ -25,6 +33,7 @@ export function chooseFile(
   input: string,
   mode: 'open' | 'save',
   defaultExtension = '',
+  pickable: readonly Pickable[] = DOCUMENTS,
 ): FileChoice {
   const typed = input
     .trim()
@@ -42,7 +51,7 @@ export function chooseFile(
   let name = path.slice(split + 1)
   if (defaultExtension && !extension(name)) name += `.${defaultExtension}`
   const existing = findChild(state, parent.id, name)
-  if (existing?.kind === 'file') {
+  if (existing && isPickable(existing, pickable)) {
     return { kind: 'existing', id: existing.id, parent: parent.id, name: existing.name }
   }
   if (existing) return { kind: 'error', message: 'This item is not a document.' }

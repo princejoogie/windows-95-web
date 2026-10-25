@@ -1,18 +1,23 @@
-import { useState } from 'react'
-import { resolvePath } from '../fs/fs'
+import { useEffect, useRef, useState } from 'react'
+import { pathOf, resolvePath } from '../fs/fs'
 import { fs } from '../fs/store'
+import { WINDOWS_DIR } from '../fs/types'
 import { icons } from '../icons'
 import { Button } from '../ui/Button'
 import { Dialog } from '../ui/Dialog'
+import { FileDialog, type FileTypeFilter } from '../ui/FileDialog'
 import { TextBox } from '../ui/fields'
 import { MenuList } from '../ui/Menu'
 import { MessageBox } from '../ui/MessageBox'
 import { shellEvents } from './events'
-import { RunBrowse } from './RunBrowse'
 import { findAppByExe } from './registry'
 import { launch, openNode } from './system'
 
 const HISTORY_KEY = 'w95.run.v1'
+const BROWSE_FILTERS: readonly FileTypeFilter[] = [
+  { label: 'Programs', extensions: ['exe', 'pif', 'com', 'bat'] },
+  { label: 'All Files (*.*)', extensions: ['*'] },
+]
 function history(): string[] {
   const raw = localStorage.getItem(HISTORY_KEY)
   if (!raw) return []
@@ -32,6 +37,12 @@ export function RunDialog({ onClose }: { onClose: () => void }) {
   const [value, setValue] = useState(() => recent[0] ?? '')
   const [drop, setDrop] = useState(false)
   const [browse, setBrowse] = useState(false)
+  const [picked, setPicked] = useState(0)
+  const form = useRef<HTMLFormElement>(null)
+  // Runs after Browse has handed focus back to its opener, so OK ends up focused, as in Windows 95.
+  useEffect(() => {
+    if (picked) form.current?.querySelector<HTMLButtonElement>('button[type="submit"]')?.focus()
+  }, [picked])
   const [error, setError] = useState<string | null>(null)
 
   const run = () => {
@@ -59,6 +70,7 @@ export function RunDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog title="Run" onClose={onClose} initialPosition={{ left: 4, bottom: 4 }} className="w-[347px]">
       <form
+        ref={form}
         className="flex flex-col gap-[10px] p-[10px]"
         onSubmit={(event) => {
           event.preventDefault()
@@ -122,11 +134,17 @@ export function RunDialog({ onClose }: { onClose: () => void }) {
         </div>
       </form>
       {browse && (
-        <RunBrowse
-          onClose={() => setBrowse(false)}
-          onSelect={(path) => {
-            setValue(path)
+        <FileDialog
+          mode="open"
+          title="Browse"
+          initialFolder={WINDOWS_DIR}
+          filters={BROWSE_FILTERS}
+          pickable={['file', 'program']}
+          onCancel={() => setBrowse(false)}
+          onSelect={(result) => {
+            if (result.kind === 'existing') setValue(pathOf(fs.get(), result.id))
             setBrowse(false)
+            setPicked((count) => count + 1)
           }}
         />
       )}
