@@ -99,10 +99,10 @@ export function reduceCalculator(state: Calculator, action: Action): Calculator 
   const value = Number(state.display)
   switch (key) {
     case 'MS':
-      return { ...state, memory: value, entry: 'replace' }
+      return { ...state, memory: value, entry: state.entry === 'waiting' ? 'waiting' : 'replace' }
     case 'M+':
       return Number.isFinite(state.memory + value)
-        ? { ...state, memory: state.memory + value, entry: 'replace' }
+        ? { ...state, memory: state.memory + value, entry: state.entry === 'waiting' ? 'waiting' : 'replace' }
         : state
     case 'back':
       return state.entry === 'typing'
@@ -120,6 +120,7 @@ export function reduceCalculator(state: Calculator, action: Action): Calculator 
     case 'sign':
       return {
         ...state,
+        entry: state.entry === 'waiting' ? 'replace' : state.entry,
         display:
           value === 0 ? '0' : state.display.startsWith('-') ? state.display.slice(1) : `-${state.display}`,
       }

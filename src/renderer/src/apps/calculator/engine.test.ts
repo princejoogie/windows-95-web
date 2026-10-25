@@ -72,4 +72,9 @@ describe('Windows standard calculator', () => {
     expect(press('7', pasted).display).toBe('7')
     expect(press('.5', pasted).display).toBe('0.5')
   })
+  it('distinguishes a signed operand from memory commands while waiting', () => {
+    expect(press('*2=', key(press('5+'), 'sign')).display).toBe('0')
+    expect(press('*2=', key(press('5+'), 'MS')).display).toBe('10')
+    expect(press('*2=', key(press('5+'), 'M+')).display).toBe('10')
+  })
 })
