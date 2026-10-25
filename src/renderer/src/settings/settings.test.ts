@@ -11,12 +11,23 @@ describe('persistent settings', () => {
       type: 'apply',
       patch: {
         pattern: 'Bricks',
+        customPattern: [128, 8, 8, 8, 255, 128, 128, 128],
         wallpaper: 'Setup',
         wallpaperMode: 'tile',
         clockOffset: 3600000,
         appearance: { scheme: 'Eggplant', colors: { title: '#123456' } },
         keyboard: { repeatDelay: 250, repeatRate: 30, cursorBlink: 0 },
         accessibility: { ...defaultSettings.accessibility, stickyKeys: true },
+        network: {
+          ...defaultSettings.network,
+          computer: 'PENTIUM',
+          workgroup: 'HOME',
+          components: ['TCP/IP'],
+        },
+        passwords: { ...defaultSettings.passwords, separateProfiles: true },
+        multimedia: { ...defaultSettings.multimedia, playbackVolume: 25 },
+        dialing: { ...defaultSettings.dialing, areaCode: '02', tone: false },
+        joystick: { type: 'Gamepad' },
       },
     })
     expect(parseSettings(JSON.parse(JSON.stringify(settings)))).toEqual(settings)
@@ -29,11 +40,19 @@ describe('persistent settings', () => {
       mouse: { doubleClickMs: 0 },
       clockOffset: Number.NaN,
       appearance: { scheme: 'missing', colors: { title: 'red' } },
+      network: { components: ['TCP/IP', 'Unknown protocol', 42], workgroup: false },
+      multimedia: { playbackVolume: 200, videoSize: 'invalid' },
+      customPattern: [256, 0, 0, 0, 0, 0, 0, 0],
     })
     expect(result.desktopColor).toBe('#008080')
     expect(result.mouse.doubleClickMs).toBe(100)
     expect(result.appearance).toEqual(defaultSettings.appearance)
     expect(result.clockOffset).toBe(0)
+    expect(result.network.components).toEqual(['TCP/IP'])
+    expect(result.network.workgroup).toBe('WORKGROUP')
+    expect(result.multimedia.playbackVolume).toBe(100)
+    expect(result.multimedia.videoSize).toBe('Original size')
+    expect(result.customPattern).toBeNull()
   })
 
   it('applies only changed fields so two open property sheets do not overwrite each other', () => {
@@ -90,6 +109,17 @@ describe('Windows desktop backgrounds', () => {
       images.add(image)
     }
     expect(images.size).toBe(20)
+  })
+
+  it('uses edited pattern pixels in the desktop background', () => {
+    const pattern = {
+      ...defaultSettings,
+      pattern: 'Bricks',
+      customPattern: [0, 0, 0, 0, 0, 0, 0, 0],
+    } satisfies typeof defaultSettings
+    expect(desktopBackground(pattern)['--desktop-image']).not.toBe(
+      desktopBackground({ ...pattern, customPattern: null })['--desktop-image'],
+    )
   })
 
   it('centers or tiles wallpaper over a repeating pattern at its native size', () => {

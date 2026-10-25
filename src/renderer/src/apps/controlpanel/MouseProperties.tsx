@@ -1,13 +1,35 @@
 import { useRef, useState } from 'react'
+import { Button, ComboBox, ListBox } from '../../ui'
 import { Checkbox, GroupBox, Radio } from '../../ui/fields'
 import { appletIcons } from './icons'
+import { DeviceGeneral } from './OtherApplets'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
+
+const pointerFiles = import.meta.glob<string>('../../assets/system/*.cur', {
+  query: '?url',
+  import: 'default',
+  eager: true,
+})
+const pointers = [
+  { name: 'Normal Select', file: 'arrow_r' },
+  { name: 'Help Select', file: 'help_r' },
+  { name: 'Working in Background', file: 'busy_r' },
+  { name: 'Busy', file: 'wait_r' },
+  { name: 'Text Select', file: 'beam_r' },
+  { name: 'Unavailable', file: 'no_r' },
+  { name: 'Vertical Resize', file: 'size4_r' },
+  { name: 'Horizontal Resize', file: 'size3_r' },
+  { name: 'Diagonal Resize 1', file: 'size1_r' },
+  { name: 'Diagonal Resize 2', file: 'size2_r' },
+  { name: 'Move', file: 'move_r' },
+]
 
 export function MouseProperties({ onClose }: { onClose: () => void }) {
   const state = useSettingsDraft()
   const { draft, change } = state
   const lastClick = useRef<number | null>(null)
   const [open, setOpen] = useState(false)
+  const [pointer, setPointer] = useState('Normal Select')
   const mouse = draft.mouse
   return (
     <PropertySheet
@@ -36,6 +58,18 @@ export function MouseProperties({ onClose }: { onClose: () => void }) {
                       onChange={() => change({ mouse: { ...mouse, swapped: true } })}
                     />
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <p>
+                    Left Button:
+                    <br />
+                    {mouse.swapped ? 'Context Menu, Special Drag' : 'Normal Select, Normal Drag'}
+                  </p>
+                  <p>
+                    Right Button:
+                    <br />
+                    {mouse.swapped ? 'Normal Select, Normal Drag' : 'Context Menu, Special Drag'}
+                  </p>
                 </div>
               </GroupBox>
               <GroupBox label="Double-click speed">
@@ -97,6 +131,53 @@ export function MouseProperties({ onClose }: { onClose: () => void }) {
           ),
         },
         {
+          label: 'Pointers',
+          content: (
+            <>
+              <p className="mb-2 mt-2">Scheme:</p>
+              <div className="flex gap-2">
+                <ComboBox
+                  aria-label="Pointer scheme"
+                  value="(None)"
+                  options={[{ key: '(None)', label: '(None)' }]}
+                  onChange={() => {}}
+                  className="flex-1"
+                />
+                <Button disabled>Save As...</Button>
+                <Button disabled>Delete</Button>
+              </div>
+              <p className="mt-4 mb-2">Customize:</p>
+              <ListBox
+                label="Mouse pointers"
+                items={pointers.map((item) => item.name)}
+                value={pointer}
+                onChange={setPointer}
+                className="h-[175px]"
+                render={(name) => (
+                  <span className="flex justify-between items-center h-[16px]">
+                    <span>{name}</span>
+                    <img
+                      src={
+                        pointerFiles[
+                          `../../assets/system/${pointers.find((item) => item.name === name)?.file}.cur`
+                        ]
+                      }
+                      alt=""
+                      width={16}
+                      height={16}
+                      className="pixelated"
+                    />
+                  </span>
+                )}
+              />
+              <div className="flex justify-end gap-2 mt-3">
+                <Button disabled>Use Default</Button>
+                <Button disabled>Browse...</Button>
+              </div>
+            </>
+          ),
+        },
+        {
           label: 'Motion',
           content: (
             <>
@@ -127,6 +208,10 @@ export function MouseProperties({ onClose }: { onClose: () => void }) {
               </GroupBox>
             </>
           ),
+        },
+        {
+          label: 'General',
+          content: <DeviceGeneral name="Standard mouse" manufacturer="(Standard mouse types)" />,
         },
       ]}
     />

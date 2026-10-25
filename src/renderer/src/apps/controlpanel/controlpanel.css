@@ -1,57 +1,19 @@
-.cp-folder {
-  color: var(--color-text);
-}
-
-.cp-icons {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 92px);
-  align-content: start;
-  gap: 8px 2px;
-  padding: 12px 5px;
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  background: var(--color-window, #ffffff);
-  color: var(--color-window-text, #000000);
-}
-
-.cp-icon {
-  width: 92px;
-  min-height: 67px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 2px;
-  outline: none;
-}
-
-.cp-icon img {
-  width: 32px;
-  height: 32px;
-}
-
-.cp-icon span {
-  padding: 1px 2px;
-  max-width: 86px;
-  text-align: center;
-  line-height: 13px;
-}
-
-.cp-icon[aria-selected="true"] span {
-  background: var(--color-select);
-  color: var(--color-select-text);
-  outline: 1px dotted var(--color-select-text);
-  outline-offset: -1px;
-}
-
-.cp-icon[aria-selected="true"] img {
-  filter: brightness(0.7);
-}
-
 .cp-sheet {
   max-width: calc(100vw - 24px);
   padding: 9px 6px 7px;
+}
+
+.cp-form-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.cp-form-row > input {
+  margin-left: auto;
+  width: 190px;
+  min-width: 0;
 }
 
 .cp-dialog {
@@ -195,13 +157,6 @@
     inset 1px 1px var(--color-hilight),
     inset -1px -1px var(--color-dark),
     inset -2px -2px var(--color-shadow);
-}
-
-.cp-fonts {
-  height: 270px;
-  overflow: auto;
-  padding: 5px;
-  background: var(--color-window);
 }
 
 @keyframes cp-blink {
