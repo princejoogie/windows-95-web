@@ -1,7 +1,18 @@
-import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import {
+  type CSSProperties,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { createPortal } from 'react-dom'
+import { WindowContext } from '../shell/context'
+import { shellEvents } from '../shell/events'
+import { type MenuState, menuKey } from '../shell/menuMachine'
 import type { Point } from '../shell/types'
-import { Accel } from './text'
+import { Accel, accelKey } from './text'
 
 export type MenuEntry =
   | {
@@ -16,7 +27,94 @@ export type MenuEntry =
     }
   | 'separator'
 
-const SUBMENU_DELAY_MS = 300
+let activeMenu: symbol | null = null
+let tracking = false
+export const menuIsActive = () => activeMenu !== null
+export function beginMenuTracking() {
+  tracking = true
+}
+
+function useMenu(
+  roots: readonly (readonly MenuEntry[])[],
+  initial: MenuState,
+  bar: boolean,
+  onClose?: () => void,
+  titles: readonly string[] = [],
+) {
+  const [state, setState] = useState<MenuState>(initial)
+  const token = useRef(Symbol())
+  const previousFocus = useRef<HTMLElement | null>(null)
+  const restoreFocus = useCallback(() => {
+    const previous = previousFocus.current
+    previousFocus.current = null
+    if (previous?.isConnected) previous.focus({ preventScroll: true })
+  }, [])
+  const latest = useRef({ roots, state, onClose, titles })
+  latest.current = { roots, state, onClose, titles }
+  const active = state.kind !== 'closed'
+  useEffect(() => {
+    if (!active) return
+    activeMenu = token.current
+    const previous = document.activeElement
+    previousFocus.current = previous instanceof HTMLElement ? previous : null
+    if (previous instanceof HTMLElement) previous.blur()
+    const key = (event: KeyboardEvent) => {
+      if (activeMenu !== token.current) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      const title = event.altKey
+        ? latest.current.titles.findIndex((label) => accelKey(label) === event.key.toLowerCase())
+        : -1
+      const next: ReturnType<typeof menuKey> =
+        title >= 0
+          ? { state: { kind: 'open', title, path: [0] } }
+          : menuKey(latest.current.state, event.key, latest.current.roots, bar, latest.current.titles)
+      if (next.command) restoreFocus()
+      setState(next.state)
+      if (next.state.kind === 'closed') latest.current.onClose?.()
+      if (next.command) {
+        shellEvents.emit('menu-command')
+        next.command.onSelect?.()
+      }
+    }
+    const swallow = (event: KeyboardEvent) => {
+      if (activeMenu === token.current) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+      }
+    }
+    document.addEventListener('keydown', key, true)
+    document.addEventListener('keypress', swallow, true)
+    return () => {
+      if (activeMenu === token.current) activeMenu = null
+      tracking = false
+      document.removeEventListener('keydown', key, true)
+      document.removeEventListener('keypress', swallow, true)
+      restoreFocus()
+    }
+  }, [active, bar, restoreFocus])
+  const close = () => {
+    setState({ kind: 'closed' })
+    onClose?.()
+  }
+  const pick = (item: Exclude<MenuEntry, 'separator'>, path: readonly number[]) => {
+    if (item.disabled) return
+    if (item.items)
+      setState({
+        kind: tracking ? 'tracking' : 'open',
+        title: state.kind === 'closed' ? 0 : state.title,
+        path: [...path, -1],
+      })
+    else {
+      restoreFocus()
+      close()
+      shellEvents.emit('menu-command')
+      item.onSelect?.()
+    }
+  }
+  return { state, setState, close, pick }
+}
+type Controller = ReturnType<typeof useMenu>
 
 function Arrow() {
   return (
@@ -33,114 +131,129 @@ function Arrow() {
   )
 }
 
-function Check({ on }: { on: boolean }) {
-  if (!on) return null
-  return (
-    <svg
-      aria-hidden="true"
-      width="7"
-      height="7"
-      viewBox="0 0 7 7"
-      shapeRendering="crispEdges"
-      className="fill-current"
-    >
-      <path d="M6 0h1v3H6v1H5v1H4v1H3v1H2V6H1V5H0V2h1v1h1v1h1V3h1V2h1V1h1z" />
-    </svg>
-  )
-}
-
-interface MenuListProps {
+function MenuTree({
+  items,
+  controller,
+  prefix = [],
+  density = 'menu',
+  style,
+  className = '',
+  label,
+}: {
   items: readonly MenuEntry[]
-  onClose: () => void
-  style?: CSSProperties
-  className?: string
-}
-
-/** A popup menu. Submenus open on hover after a short delay, the way Windows does it. */
-export function MenuList({ items, onClose, style, className = '' }: MenuListProps) {
-  const [hot, setHot] = useState<number | null>(null)
-  const [open, setOpen] = useState<number | null>(null)
-  const [lift, setLift] = useState(0)
+  controller: Controller
+  prefix?: readonly number[]
+  density?: 'menu' | 'start' | 'start-root'
+  style?: CSSProperties | undefined
+  className?: string | undefined
+  label?: string | undefined
+}) {
+  const { state, setState, pick } = controller
+  const path = state.kind === 'open' || state.kind === 'tracking' ? state.path : []
+  const hot = path[prefix.length]
   const ref = useRef<HTMLDivElement>(null)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const [shift, setShift] = useState({ x: 0, y: 0 })
   useEffect(() => () => clearTimeout(timer.current), [])
-
-  // A submenu that would run off the bottom of the screen moves up until it fits.
   useLayoutEffect(() => {
     const box = ref.current?.getBoundingClientRect()
-    if (box) setLift(Math.max(0, Math.min(box.bottom - innerHeight, box.top)))
-  }, [])
-
-  const hover = (index: number, hasSubmenu: boolean) => {
-    setHot(index)
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => setOpen(hasSubmenu ? index : null), SUBMENU_DELAY_MS)
-  }
-
+    if (!box) return
+    const parentWidth = ref.current?.parentElement?.getBoundingClientRect().width ?? 0
+    setShift({
+      x:
+        box.right > innerWidth && prefix.length > 0
+          ? Math.max(-box.left, -box.width - parentWidth + 3)
+          : Math.min(0, innerWidth - box.right),
+      y: Math.min(0, innerHeight - box.bottom),
+    })
+  }, [prefix.length])
   return (
     <div
       ref={ref}
       role="menu"
+      aria-label={label}
       className={`absolute z-50 min-w-[120px] p-[3px] bg-face bevel-window ${className}`}
-      style={{ ...style, marginTop: -lift }}
+      style={{ ...style, marginLeft: shift.x, marginTop: shift.y }}
       onPointerDown={(event) => {
         event.preventDefault()
         event.stopPropagation()
+        tracking = true
       }}
     >
       {items.map((item, index) => {
-        if (item === 'separator') {
-          const next = items[index + 1]
+        if (item === 'separator')
           return (
-            <div
-              key={next && next !== 'separator' ? `before-${next.label}` : 'trailing-separator'}
-              className="my-[3px] mx-[1px] h-[2px] border-t border-shadow border-b border-b-white"
+            <hr
+              key={`separator-${items.slice(index + 1).find((next) => next !== 'separator')?.label ?? 'last'}`}
+              className="my-[3px] mx-px h-[2px] border-t border-shadow border-b border-b-white"
             />
           )
-        }
-        const submenu = item.items
-        const lit = hot === index
+        const selected = hot === index
+        const itemPath = [...prefix, index]
+        const expanded = selected && path.length > itemPath.length && Boolean(item.items)
         return (
           <div key={item.label} className="relative">
             <button
               type="button"
               role="menuitem"
+              tabIndex={-1}
               aria-disabled={item.disabled}
-              aria-haspopup={submenu ? 'menu' : undefined}
-              className={`flex w-full text-left outline-none items-center h-[18px] pr-[6px] whitespace-nowrap ${lit ? 'bg-select text-white' : ''}
-                ${item.disabled ? (lit ? 'text-shadow' : 'text-embossed') : ''} ${item.bold ? 'font-bold' : ''}`}
-              onPointerEnter={() => hover(index, Boolean(submenu))}
-              onPointerLeave={() =>
-                setHot((current) => (current === index && open !== index ? null : current))
-              }
-              onClick={() => {
-                if (item.disabled) return
-                if (submenu) {
+              aria-haspopup={item.items ? 'menu' : undefined}
+              aria-expanded={item.items ? expanded : undefined}
+              className={`flex w-full text-left outline-none items-center pr-[6px] whitespace-nowrap ${density === 'start-root' ? 'h-[32px] gap-[8px] pl-[4px]' : density === 'start' ? 'h-[20px]' : 'h-[17px]'} ${selected ? 'bg-select text-white' : ''} ${item.disabled ? (selected ? 'text-shadow' : 'text-embossed') : ''} ${item.bold ? 'font-bold' : ''}`}
+              onPointerEnter={() => {
+                clearTimeout(timer.current)
+                if (state.kind === 'closed' || state.kind === 'bar-armed') return
+                if (!selected) setState({ ...state, path: itemPath })
+                timer.current = setTimeout(() => {
+                  if (item.items && !item.disabled)
+                    setState({
+                      kind: tracking ? 'tracking' : 'open',
+                      title: state.title,
+                      path: [...itemPath, -1],
+                    })
+                }, 300)
+              }}
+              onPointerUp={() => {
+                if (tracking || state.kind === 'tracking') {
+                  tracking = false
                   clearTimeout(timer.current)
-                  setOpen(index)
-                  return
+                  pick(item, itemPath)
                 }
-                onClose()
-                item.onSelect?.()
+              }}
+              onClick={(event) => {
+                if (event.detail === 0) pick(item, itemPath)
               }}
             >
-              <span className="w-[20px] flex justify-center shrink-0">
+              <span
+                className={`${density === 'start-root' ? 'size-8' : 'w-[20px]'} flex justify-center shrink-0`}
+              >
                 {item.icon ? (
-                  <img src={item.icon} alt="" className="size-4" />
-                ) : (
-                  <Check on={Boolean(item.checked)} />
-                )}
+                  <img
+                    src={item.icon}
+                    alt=""
+                    draggable={false}
+                    className={density === 'start-root' ? 'size-8' : 'size-4'}
+                  />
+                ) : item.checked ? (
+                  <svg width="7" height="7" viewBox="0 0 7 7" className="fill-current">
+                    <title>Checked</title>
+                    <path d="M6 0h1v3H6v1H5v1H4v1H3v1H2V6H1V5H0V2h1v1h1v1h1V3h1V2h1V1h1z" />
+                  </svg>
+                ) : null}
               </span>
               <span className="flex-1 pr-[16px]">
                 <Accel label={item.label} />
               </span>
               {item.shortcut && <span className="pl-[12px]">{item.shortcut}</span>}
-              {submenu && <Arrow />}
+              {item.items && <Arrow />}
             </button>
-            {submenu && open === index && (
-              <MenuList
-                items={submenu}
-                onClose={onClose}
+            {item.items && expanded && (
+              <MenuTree
+                items={item.items}
+                controller={controller}
+                prefix={itemPath}
+                density={density === 'menu' ? 'menu' : 'start'}
                 style={{ left: '100%', top: -3 }}
                 className="ml-[-3px]"
               />
@@ -152,52 +265,133 @@ export function MenuList({ items, onClose, style, className = '' }: MenuListProp
   )
 }
 
+export function MenuList({
+  items,
+  onClose,
+  style,
+  className,
+  density = 'menu',
+  label,
+}: {
+  items: readonly MenuEntry[]
+  onClose: () => void
+  style?: CSSProperties
+  className?: string
+  density?: 'menu' | 'start' | 'start-root'
+  label?: string
+}) {
+  const controller = useMenu(
+    [items],
+    { kind: tracking ? 'tracking' : 'open', title: 0, path: [-1] },
+    false,
+    onClose,
+  )
+  return (
+    <MenuTree
+      items={items}
+      controller={controller}
+      style={style}
+      className={className}
+      density={density}
+      label={label}
+    />
+  )
+}
+
 export interface MenuBarMenu {
   readonly label: string
   readonly items: readonly MenuEntry[]
 }
-
-/** The File, Edit, Help strip under a title bar. */
 export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
-  const [open, setOpen] = useState<number | null>(null)
   const root = useRef<HTMLDivElement>(null)
-
+  const owner = useContext(WindowContext)
+  const focused = owner?.api.focused ?? true
+  const controller = useMenu(
+    menus.map((menu) => menu.items),
+    { kind: 'closed' },
+    true,
+    undefined,
+    menus.map((menu) => menu.label),
+  )
+  const { state, setState, close } = controller
+  const latest = useRef(menus)
+  latest.current = menus
   useEffect(() => {
-    if (open === null) return
-    const close = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(null)
+    if (!focused) {
+      setState({ kind: 'closed' })
+      return
     }
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(null)
+    let alt = false
+    const keyDown = (event: KeyboardEvent) => {
+      if (menuIsActive() || (event.target instanceof Element && event.target.closest('[role="dialog"]')))
+        return
+      if (event.key === 'Alt') {
+        alt = true
+        return
+      }
+      if (event.altKey) {
+        alt = false
+        const title = latest.current.findIndex((menu) => accelKey(menu.label) === event.key.toLowerCase())
+        if (title >= 0) {
+          event.preventDefault()
+          event.stopImmediatePropagation()
+          setState({ kind: 'open', title, path: [0] })
+        }
+      }
+      if (event.key === 'F10' && !event.shiftKey) {
+        event.preventDefault()
+        setState({ kind: 'bar-armed', title: 0 })
+      }
     }
-    document.addEventListener('pointerdown', close, true)
-    document.addEventListener('keydown', onEscape)
+    const keyUp = (event: KeyboardEvent) => {
+      if (event.key === 'Alt' && alt) {
+        alt = false
+        event.preventDefault()
+        setState({ kind: 'bar-armed', title: 0 })
+      }
+    }
+    document.addEventListener('keydown', keyDown, true)
+    document.addEventListener('keyup', keyUp, true)
     return () => {
-      document.removeEventListener('pointerdown', close, true)
-      document.removeEventListener('keydown', onEscape)
+      document.removeEventListener('keydown', keyDown, true)
+      document.removeEventListener('keyup', keyUp, true)
     }
-  }, [open])
-
+  }, [focused, setState])
+  useEffect(() => {
+    if (state.kind === 'closed') return
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !root.current?.contains(event.target)) close()
+    }
+    document.addEventListener('pointerdown', outside, true)
+    return () => document.removeEventListener('pointerdown', outside, true)
+  })
   return (
     <div ref={root} role="menubar" className="relative flex h-[19px] shrink-0 bg-face">
-      {menus.map((menu, index) => (
+      {menus.map((menu, title) => (
         <div key={menu.label} className="relative">
           <button
             type="button"
-            className={`h-[19px] px-[6px] outline-none ${open === index ? 'bevel-shallow' : ''}`}
+            tabIndex={-1}
+            className={`h-[19px] px-[6px] outline-none ${state.kind !== 'closed' && state.title === title ? (state.kind === 'bar-armed' ? 'bg-select text-white' : 'bevel-shallow') : ''}`}
             onPointerDown={(event) => {
               event.preventDefault()
               event.stopPropagation()
-              setOpen(open === index ? null : index)
+              beginMenuTracking()
+              setState(
+                state.kind !== 'closed' && state.title === title
+                  ? { kind: 'closed' }
+                  : { kind: 'tracking', title, path: [-1] },
+              )
             }}
-            onPointerEnter={() => open !== null && setOpen(index)}
+            onPointerEnter={() => {
+              if (state.kind === 'open' || state.kind === 'tracking')
+                setState({ ...state, title, path: [-1] })
+            }}
           >
-            <span className={open === index ? 'relative left-px top-px' : ''}>
-              <Accel label={menu.label} />
-            </span>
+            <Accel label={menu.label} />
           </button>
-          {open === index && (
-            <MenuList items={menu.items} onClose={() => setOpen(null)} style={{ left: 0, top: '100%' }} />
+          {(state.kind === 'open' || state.kind === 'tracking') && state.title === title && (
+            <MenuTree items={menu.items} controller={controller} style={{ left: 0, top: '100%' }} />
           )}
         </div>
       ))}
@@ -205,7 +399,6 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
   )
 }
 
-/** A right-click menu at a viewport point. It flips to stay on screen. */
 export function ContextMenu({
   at,
   items,
@@ -217,31 +410,23 @@ export function ContextMenu({
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState(at)
-
   useLayoutEffect(() => {
     const box = ref.current?.firstElementChild?.getBoundingClientRect()
-    if (!box) return
-    setPosition({
-      x: at.x + box.width > innerWidth ? Math.max(0, at.x - box.width) : at.x,
-      y: at.y + box.height > innerHeight ? Math.max(0, at.y - box.height) : at.y,
-    })
+    if (box)
+      setPosition({
+        x: Math.max(0, Math.min(at.x, innerWidth - box.width)),
+        y: Math.max(0, Math.min(at.y, innerHeight - box.height)),
+      })
   }, [at])
-
   useEffect(() => {
-    const close = () => onClose()
-    const onEscape = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
-    document.addEventListener('pointerdown', close)
-    document.addEventListener('keydown', onEscape)
-    addEventListener('blur', close)
-    return () => {
-      document.removeEventListener('pointerdown', close)
-      document.removeEventListener('keydown', onEscape)
-      removeEventListener('blur', close)
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !ref.current?.contains(event.target)) onClose()
     }
+    document.addEventListener('pointerdown', outside, true)
+    return () => document.removeEventListener('pointerdown', outside, true)
   }, [onClose])
-
   return createPortal(
-    <div ref={ref} className="fixed z-[10000]" style={{ left: position.x, top: position.y }}>
+    <div ref={ref} className="fixed z-[10050]" style={{ left: position.x, top: position.y }}>
       <MenuList items={items} onClose={onClose} style={{ position: 'relative' }} />
     </div>,
     document.body,

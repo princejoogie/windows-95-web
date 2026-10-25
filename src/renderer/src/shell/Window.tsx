@@ -7,21 +7,19 @@ import {
   useRef,
   useState,
 } from 'react'
-import { createPortal } from 'react-dom'
+import { useModalCount } from '../ui/Dialog'
 import { TitleBar, TitleButton } from '../ui/TitleBar'
 import { registerCloseRequest } from './closeRequests'
 import { WindowContext } from './context'
+import { Outline, type Rect } from './Outline'
 import { smallIcon } from './registry'
+import { openSystemMenu, registerWindowControls } from './SystemMenu'
 import { windowsStore } from './system'
+import { animateWindow } from './transitions'
 import type { AppManifest, LaunchArgs, Size, WindowApi } from './types'
 import type { WindowState } from './windows'
 
-interface Rect {
-  x: number
-  y: number
-  width: number
-  height: number
-}
+export { Outline } from './Outline'
 
 interface Edges {
   n?: boolean
@@ -37,6 +35,7 @@ interface Drag {
   pointer: { x: number; y: number }
   frame: Rect
   client: Size
+  origin: { x: number; y: number }
   started: boolean
 }
 
@@ -53,30 +52,24 @@ const HANDLES: { edges: Edges; className: string; cursor: string }[] = [
   { edges: { s: true }, className: 'left-[4px] right-[4px] bottom-0 h-[4px]', cursor: 'ns-resize' },
   { edges: { w: true }, className: 'top-[4px] bottom-[4px] left-0 w-[4px]', cursor: 'ew-resize' },
   { edges: { e: true }, className: 'top-[4px] bottom-[4px] right-0 w-[4px]', cursor: 'ew-resize' },
-  { edges: { n: true, w: true }, className: 'left-0 top-0 size-[6px]', cursor: 'nwse-resize' },
-  { edges: { n: true, e: true }, className: 'right-0 top-0 size-[6px]', cursor: 'nesw-resize' },
-  { edges: { s: true, w: true }, className: 'left-0 bottom-0 size-[6px]', cursor: 'nesw-resize' },
-  { edges: { s: true, e: true }, className: 'right-0 bottom-0 size-[12px]', cursor: 'nwse-resize' },
+  ...(['top', 'bottom'] as const).flatMap((vertical) =>
+    (['left', 'right'] as const).flatMap((horizontal) => {
+      const edges = {
+        n: vertical === 'top',
+        s: vertical === 'bottom',
+        w: horizontal === 'left',
+        e: horizontal === 'right',
+      }
+      const cursor = edges.n === edges.w ? 'nwse-resize' : 'nesw-resize'
+      return [
+        { edges, className: `${vertical}-0 ${horizontal}-0 w-[20px] h-[4px]`, cursor },
+        { edges, className: `${vertical}-0 ${horizontal}-0 w-[4px] h-[20px]`, cursor },
+      ]
+    }),
+  ),
 ]
 
 /** The dithered, color-inverting frame Windows 95 drags instead of the window itself. */
-function Outline({ rect }: { rect: Rect }) {
-  return createPortal(
-    <div
-      className="fixed z-[9999] pointer-events-none mix-blend-difference bg-[repeating-conic-gradient(#fff_0_25%,transparent_0_50%)] bg-size-[2px_2px]"
-      style={{
-        left: rect.x,
-        top: rect.y,
-        width: rect.width,
-        height: rect.height,
-        clipPath:
-          'polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, 4px 4px, 4px calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 4px, 4px 4px)',
-      }}
-    />,
-    document.body,
-  )
-}
-
 /** Keeps app content from re-rendering when only the frame moves. */
 const AppHost = memo(function AppHost({
   app,
@@ -106,6 +99,9 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
   const drag = useRef<Drag | null>(null)
   const [outline, setOutline] = useState<Rect | null>(null)
   const [dialogHost, setDialogHost] = useState<HTMLDivElement | null>(null)
+  const modalCount = useModalCount(dialogHost)
+  const lastControl = useRef<HTMLElement | null>(null)
+  const keyboard = useRef<{ mode: 'move' | 'size'; frame: Rect; client: Size } | null>(null)
   const resizable = app.window.kind === 'resizable'
   const closeHandler = useRef<(() => Promise<boolean>) | null>(null)
   const requestClose = useCallback(async () => {
@@ -127,7 +123,9 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
           if (closeHandler.current === handler) closeHandler.current = null
         }
       },
-      close: () => windowsStore.dispatch({ type: 'close', id }),
+      close: () => {
+        windowsStore.dispatch({ type: 'close', id })
+      },
     }),
     [id, focused, minimized],
   )
@@ -135,8 +133,68 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
 
   useEffect(() => {
     const frame = frameRef.current
-    if (focused && frame && !frame.contains(document.activeElement)) frame.focus({ preventScroll: true })
-  }, [focused])
+    if (focused && frame && !modalCount && !frame.contains(document.activeElement)) {
+      const control = lastControl.current?.isConnected
+        ? lastControl.current
+        : clientRef.current?.querySelector<HTMLElement>(
+            'textarea, input, button:not([disabled]):not([tabindex="-1"]), [tabindex="0"]',
+          )
+      ;(control ?? frame).focus({ preventScroll: true })
+    }
+  }, [focused, modalCount])
+
+  useEffect(
+    () =>
+      registerWindowControls(id, (mode) => {
+        const frame = frameRef.current?.getBoundingClientRect(),
+          client = clientRef.current?.getBoundingClientRect()
+        if (!frame || !client) return
+        windowsStore.dispatch({ type: 'focus', id })
+        keyboard.current = {
+          mode,
+          frame: { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
+          client: { width: client.width, height: client.height },
+        }
+        setOutline(keyboard.current.frame)
+      }),
+    [id],
+  )
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      const current = keyboard.current
+      if (!current) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      if (event.key === 'Enter' || event.key === 'Escape') {
+        if (event.key === 'Enter') {
+          const parent = frameRef.current?.parentElement?.getBoundingClientRect()
+          const position = { x: current.frame.x - (parent?.x ?? 0), y: current.frame.y - (parent?.y ?? 0) }
+          if (current.mode === 'move') windowsStore.dispatch({ type: 'move', id, position })
+          else windowsStore.dispatch({ type: 'resize', id, position, size: current.client })
+        }
+        keyboard.current = null
+        setOutline(null)
+        return
+      }
+      const amount = event.ctrlKey ? 1 : 8
+      const dx = event.key === 'ArrowRight' ? amount : event.key === 'ArrowLeft' ? -amount : 0
+      const dy = event.key === 'ArrowDown' ? amount : event.key === 'ArrowUp' ? -amount : 0
+      if (current.mode === 'move') {
+        current.frame.x += dx
+        current.frame.y += dy
+      } else {
+        const spec = app.window.kind === 'resizable' ? app.window : null
+        const width = Math.max(spec?.minWidth ?? 120, current.client.width + dx),
+          height = Math.max(spec?.minHeight ?? 40, current.client.height + dy)
+        current.frame.width += width - current.client.width
+        current.frame.height += height - current.client.height
+        current.client = { width, height }
+      }
+      setOutline({ ...current.frame })
+    }
+    document.addEventListener('keydown', key, true)
+    return () => document.removeEventListener('keydown', key, true)
+  }, [id, app.window])
 
   // A new window opens fully on screen. After that, a shrinking desktop only keeps its title bar reachable.
   const position = useRef(state.position)
@@ -159,14 +217,17 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
 
   const begin = (gesture: Gesture) => (event: ReactPointerEvent<HTMLElement>) => {
     if (event.button !== 0 || maximized) return
+    event.preventDefault()
     const frame = frameRef.current?.getBoundingClientRect()
+    const origin = frameRef.current?.parentElement?.getBoundingClientRect()
     const client = clientRef.current?.getBoundingClientRect()
     if (!frame || !client) return
     event.currentTarget.setPointerCapture(event.pointerId)
     drag.current = {
       gesture,
       pointer: { x: event.clientX, y: event.clientY },
-      frame: { x: state.position.x, y: state.position.y, width: frame.width, height: frame.height },
+      frame: { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
+      origin: { x: origin?.x ?? 0, y: origin?.y ?? 0 },
       client: { width: client.width, height: client.height },
       started: false,
     }
@@ -179,8 +240,12 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
     if (gesture.kind === 'move') {
       return {
         ...frame,
-        x: clamp(frame.x + dx, KEEP_VISIBLE - frame.width, desktop.width - KEEP_VISIBLE),
-        y: clamp(frame.y + dy, 0, desktop.height - 20),
+        x: clamp(
+          frame.x + dx,
+          current.origin.x + KEEP_VISIBLE - frame.width,
+          current.origin.x + desktop.width - KEEP_VISIBLE,
+        ),
+        y: clamp(frame.y + dy, current.origin.y, current.origin.y + desktop.height - 20),
       }
     }
     const spec = app.window.kind === 'resizable' ? app.window : null
@@ -213,21 +278,30 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
     if (!current?.started) return
     const rect = target(current, event)
     if (current.gesture.kind === 'move') {
-      windowsStore.dispatch({ type: 'move', id, position: { x: rect.x, y: rect.y } })
+      windowsStore.dispatch({
+        type: 'move',
+        id,
+        position: { x: rect.x - current.origin.x, y: rect.y - current.origin.y },
+      })
       return
     }
     const size = {
       width: current.client.width + rect.width - current.frame.width,
       height: current.client.height + rect.height - current.frame.height,
     }
-    windowsStore.dispatch({ type: 'resize', id, position: { x: rect.x, y: rect.y }, size })
+    windowsStore.dispatch({
+      type: 'resize',
+      id,
+      position: { x: rect.x - current.origin.x, y: rect.y - current.origin.y },
+      size,
+    })
   }
 
   const gestureHandlers = { onPointerMove, onPointerUp, onPointerCancel: onPointerUp }
-  const toggleMaximize = () => resizable && windowsStore.dispatch({ type: 'toggleMaximize', id })
+  const toggleMaximize = () => resizable && animateWindow({ type: 'toggleMaximize', id })
 
   const frameStyle = maximized
-    ? { left: 0, top: 0, width: desktop.width, height: desktop.height, zIndex }
+    ? { left: -4, top: -4, width: desktop.width + 8, height: desktop.height + 8, zIndex }
     : { left: state.position.x, top: state.position.y, zIndex }
 
   return (
@@ -237,24 +311,51 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
       aria-label={state.title}
       data-window={id}
       tabIndex={-1}
-      className={`absolute flex-col p-[3px] bg-face bevel-window outline-none ${minimized ? 'hidden' : 'flex'}`}
+      className={`absolute flex-col ${resizable ? 'p-[4px]' : 'p-[3px]'} bg-face bevel-window outline-none ${minimized ? 'hidden' : 'flex'}`}
       style={frameStyle}
       onPointerDownCapture={() => {
         if (!focused) windowsStore.dispatch({ type: 'focus', id })
       }}
+      onFocusCapture={(event) => {
+        if (
+          event.target instanceof HTMLElement &&
+          event.target !== frameRef.current &&
+          !event.target.closest('[role="dialog"]') &&
+          clientRef.current?.contains(event.target)
+        )
+          lastControl.current = event.target
+      }}
     >
       <TitleBar
         title={state.title}
-        active={focused}
+        active={focused && modalCount === 0}
         icon={smallIcon(app)}
-        onPointerDown={begin({ kind: 'move' })}
-        onDoubleClick={toggleMaximize}
+        onPointerDown={(event) => {
+          if (event.target instanceof HTMLImageElement) {
+            event.preventDefault()
+            event.stopPropagation()
+            const box = frameRef.current?.getBoundingClientRect()
+            if (box && event.button === 0) openSystemMenu(id, { x: box.x, y: box.y + 22 })
+          } else begin({ kind: 'move' })(event)
+        }}
+        onContextMenu={(event) => {
+          event.preventDefault()
+          openSystemMenu(id, { x: event.clientX, y: event.clientY })
+        }}
+        onDoubleClick={(event) => {
+          if (event.target instanceof HTMLImageElement) {
+            event.stopPropagation()
+            void requestClose()
+          } else void toggleMaximize()
+        }}
         {...gestureHandlers}
       >
         <TitleButton
           glyph="minimize"
           label="Minimize"
-          onClick={() => windowsStore.dispatch({ type: 'minimize', id })}
+          onClick={() => {
+            void animateWindow({ type: 'minimize', id })
+          }}
         />
         <TitleButton
           glyph={maximized ? 'restore' : 'maximize'}

@@ -1,3 +1,4 @@
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import { CHANNELS, type HostEvent } from '../shared/ipc'
@@ -16,6 +17,17 @@ const rendererDir = join(import.meta.dirname, '../renderer')
 let allowQuit = false
 
 function createWindow(): BrowserWindow {
+  mkdirSync(app.getPath('userData'), { recursive: true })
+  const preference = join(app.getPath('userData'), 'shell-window.json')
+  let fullscreen = false
+  try {
+    const saved: unknown = JSON.parse(readFileSync(preference, 'utf8'))
+    fullscreen = Boolean(
+      saved && typeof saved === 'object' && 'fullscreen' in saved && saved.fullscreen === true,
+    )
+  } catch {
+    /* The first launch has no window preference. */
+  }
   const win = new BrowserWindow({
     width: 1024,
     height: 768,
@@ -24,6 +36,7 @@ function createWindow(): BrowserWindow {
     minHeight: 480,
     show: false,
     frame: false,
+    fullscreen,
     backgroundColor: '#000000',
     title: 'Windows 95',
     icon: join(rendererDir, 'icon.ico'),
@@ -35,6 +48,8 @@ function createWindow(): BrowserWindow {
   })
 
   win.once('ready-to-show', () => win.show())
+  win.on('enter-full-screen', () => writeFileSync(preference, JSON.stringify({ fullscreen: true })))
+  win.on('leave-full-screen', () => writeFileSync(preference, JSON.stringify({ fullscreen: false })))
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   win.webContents.on('will-navigate', (event) => event.preventDefault())
   win.webContents.on('before-input-event', (event, input) => {
@@ -42,7 +57,8 @@ function createWindow(): BrowserWindow {
       event.preventDefault()
       win.webContents.send(CHANNELS.hostEvent, message)
     }
-    if (input.type === 'keyUp' && input.key === 'Alt') forward({ type: 'alt-release' })
+    if (input.type === 'keyUp' && input.key === 'Alt')
+      win.webContents.send(CHANNELS.hostEvent, { type: 'alt-release' } satisfies HostEvent)
     if (input.type === 'keyDown') {
       if (input.alt && input.key === 'F4') forward({ type: 'alt-f4' })
       else if (input.alt && input.key === 'Tab') forward({ type: 'alt-tab', reverse: input.shift })

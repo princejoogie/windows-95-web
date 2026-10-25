@@ -15,7 +15,6 @@ import { ContextMenu } from '../ui/Menu'
 import { MessageBox } from '../ui/MessageBox'
 import { PropertiesSheet } from '../ui/PropertiesSheet'
 import { bytesOf, isHidden, typeName } from '../ui/properties'
-import { TooltipLayer } from '../ui/Tooltip'
 import { CreateShortcut } from './CreateShortcut'
 import {
   type Clip,
@@ -846,7 +845,6 @@ export function Desktop({ size }: { size: Size }) {
           }}
         />
       )}
-      <TooltipLayer />
     </div>
   )
 }

@@ -152,20 +152,27 @@ if (phase === 'smoke') {
   shot('window-resized')
   const resized = rectangle(first)
   browser('click', `${first} button[aria-label="Maximize"]`)
-  check(rectangle(first).height === rectangle('[data-desktop]').height, 'Maximize fills the desktop')
+  wait(`document.querySelector('${first}').style.left === '-4px'`)
+  check(
+    rectangle(first).height === rectangle('[data-desktop]').height + 8,
+    'Maximize hides the sizing border off screen',
+  )
   shot('window-maximized')
   browser('click', `${first} button[aria-label="Restore"]`)
+  wait(`document.querySelector('${first}').getBoundingClientRect().width === ${resized.width}`)
   check(
     rectangle(first).width === resized.width && rectangle(first).x === resized.x,
     'Restore recovers the previous bounds',
   )
   browser('click', `${first} button[aria-label="Minimize"]`)
+  wait('getComputedStyle(document.querySelector(`[data-window="1"]`)).display === `none`')
   check(
     evaluate('getComputedStyle(document.querySelector(`[data-window="1"]`)).display === `none`'),
     'Minimize hides the frame',
   )
   shot('window-minimized')
   browser('click', '[data-task="1"]')
+  wait('getComputedStyle(document.querySelector(`[data-window="1"]`)).display !== `none`')
   check(
     evaluate('getComputedStyle(document.querySelector(`[data-window="1"]`)).display !== `none`'),
     'Taskbar restores the window',
@@ -342,9 +349,9 @@ if (phase === 'smoke') {
   browser('click', '[data-window] button[aria-label="Close"]')
   start()
   menu('Documents')
-  waitMenu('Readme.txt')
-  menu('Readme.txt')
-  browser('wait', '[data-window][aria-label="Readme.txt - Notepad"]')
+  waitMenu('Shell Readme.txt')
+  menu('Shell Readme.txt')
+  browser('wait', '[data-window][aria-label="Shell Readme.txt - Notepad"]')
   shot('start-documents-notepad')
   browser('click', '[data-window] button[aria-label="Close"]')
 } else if (phase === 'persistence') {
@@ -365,11 +372,29 @@ if (phase === 'smoke') {
   check(icon.x === at.x && icon.y === at.y, 'Desktop positions survive a process restart')
   shot('desktop-persisted')
 } else if (phase === 'shutdown') {
+  run('notepad')
+  browser('wait', 'textarea')
+  browser('fill', 'textarea', 'Shutdown must ask before closing this document.')
+  start()
+  menu('Shut Down...')
+  button('Yes')
+  browser('wait', '[role="dialog"][aria-label="Notepad"]')
+  shot('shutdown-unsaved-prompt')
+  check(evaluate('document.querySelector(`textarea`) !== null'), 'Shutdown queries the unsaved document')
+  button('Cancel')
+  check(
+    evaluate(
+      'document.querySelector(`textarea`).value === `Shutdown must ask before closing this document.`',
+    ),
+    'Cancel aborts shutdown and keeps the document',
+  )
   start()
   menu('Shut Down...')
   browser('wait', '[aria-label="Shut Down Windows"]')
   shot('shutdown-choice')
   button('Yes')
+  browser('wait', '[role="dialog"][aria-label="Notepad"]')
+  button('No')
   browser('wait', '[role="status"]')
   check(evaluate('document.querySelectorAll(`[data-window]`).length === 0'), 'Shutdown closes app windows')
   shot('shutting-down')

@@ -4,25 +4,43 @@ import { Button } from '../ui/Button'
 import { Dialog } from '../ui/Dialog'
 import { Radio } from '../ui/fields'
 
-export type ShutDownChoice = 'shutdown' | 'restart'
+export type ShutDownChoice = 'shutdown' | 'restart' | 'dos' | 'logoff'
 
 const CHOICES: { value: ShutDownChoice; label: string }[] = [
   { value: 'shutdown', label: 'Shut down the computer?' },
   { value: 'restart', label: 'Restart the computer?' },
+  { value: 'dos', label: 'Restart the computer in MS-DOS mode?' },
+  { value: 'logoff', label: 'Close all programs and log on as a different user?' },
 ]
 
 export function ShutDownDialog({
   onChoose,
   onClose,
+  onHelp,
 }: {
   onChoose: (choice: ShutDownChoice) => void
   onClose: () => void
+  onHelp: () => void
 }) {
   const [choice, setChoice] = useState<ShutDownChoice>('shutdown')
   return (
-    <Dialog title="Shut Down Windows" onClose={onClose} dim className="w-[335px]">
+    <Dialog title="Shut Down Windows" onClose={onClose} dim className="w-[390px]">
       <form
         className="flex gap-[14px] p-[12px]"
+        onKeyDown={(event) => {
+          if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return
+          event.preventDefault()
+          const index = CHOICES.findIndex((option) => option.value === choice)
+          const next =
+            CHOICES[
+              (index + (event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : CHOICES.length - 1)) %
+                CHOICES.length
+            ]
+          if (next) {
+            setChoice(next.value)
+            event.currentTarget.querySelector<HTMLInputElement>(`input[value="${next.value}"]`)?.focus()
+          }
+        }}
         onSubmit={(event) => {
           event.preventDefault()
           onChoose(choice)
@@ -35,6 +53,8 @@ export function ShutDownDialog({
             <Radio
               key={option.value}
               name="shutdown"
+              value={option.value}
+              tabIndex={choice === option.value ? 0 : -1}
               label={option.label}
               checked={choice === option.value}
               onChange={() => setChoice(option.value)}
@@ -45,6 +65,7 @@ export function ShutDownDialog({
               Yes
             </Button>
             <Button onClick={onClose}>No</Button>
+            <Button onClick={onHelp}>Help</Button>
           </div>
         </div>
       </form>
