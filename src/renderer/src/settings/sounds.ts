@@ -16,18 +16,27 @@ const shellSounds = {
   startup: 'Start Windows',
   shutdown: 'Exit Windows',
   error: 'Critical Stop',
-  question: 'Default Sound',
+  warning: 'Exclamation',
+  info: 'Asterisk',
+  question: 'Question',
+  'default-beep': 'Default Sound',
   minimize: 'Minimize',
   maximize: 'Maximize',
-  restore: 'Restore Up',
   'menu-command': 'Menu Command',
   open: null,
   close: null,
-} satisfies Record<ShellEvent, SoundEvent | null>
+} satisfies Record<Exclude<ShellEvent['type'], 'restore'>, SoundEvent | null>
+
+const soundFor = (event: ShellEvent): SoundEvent | null =>
+  event.type === 'restore'
+    ? event.direction === 'up'
+      ? 'Restore Up'
+      : 'Restore Down'
+    : shellSounds[event.type]
 
 export function connectSystemSounds(): () => void {
   const unsubscribeShell = shellEvents.subscribe((event) => {
-    const sound = shellSounds[event]
+    const sound = soundFor(event)
     if (sound) void playSystemSound(sound)
   })
   let previous = fsStore.get()

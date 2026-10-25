@@ -1,4 +1,3 @@
-import { createStore } from '../../lib/store'
 import type { Point, Size } from '../../shell/types'
 import type { Sort, View } from './model'
 
@@ -11,34 +10,7 @@ export interface FolderPreferences {
   readonly positions: Readonly<Record<string, Point>>
   readonly geometry?: { position: Point; size: Size }
 }
-export interface Options {
-  readonly hideExtensions: boolean
-  readonly sameWindow: boolean
-  readonly showHidden: boolean
-  readonly confirmDelete: boolean
-}
 const KEY = 'w95.folders.v1'
-export const OPTIONS_KEY = 'w95.folder-options.v1'
-const defaults: Options = { hideExtensions: true, sameWindow: false, showHidden: false, confirmDelete: true }
-function readOptions(): Options {
-  try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(OPTIONS_KEY) ?? 'null')
-    if (!parsed || typeof parsed !== 'object') return defaults
-    return {
-      hideExtensions:
-        'hideExtensions' in parsed && typeof parsed.hideExtensions === 'boolean'
-          ? parsed.hideExtensions
-          : true,
-      sameWindow: 'sameWindow' in parsed && parsed.sameWindow === true,
-      showHidden: 'showHidden' in parsed && parsed.showHidden === true,
-      confirmDelete: !('confirmDelete' in parsed) || parsed.confirmDelete !== false,
-    }
-  } catch {
-    return defaults
-  }
-}
-export const options = createStore<Options, Options>((_old, next) => next, readOptions())
-options.subscribe(() => localStorage.setItem(OPTIONS_KEY, JSON.stringify(options.get())))
 
 export function folderPreferences(key: string, exploring: boolean, recycled: boolean): FolderPreferences {
   const fallback: FolderPreferences = {

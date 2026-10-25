@@ -6,6 +6,7 @@ import { useKeyDown } from '../../shell/context'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
 import {
+  AboutDialog,
   Button,
   FileDialog,
   type FileDialogResult,
@@ -16,7 +17,6 @@ import {
   StatusPane,
 } from '../../ui'
 import {
-  AboutWordPad,
   DateTimeDialog,
   FindDialog,
   type FindState,
@@ -838,7 +838,7 @@ export function WordPad({ window: windowApi, args }: AppProps) {
           onClose={closeDialog}
         />
       )}
-      {dialog?.kind === 'about' && <AboutWordPad onClose={closeDialog} />}
+      {dialog?.kind === 'about' && <AboutDialog app="WordPad" icon={wordpadIcon} onClose={closeDialog} />}
       {dialog?.kind === 'message' && (
         <MessageBox
           title={dialog.title}

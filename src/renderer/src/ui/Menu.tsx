@@ -1,5 +1,7 @@
 import {
   type CSSProperties,
+  type ReactNode,
+  type RefObject,
   useCallback,
   useContext,
   useEffect,
@@ -12,6 +14,7 @@ import { WindowContext } from '../shell/context'
 import { shellEvents } from '../shell/events'
 import { type MenuState, menuKey } from '../shell/menuMachine'
 import type { Point } from '../shell/types'
+import { highlightedHelp } from './menuHelp'
 import { Accel, accelKey } from './text'
 
 export type MenuEntry =
@@ -23,6 +26,8 @@ export type MenuEntry =
       readonly shortcut?: string
       readonly icon?: string
       readonly bold?: boolean
+      /** What the app's status bar says while this item is highlighted. */
+      readonly help?: string
       readonly items?: readonly MenuEntry[]
     }
   | 'separator'
@@ -73,7 +78,7 @@ function useMenu(
       setState(next.state)
       if (next.state.kind === 'closed') latest.current.onClose?.()
       if (next.command) {
-        shellEvents.emit('menu-command')
+        shellEvents.emit({ type: 'menu-command' })
         next.command.onSelect?.()
       }
     }
@@ -108,7 +113,7 @@ function useMenu(
     else {
       restoreFocus()
       close()
-      shellEvents.emit('menu-command')
+      shellEvents.emit({ type: 'menu-command' })
       item.onSelect?.()
     }
   }
@@ -139,6 +144,7 @@ function MenuTree({
   style,
   className = '',
   label,
+  dropsBelow = false,
 }: {
   items: readonly MenuEntry[]
   controller: Controller
@@ -147,6 +153,8 @@ function MenuTree({
   style?: CSSProperties | undefined
   className?: string | undefined
   label?: string | undefined
+  /** Hangs below its parent, like a menu bar title, so it opens upward when the screen runs out. */
+  dropsBelow?: boolean
 }) {
   const { state, setState, pick } = controller
   const path = state.kind === 'open' || state.kind === 'tracking' ? state.path : []
@@ -158,15 +166,20 @@ function MenuTree({
   useLayoutEffect(() => {
     const box = ref.current?.getBoundingClientRect()
     if (!box) return
-    const parentWidth = ref.current?.parentElement?.getBoundingClientRect().width ?? 0
+    const parent = ref.current?.parentElement?.getBoundingClientRect()
+    const parentWidth = parent?.width ?? 0
+    const above = box.top - (parent?.height ?? 0) - box.height
     setShift({
       x:
         box.right > innerWidth && prefix.length > 0
           ? Math.max(-box.left, -box.width - parentWidth + 3)
           : Math.min(0, innerWidth - box.right),
-      y: Math.min(0, innerHeight - box.bottom),
+      y:
+        dropsBelow && box.bottom > innerHeight && above >= 0
+          ? above - box.top
+          : Math.min(0, innerHeight - box.bottom),
     })
-  }, [prefix.length])
+  }, [prefix.length, dropsBelow])
   return (
     <div
       ref={ref}
@@ -298,12 +311,49 @@ export function MenuList({
   )
 }
 
+/**
+ * Lifts a menu bar's drop-down out of the window, as Windows 95 menus are popups of their own: a window's client
+ * area clips its content, so a tall menu or one that opens upward would otherwise be cut off.
+ */
+function BarPopup({
+  anchor,
+  popup,
+  children,
+}: {
+  anchor: HTMLElement | null
+  popup: RefObject<HTMLDivElement | null>
+  children: ReactNode
+}) {
+  const [rect, setRect] = useState<DOMRect | null>(null)
+  useLayoutEffect(() => setRect(anchor?.getBoundingClientRect() ?? null), [anchor])
+  if (!rect) return null
+  return createPortal(
+    <div
+      ref={popup}
+      className="fixed z-[10050] pointer-events-none"
+      style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
+    >
+      {children}
+    </div>,
+    document.body,
+  )
+}
+
 export interface MenuBarMenu {
   readonly label: string
   readonly items: readonly MenuEntry[]
 }
-export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
+export function MenuBar({
+  menus,
+  onHelp,
+}: {
+  menus: readonly MenuBarMenu[]
+  /** Receives the highlighted item's help while a menu is open, and `null` when the menus close. */
+  onHelp?: (help: string | null) => void
+}) {
   const root = useRef<HTMLDivElement>(null)
+  const popup = useRef<HTMLDivElement>(null)
+  const titleRefs = useRef<(HTMLDivElement | null)[]>([])
   const owner = useContext(WindowContext)
   const focused = owner?.api.focused ?? true
   const controller = useMenu(
@@ -316,6 +366,13 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
   const { state, setState, close } = controller
   const latest = useRef(menus)
   latest.current = menus
+  const help = highlightedHelp(
+    menus.map((menu) => menu.items),
+    state,
+  )
+  const reportHelp = useRef(onHelp)
+  reportHelp.current = onHelp
+  useEffect(() => reportHelp.current?.(help), [help])
   useEffect(() => {
     if (!focused) {
       setState({ kind: 'closed' })
@@ -323,6 +380,8 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
     }
     let alt = false
     const keyDown = (event: KeyboardEvent) => {
+      // Alt arms the bar only as a tap. Any other key in between, such as Space for the system menu, cancels it.
+      if (event.key !== 'Alt') alt = false
       if (menuIsActive() || (event.target instanceof Element && event.target.closest('[role="dialog"]')))
         return
       if (event.key === 'Alt') {
@@ -330,7 +389,6 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
         return
       }
       if (event.altKey) {
-        alt = false
         const title = latest.current.findIndex((menu) => accelKey(menu.label) === event.key.toLowerCase())
         if (title >= 0) {
           event.preventDefault()
@@ -344,7 +402,7 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
       }
     }
     const keyUp = (event: KeyboardEvent) => {
-      if (event.key === 'Alt' && alt) {
+      if (event.key === 'Alt' && alt && !menuIsActive()) {
         alt = false
         event.preventDefault()
         setState({ kind: 'bar-armed', title: 0 })
@@ -360,7 +418,12 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
   useEffect(() => {
     if (state.kind === 'closed') return
     const outside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !root.current?.contains(event.target)) close()
+      if (
+        event.target instanceof Node &&
+        !root.current?.contains(event.target) &&
+        !popup.current?.contains(event.target)
+      )
+        close()
     }
     document.addEventListener('pointerdown', outside, true)
     return () => document.removeEventListener('pointerdown', outside, true)
@@ -368,11 +431,17 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
   return (
     <div ref={root} role="menubar" className="relative flex h-[19px] shrink-0 bg-face">
       {menus.map((menu, title) => (
-        <div key={menu.label} className="relative">
+        <div
+          key={menu.label}
+          ref={(element) => {
+            titleRefs.current[title] = element
+          }}
+          className="relative"
+        >
           <button
             type="button"
             tabIndex={-1}
-            className={`h-[19px] px-[6px] outline-none ${state.kind !== 'closed' && state.title === title ? (state.kind === 'bar-armed' ? 'bg-select text-white' : 'bevel-shallow') : ''}`}
+            className={`h-[19px] px-[6px] outline-none ${state.kind !== 'closed' && state.title === title ? 'bg-select text-white' : ''}`}
             onPointerDown={(event) => {
               event.preventDefault()
               event.stopPropagation()
@@ -391,7 +460,15 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
             <Accel label={menu.label} />
           </button>
           {(state.kind === 'open' || state.kind === 'tracking') && state.title === title && (
-            <MenuTree items={menu.items} controller={controller} style={{ left: 0, top: '100%' }} />
+            <BarPopup anchor={titleRefs.current[title] ?? null} popup={popup}>
+              <MenuTree
+                items={menu.items}
+                controller={controller}
+                style={{ left: 0, top: '100%' }}
+                className="pointer-events-auto"
+                dropsBelow
+              />
+            </BarPopup>
           )}
         </div>
       ))}

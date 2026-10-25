@@ -15,10 +15,6 @@
   flex: 1;
   min-width: 0;
 }
-.find-criteria .classic-sheet {
-  height: 160px;
-  padding: 13px 12px;
-}
 .find-actions {
   padding-top: 25px;
   display: flex;

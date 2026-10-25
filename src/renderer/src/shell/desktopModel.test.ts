@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arranged, layout, neighbor, pointOf, spanned, touched, typeAhead } from './desktopModel'
+import { arranged, freeSpot, layout, neighbor, pointOf, spanned, touched, typeAhead } from './desktopModel'
 import type { Point } from './types'
 
 const desktop = { width: 800, height: 4 + 75 * 3 }
@@ -11,6 +11,27 @@ describe('desktop layout', () => {
     expect(placed.get('a')).toEqual(pointOf(0, 1))
     expect(placed.get('c')).toEqual(pointOf(0, 2))
     expect(placed.get('d')).toEqual(pointOf(1, 0))
+  })
+
+  it('never stacks two saved icons in one cell', () => {
+    const spot = pointOf(3, 1)
+    const placed = layout(
+      ['first', 'second', 'third'],
+      { first: spot, second: spot, third: { x: spot.x + 10, y: spot.y - 8 } },
+      desktop,
+    )
+    const cells = new Set([...placed.values()].map((point) => `${point.x}:${point.y}`))
+    expect(cells.size).toBe(3)
+    expect(placed.get('first')).toEqual(spot)
+    expect([pointOf(3, 0), pointOf(3, 2), pointOf(2, 1), pointOf(4, 1)]).toContainEqual(placed.get('second'))
+  })
+
+  it('drops a new icon on the clicked cell, or the nearest free one', () => {
+    const occupied = [pointOf(2, 1)]
+    expect(freeSpot(pointOf(5, 2), occupied, desktop)).toEqual(pointOf(5, 2))
+    const moved = freeSpot({ x: pointOf(2, 1).x + 5, y: pointOf(2, 1).y + 5 }, occupied, desktop)
+    expect(moved).not.toEqual(pointOf(2, 1))
+    expect(Math.abs(moved.x - pointOf(2, 1).x) + Math.abs(moved.y - pointOf(2, 1).y)).toBe(75)
   })
 
   it('arranges in the given order', () => {

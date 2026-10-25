@@ -69,6 +69,8 @@ export function Dialog({
   const [nestedHost, setNestedHost] = useState<HTMLDivElement | null>(null)
   const nestedCount = useModalCount(nestedHost)
   const token = useRef(Symbol())
+  // Read during the first render, before the dialog's own autofocus moves focus inside it.
+  const [opener] = useState(() => document.activeElement)
   const count = useModalCount(host)
   const focused = useWindows((state) => state.focused)
   const active =
@@ -104,7 +106,11 @@ export function Dialog({
     const observer = new ResizeObserver(round)
     observer.observe(host)
     observer.observe(dialog)
-    return () => observer.disconnect()
+    addEventListener('resize', round)
+    return () => {
+      observer.disconnect()
+      removeEventListener('resize', round)
+    }
   }, [host])
   const latestClose = useRef(onClose)
   latestClose.current = onClose
@@ -116,15 +122,14 @@ export function Dialog({
     stack.push(token.current)
     notify()
     if (!owned) windowsStore.dispatch({ type: 'blur' })
-    const previous = document.activeElement
     const currentToken = token.current
     return () => {
       const index = stack.indexOf(currentToken)
       if (index >= 0) stack.splice(index, 1)
       notify()
-      if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true })
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true })
     }
-  }, [host, owned])
+  }, [host, owned, opener])
   useEffect(() => () => clearInterval(flashTimer.current), [])
   useEffect(() => {
     if (!active) return
@@ -158,7 +163,7 @@ export function Dialog({
       if (menuIsActive()) return
       if (event.target instanceof Element && event.target.closest('[role="combobox"][aria-expanded="true"]'))
         return
-      if (event.key === 'Tab') {
+      if (event.key === 'Tab' && !event.ctrlKey) {
         const elements = focusable(),
           first = elements[0],
           last = elements.at(-1)
@@ -184,7 +189,7 @@ export function Dialog({
   }, [active])
   if (!host) return null
   const feedback = () => {
-    shellEvents.emit('question')
+    shellEvents.emit({ type: 'default-beep' })
     clearInterval(flashTimer.current)
     let ticks = 0
     flashTimer.current = setInterval(() => {

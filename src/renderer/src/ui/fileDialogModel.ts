@@ -1,6 +1,6 @@
 import { children } from '../fs/fs'
 import { DESKTOP_DIR, type FsNode, type FsState, type NodeId, ROOT } from '../fs/types'
-import { type FileTypeFilter, matchesFileType } from './fileChoice'
+import { DOCUMENTS, type FileTypeFilter, isPickable, matchesFileType, type Pickable } from './fileChoice'
 import { isHidden } from './properties'
 
 /** Where the dialog is looking. Desktop and My Computer are shell places, not folders. */
@@ -95,7 +95,12 @@ export function lookInRows(state: FsState, current: Place): PlaceRow[] {
 }
 
 /** What the file list shows in a place: folders first, then files the filter matches. Hidden items stay out. */
-export function listEntries(state: FsState, place: Place, filter: FileTypeFilter): ListEntry[] {
+export function listEntries(
+  state: FsState,
+  place: Place,
+  filter: FileTypeFilter,
+  pickable: readonly Pickable[] = DOCUMENTS,
+): ListEntry[] {
   if (place.kind === 'computer') {
     return Object.values(state.nodes)
       .filter((node) => node.kind === 'drive')
@@ -115,7 +120,7 @@ export function listEntries(state: FsState, place: Place, filter: FileTypeFilter
   const entries: ListEntry[] = nodes.flatMap((node): ListEntry[] => {
     if (node.kind === 'folder')
       return [{ kind: 'place', key: node.id, label: node.name, place: { kind: 'folder', id: node.id }, node }]
-    if (node.kind === 'file' && matchesFileType(node.name, filter))
+    if (isPickable(node, pickable) && matchesFileType(node.name, filter))
       return [{ kind: 'file', key: node.id, label: node.name, node }]
     return []
   })

@@ -2,8 +2,17 @@ import { type CSSProperties, type PointerEvent, useEffect, useLayoutEffect, useR
 import { useKeyDown } from '../../shell/context'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { Button, Checkbox, Dialog, GroupBox, MenuBar, Radio, StatusBar, StatusPane } from '../../ui'
-import { About } from './About'
+import {
+  AboutDialog,
+  Button,
+  Checkbox,
+  Dialog,
+  GroupBox,
+  MenuBar,
+  Radio,
+  StatusBar,
+  StatusPane,
+} from '../../ui'
 import { Cascade } from './Cascade'
 import {
   ANIMATED_BACKS,
@@ -689,7 +698,9 @@ function Solitaire({ window }: AppProps) {
           }}
         />
       )}
-      {dialog === 'about' && <About onClose={() => setDialog(null)} />}
+      {dialog === 'about' && (
+        <AboutDialog app="Solitaire" icon={icon} credit="by Wes Cherry" onClose={() => setDialog(null)} />
+      )}
     </div>
   )
 }

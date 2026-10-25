@@ -15,6 +15,7 @@ export interface DesktopActions {
   readonly pasteShortcut: () => void
   readonly createShortcut: () => void
   readonly remove: () => void
+  readonly undo: () => void
   readonly rename: () => void
   readonly properties: () => void
   readonly sendToDocuments: () => void
@@ -39,6 +40,8 @@ export interface MenuFacts {
   /** False for C:, WINDOWS, and the other folders Windows won't let you move or delete. */
   readonly mutable: boolean
   readonly hasProperties: boolean
+  /** The newest undoable operation's menu label, or null when there is none. */
+  readonly undo: string | null
 }
 
 type Build = (facts: MenuFacts, act: DesktopActions) => MenuEntry[]
@@ -60,6 +63,7 @@ export const backgroundMenu: Build = (facts, act) => [
   'separator',
   { label: '&Paste', disabled: !facts.canPaste, onSelect: act.paste },
   { label: 'Paste &Shortcut', disabled: !facts.canPaste, onSelect: act.pasteShortcut },
+  { label: facts.undo ?? '&Undo', disabled: !facts.undo, onSelect: act.undo },
   'separator',
   {
     label: 'Ne&w',

@@ -1,5 +1,6 @@
 import { children, extension, fileSize, pathOf } from '../../fs/fs'
 import { type FsNode, type FsState, type NodeId, RECYCLED_DIR } from '../../fs/types'
+import { formatShortDate } from '../../ui/properties'
 
 export type View = 'large' | 'small' | 'list' | 'details'
 export type Location = { kind: 'folder'; id: NodeId } | { kind: 'computer' } | { kind: 'recycle' }
@@ -47,33 +48,6 @@ export function typeOf(node: FsNode): string {
 }
 
 export const sizeOf = fileSize
-export const formatDate = (at: number): string => {
-  const date = new Date(at)
-  return `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear() % 100).padStart(2, '0')} ${date.getHours() % 12 || 12}:${String(date.getMinutes()).padStart(2, '0')} ${date.getHours() < 12 ? 'AM' : 'PM'}`
-}
-
-export function displayName(node: FsNode, hideExtensions: boolean, registered: ReadonlySet<string>): string {
-  if (node.kind === 'drive') return '(C:)'
-  const ext = extension(node.name)
-  return hideExtensions && node.kind !== 'folder' && node.kind !== 'shortcut' && registered.has(ext)
-    ? node.name.slice(0, -(ext.length + 1))
-    : node.name
-}
-
-export function renamedName(
-  node: FsNode,
-  name: string,
-  hideExtensions: boolean,
-  registered: ReadonlySet<string>,
-): string {
-  return (
-    name +
-    (displayName(node, hideExtensions, registered) !== node.name && node.kind !== 'drive'
-      ? node.name.slice(node.name.lastIndexOf('.'))
-      : '')
-  )
-}
-
 export function cellValue(state: FsState, node: FsNode, column: Column): string {
   switch (column) {
     case 'name':
@@ -85,14 +59,14 @@ export function cellValue(state: FsState, node: FsNode, column: Column): string 
     case 'type':
       return typeOf(node)
     case 'modified':
-      return formatDate(node.modified)
+      return formatShortDate(node.modified)
     case 'original': {
       const record = state.recycled[node.id]
       return record ? pathOf(state, record.from) : ''
     }
     case 'deleted': {
       const record = state.recycled[node.id]
-      return record ? formatDate(record.at) : ''
+      return record ? formatShortDate(record.at) : ''
     }
   }
 }

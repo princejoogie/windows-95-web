@@ -6,6 +6,8 @@ export interface WindowContextValue {
   readonly api: WindowApi
   /** Where this window's dialogs render, so they stack and minimize with it. */
   readonly dialogHost: HTMLElement | null
+  /** A modeless dialog reports holding focus, which turns the owner's caption inactive. */
+  readonly setDialogFocused: (focused: boolean) => void
 }
 
 export const WindowContext = createContext<WindowContextValue | null>(null)

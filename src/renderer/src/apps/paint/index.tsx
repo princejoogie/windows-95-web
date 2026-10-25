@@ -8,6 +8,7 @@ import { useKeyDown } from '../../shell/context'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
 import {
+  AboutDialog,
   FileDialog,
   type FileDialogResult,
   type FileTypeFilter,
@@ -41,7 +42,6 @@ import { decodeBitmap, drawBitmap, encodeBitmap, PaintCanvas } from './Canvas'
 import { clipboardPiece, copyPiece, useClipboard } from './clipboard'
 import { formatPalette, parsePalette } from './colors'
 import {
-  AboutDialog,
   AttributesDialog,
   CustomZoomDialog,
   EditColorsDialog,
@@ -135,11 +135,18 @@ const MENU_HELP: Record<string, string> = {
   'Help Topics': 'Lists Help topics.',
   'About Paint': 'Displays program information, version number, and copyright.',
 }
-const MENU_LABELS = Object.keys(MENU_HELP).sort((a, b) => b.length - a.length)
-function menuHelp(text: string): string | null {
-  if (/^\d /.test(text)) return 'Opens this document.'
-  const label = MENU_LABELS.find((entry) => text.startsWith(entry))
-  return label ? (MENU_HELP[label] ?? null) : null
+/** Attaches each command's status bar help to its menu entry. */
+function withHelp(entries: readonly MenuEntry[]): MenuEntry[] {
+  return entries.map((entry) => {
+    if (entry === 'separator') return entry
+    const label = entry.label.replace('&', '')
+    const help = /^\d /.test(label) ? 'Opens this document.' : MENU_HELP[label]
+    return {
+      ...entry,
+      ...(help ? { help } : {}),
+      ...(entry.items ? { items: withHelp(entry.items) } : {}),
+    }
+  })
 }
 
 type Command = 'new' | 'open' | 'exit'
@@ -195,16 +202,6 @@ function Paint({ window: windowApi, args }: AppProps) {
   const [recent, addRecent] = useRecent()
   const clipboard = useClipboard()
   const scroller = useRef<HTMLDivElement>(null)
-  const menuBar = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const element = menuBar.current
-    if (!element) return
-    const observer = new MutationObserver(() => {
-      if (!element.querySelector('[role="menu"]')) setHelp(null)
-    })
-    observer.observe(element, { childList: true, subtree: true })
-    return () => observer.disconnect()
-  }, [])
   const loadVersion = useRef(0)
   const closeResult = useRef<((closed: boolean) => void) | null>(null)
   const cancelClose = () => {
@@ -666,19 +663,7 @@ function Paint({ window: windowApi, args }: AppProps) {
   const size = dragSize ?? (marquee ? rectOf(marquee) : null)
   return (
     <div className="relative flex h-full w-full flex-col bg-face">
-      <div
-        ref={menuBar}
-        className="contents"
-        onPointerOver={(event) => {
-          const item = (event.target as HTMLElement).closest('[role="menuitem"]')
-          if (item) setHelp(menuHelp(item.textContent ?? ''))
-        }}
-        onPointerOut={(event) => {
-          if ((event.target as HTMLElement).closest('[role="menuitem"]')) setHelp(null)
-        }}
-      >
-        <MenuBar menus={menus} />
-      </div>
+      <MenuBar menus={menus.map((menu) => ({ ...menu, items: withHelp(menu.items) }))} onHelp={setHelp} />
       <div className="flex flex-1 min-h-0">
         {panels.toolBox && (
           <ToolBox
@@ -789,11 +774,8 @@ function Paint({ window: windowApi, args }: AppProps) {
           mode={dialog.mode}
           initialFolder={node?.parent ?? DOCUMENTS_DIR}
           initialName={dialog.mode === 'save' ? (node?.name ?? 'untitled.bmp') : ''}
-          filters={
-            dialog.mode === 'open'
-              ? OPEN_FILTERS
-              : [...SAVE_TYPES].sort((a, b) => Number(b.depth === depth) - Number(a.depth === depth))
-          }
+          filters={dialog.mode === 'open' ? OPEN_FILTERS : SAVE_TYPES}
+          initialFilter={dialog.mode === 'open' ? 0 : SAVE_TYPES.findIndex((type) => type.depth === depth)}
           defaultExtension="bmp"
           onSelect={choose}
           onCancel={cancelClose}
@@ -883,7 +865,9 @@ function Paint({ window: windowApi, args }: AppProps) {
       {dialog?.kind === 'message' && (
         <MessageBox title={dialog.title} message={dialog.message} buttons={['OK']} onClose={cancelClose} />
       )}
-      {dialog?.kind === 'about' && <AboutDialog onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'about' && (
+        <AboutDialog app="Paint" icon={paintIcon} onClose={() => setDialog(null)} />
+      )}
       {dialog?.kind === 'attributes' && (
         <AttributesDialog
           width={image.width}

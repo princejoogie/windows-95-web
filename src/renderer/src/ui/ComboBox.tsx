@@ -18,6 +18,8 @@ interface ComboBoxProps {
   readonly onChange: (key: string) => void
   readonly className?: string
   readonly 'aria-label'?: string
+  /** What's This text, shown after the caption `?`. */
+  readonly 'data-help'?: string
 }
 
 const ROW = 16
@@ -123,6 +125,7 @@ export function ComboBox({ id, options, value, onChange, className = '', ...rest
         role="combobox"
         tabIndex={0}
         aria-label={rest['aria-label']}
+        data-help={rest['data-help']}
         aria-expanded={open}
         aria-controls={listId}
         aria-haspopup="listbox"

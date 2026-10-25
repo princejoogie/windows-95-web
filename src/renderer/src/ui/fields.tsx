@@ -36,7 +36,7 @@ export function Checkbox({ label, className = '', ...rest }: ChoiceProps) {
         style={{ '--check': check } as React.CSSProperties}
         {...rest}
       />
-      <span>{label}</span>
+      <span className={rest.disabled ? 'text-embossed' : ''}>{label}</span>
     </label>
   )
 }
@@ -52,7 +52,7 @@ export function Radio({ label, className = '', ...rest }: ChoiceProps) {
         />
         <span className="absolute left-[4px] top-[4px] size-[4px] rounded-full bg-black hidden peer-checked:block" />
       </span>
-      <span>{label}</span>
+      <span className={rest.disabled ? 'text-embossed' : ''}>{label}</span>
     </label>
   )
 }

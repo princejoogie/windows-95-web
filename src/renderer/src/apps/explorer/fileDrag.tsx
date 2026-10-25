@@ -6,8 +6,8 @@ import { DESKTOP_DIR, type NodeId } from '../../fs/types'
 import { createStore, useStore } from '../../lib/store'
 import { planPaste } from '../../shell/clipboard'
 import type { Point } from '../../shell/types'
+import { remember } from '../../shell/undo'
 import { fileIcon } from './art'
-import { remember } from './history'
 
 interface DropTarget {
   readonly id: NodeId | 'recycle'

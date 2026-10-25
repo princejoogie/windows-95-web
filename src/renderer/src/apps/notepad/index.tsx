@@ -5,6 +5,7 @@ import { useKeyDown } from '../../shell/context'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
 import {
+  AboutDialog,
   Button,
   Checkbox,
   FileDialog,
@@ -12,14 +13,13 @@ import {
   GroupBox,
   MenuBar,
   MessageBox,
+  ModelessDialog,
   Radio,
   Separator,
   TextBox,
 } from '../../ui'
-import { AboutAccessory } from './AboutAccessory'
 import { type DocumentState, documentReducer, findText } from './document'
 import { notepadIcon } from './icon'
-import { ModelessDialog } from './ModelessDialog'
 import { defaultPageSettings, PageSetup } from './PageSetup'
 import { revealSelection } from './revealSelection'
 import './notepad.css'
@@ -428,7 +428,7 @@ export function Notepad({ window: windowApi, args }: AppProps) {
         />
       )}
       {prompt?.kind === 'about' && (
-        <AboutAccessory name="Notepad" icon={notepadIcon} onClose={() => setPrompt(null)} />
+        <AboutDialog app="Notepad" icon={notepadIcon} onClose={() => setPrompt(null)} />
       )}
     </div>
   )
