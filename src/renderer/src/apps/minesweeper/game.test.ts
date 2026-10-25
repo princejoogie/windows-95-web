@@ -14,27 +14,47 @@ import {
 } from './game'
 
 describe('Minesweeper rules', () => {
-  it('opens a safe region on 20 seeded first clicks at every preset level', () => {
+  it('uses the Windows 95 field sizes and accepts an 8 by 8 custom field', () => {
+    expect(LEVELS).toEqual({
+      beginner: { width: 8, height: 8, mines: 10 },
+      intermediate: { width: 16, height: 16, mines: 40 },
+      expert: { width: 30, height: 16, mines: 99 },
+    })
+    expect(customSize({ width: 8, height: 8, mines: 10 })).toEqual(LEVELS.beginner)
+  })
+
+  it('keeps the first square safe without reserving its neighbors at every preset level', () => {
     for (const size of Object.values(LEVELS)) {
+      let numberedStarts = 0
+      let zeroStarts = 0
       for (let seed = 0; seed < 20; seed++) {
         const index = (seed * 37) % (size.width * size.height)
         const game = reveal(createGame(size, seed), index)
-        expect(game.cells[index]).toMatchObject({ mine: false, adjacent: 0, cover: 'open' })
-        expect(game.cells.filter((cell) => cell.cover === 'open').length).toBeGreaterThan(1)
+        expect(game.cells[index]).toMatchObject({ mine: false, cover: 'open' })
+        expect(game.phase.kind).not.toBe('lost')
+        if (game.cells[index]?.adjacent) {
+          numberedStarts++
+          expect(game.cells.filter((cell) => cell.cover === 'open')).toHaveLength(1)
+        } else {
+          zeroStarts++
+          expect(game.cells.filter((cell) => cell.cover === 'open').length).toBeGreaterThan(1)
+        }
         expect(game.cells.filter((cell) => cell.mine)).toHaveLength(size.mines)
         for (const [i, cell] of game.cells.entries()) {
           expect(cell.adjacent).toBe(neighbors(size, i).filter((next) => game.cells[next]?.mine).length)
         }
       }
+      expect(numberedStarts).toBeGreaterThan(0)
+      expect(zeroStarts).toBeGreaterThan(0)
     }
   })
 
   it('keeps the first click safe even at the maximum custom density', () => {
-    const size = customSize({ width: 9, height: 9, mines: 999 })
+    const size = customSize({ width: 8, height: 8, mines: 999 })
     for (let seed = 0; seed < 20; seed++) {
-      const game = reveal(createGame(size, seed), 40)
-      expect(game.cells[40]?.mine).toBe(false)
-      expect(game.cells.filter((cell) => cell.mine)).toHaveLength(64)
+      const game = reveal(createGame(size, seed), 27)
+      expect(game.cells[27]?.mine).toBe(false)
+      expect(game.cells.filter((cell) => cell.mine)).toHaveLength(49)
     }
   })
 
@@ -46,7 +66,11 @@ describe('Minesweeper rules', () => {
   })
 
   it('flood fills connected zeros and their border without opening flags', () => {
-    const game = reveal(mark(createGame(LEVELS.beginner, 42), 39, true), 40)
+    let game = reveal(mark(createGame(LEVELS.beginner, 42), 39, true), 40)
+    const zero = game.cells.findIndex((cell, index) => !cell.mine && cell.adjacent === 0 && index !== 39)
+    expect(zero).toBeGreaterThanOrEqual(0)
+    game = reveal(game, zero)
+    expect(game.cells[zero]).toMatchObject({ adjacent: 0, cover: 'open' })
     expect(game.cells[39]?.cover).toBe('flag')
     for (const [index, cell] of game.cells.entries()) {
       if (cell.cover === 'open' && cell.adjacent === 0) {
@@ -149,8 +173,8 @@ describe('Minesweeper rules', () => {
   })
 
   it('clamps custom dimensions and mine count', () => {
-    expect(customSize({ width: 100, height: -1, mines: 999 })).toEqual({ width: 30, height: 9, mines: 232 })
-    expect(customSize({ width: 0, height: 100, mines: 0 })).toEqual({ width: 9, height: 24, mines: 10 })
+    expect(customSize({ width: 100, height: -1, mines: 999 })).toEqual({ width: 30, height: 8, mines: 203 })
+    expect(customSize({ width: 0, height: 100, mines: 0 })).toEqual({ width: 8, height: 24, mines: 10 })
     expect(customSize({ width: Number.NaN, height: Number.NaN, mines: Number.NaN })).toEqual(LEVELS.beginner)
   })
 })

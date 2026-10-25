@@ -7,7 +7,7 @@ export interface BoardSize {
 }
 
 export const LEVELS = {
-  beginner: { width: 9, height: 9, mines: 10 },
+  beginner: { width: 8, height: 8, mines: 10 },
   intermediate: { width: 16, height: 16, mines: 40 },
   expert: { width: 30, height: 16, mines: 99 },
 } satisfies Record<Exclude<Level, 'custom'>, BoardSize>
@@ -44,8 +44,8 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export function customSize(size: BoardSize): BoardSize {
-  const width = clamp(size.width, 9, 30)
-  const height = clamp(size.height, 9, 24)
+  const width = clamp(size.width, 8, 30)
+  const height = clamp(size.height, 8, 24)
   return { width, height, mines: clamp(size.mines, 10, (width - 1) * (height - 1)) }
 }
 
@@ -78,12 +78,7 @@ export function neighbors(size: BoardSize, index: number): number[] {
 
 function placeMines(game: Game, first: number): Game {
   let seed = game.seed >>> 0
-  const safe = new Set([first, ...neighbors(game.size, first)])
-  if (game.cells.length - safe.size < game.size.mines) {
-    safe.clear()
-    safe.add(first)
-  }
-  const candidates = game.cells.flatMap((_, index) => (safe.has(index) ? [] : [index]))
+  const candidates = game.cells.flatMap((_, index) => (index === first ? [] : [index]))
   const mines = new Set<number>()
   for (let count = 0; count < game.size.mines; count++) {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0

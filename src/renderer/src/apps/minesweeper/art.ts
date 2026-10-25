@@ -1,104 +1,347 @@
-import { pixelArt } from '../../icons/pixel'
+import { PALETTE, pixelArt } from '../../icons/pixel'
+
+const monochromePalette = {
+  ...PALETTE,
+  b: PALETTE.k,
+  L: PALETTE.k,
+  r: PALETTE.k,
+  B: PALETTE.k,
+  R: PALETTE.k,
+  C: PALETTE.k,
+  g: PALETTE.k,
+  y: PALETTE.w,
+}
 
 const mineRows = [
   '................',
+  '................',
   '.......k........',
-  '..k....k....k...',
-  '...k.kkkkk.k....',
+  '...k...k...k....',
+  '....kkkkkkk.....',
   '....kkkkkkk.....',
   '...kkwwkkkkk....',
-  '...kkwwkkkkk....',
-  '.kkkkkkkkkkkkk..',
-  '...kkkkkkkkk....',
+  '..kkkwwkkkkkk...',
   '...kkkkkkkkk....',
   '....kkkkkkk.....',
-  '...k.kkkkk.k....',
-  '..k....k....k...',
+  '....kkkkkkk.....',
+  '...k...k...k....',
   '.......k........',
+  '................',
   '................',
   '................',
 ]
+const flagRows = [
+  '................',
+  '................',
+  '.......rr.......',
+  '.....rrrr.......',
+  '...rrrrrr.......',
+  '.....rrrr.......',
+  '.......rr.......',
+  '........k.......',
+  '........k.......',
+  '........k.......',
+  '......kkkk......',
+  '....kkkkkkkk....',
+  '....kkkkkkkk....',
+  '................',
+  '................',
+  '................',
+]
+const numberRows = [
+  [
+    '...bb...',
+    '..bbb...',
+    '.bbbb...',
+    '...bb...',
+    '...bb...',
+    '...bb...',
+    '...bb...',
+    '...bb...',
+    '.bbbbbb.',
+    '.bbbbbb.',
+  ],
+  [
+    '.LLLLLL.',
+    'LLLLLLLL',
+    'LL....LL',
+    '......LL',
+    '....LLL.',
+    '..LLLL..',
+    '.LLL....',
+    'LL......',
+    'LLLLLLLL',
+    'LLLLLLLL',
+  ],
+  [
+    '.rrrrrr.',
+    'rrrrrrrr',
+    '......rr',
+    '......rr',
+    '..rrrrr.',
+    '..rrrrr.',
+    '......rr',
+    '......rr',
+    'rrrrrrrr',
+    '.rrrrrr.',
+  ],
+  [
+    '....BBB.',
+    '...BBBB.',
+    '..BBBBB.',
+    '.BBB.BB.',
+    'BBB..BB.',
+    'BB...BB.',
+    'BBBBBBBB',
+    'BBBBBBBB',
+    '.....BB.',
+    '.....BB.',
+  ],
+  [
+    'RRRRRRRR',
+    'RRRRRRRR',
+    'RR......',
+    'RR......',
+    'RRRRRRR.',
+    'RRRRRRRR',
+    '......RR',
+    '......RR',
+    'RRRRRRRR',
+    'RRRRRRR.',
+  ],
+  [
+    '..CCCCC.',
+    '.CCCCCC.',
+    'CCC.....',
+    'CC......',
+    'CCCCCCC.',
+    'CCCCCCCC',
+    'CC....CC',
+    'CC....CC',
+    'CCCCCCCC',
+    '.CCCCCC.',
+  ],
+  [
+    'kkkkkkkk',
+    'kkkkkkkk',
+    '......kk',
+    '.....kk.',
+    '....kk..',
+    '...kk...',
+    '..kk....',
+    '..kk....',
+    '..kk....',
+    '..kk....',
+  ],
+  [
+    '.gggggg.',
+    'gggggggg',
+    'gg....gg',
+    'gg....gg',
+    '.gggggg.',
+    '.gggggg.',
+    'gg....gg',
+    'gg....gg',
+    'gggggggg',
+    '.gggggg.',
+  ],
+]
+const questionRows = [
+  '................',
+  '................',
+  '.....kkkkk......',
+  '....kk...kk.....',
+  '....kk...kk.....',
+  '.........kk.....',
+  '........kk......',
+  '.......kk.......',
+  '.......kk.......',
+  '................',
+  '.......kk.......',
+  '.......kk.......',
+  '................',
+  '................',
+  '................',
+  '................',
+]
+const faceRows = {
+  smile: [
+    '.....kkkkkkk.....',
+    '...kkyyyyyyykk...',
+    '..kywwyyyyyyyyk..',
+    '.kywyyyyyyyyyyyk.',
+    '.kyyyyyyyyyyyyyk.',
+    'kyyyykyyyyykyyyyk',
+    'kyyyykyyyyykyyyyk',
+    'kyyyyyyyyyyyyyyyk',
+    'kyyyyyyyyyyyyyyyk',
+    'kyykyyyyyyyyykyyk',
+    'kyyykyyyyyyykyyyk',
+    'kyyyykkkkkkkyyyyk',
+    '.kyyyyyyyyyyyyyk.',
+    '.kyyyyyyyyyyyyyk.',
+    '..kyyyyyyyyyyyk..',
+    '...kkyyyyyyykk...',
+    '.....kkkkkkk.....',
+  ],
+  surprised: [
+    '.....kkkkkkk.....',
+    '...kkyyyyyyykk...',
+    '..kywwyyyyyyyyk..',
+    '.kywyyyyyyyyyyyk.',
+    '.kyyyyyyyyyyyyyk.',
+    'kyyyykyyyyykyyyyk',
+    'kyyyykyyyyykyyyyk',
+    'kyyyyyyyyyyyyyyyk',
+    'kyyyyyykkkyyyyyyk',
+    'kyyyyykyyykyyyyyk',
+    'kyyyyykyyykyyyyyk',
+    'kyyyyykyyykyyyyyk',
+    '.kyyyyykkkyyyyyk.',
+    '.kyyyyyyyyyyyyyk.',
+    '..kyyyyyyyyyyyk..',
+    '...kkyyyyyyykk...',
+    '.....kkkkkkk.....',
+  ],
+  dead: [
+    '.....kkkkkkk.....',
+    '...kkyyyyyyykk...',
+    '..kywwyyyyyyyyk..',
+    '.kywyyyyyyyyyyyk.',
+    '.kyykykyyykykyyk.',
+    'kyyyykyyyyykyyyyk',
+    'kyyykykyyykykyyyk',
+    'kyyyyyyyyyyyyyyyk',
+    'kyyyyyyyyyyyyyyyk',
+    'kyyyykkkkkkkyyyyk',
+    'kyyykyyyyyyykyyyk',
+    'kyykyyyyyyyyykyyk',
+    '.kyyyyyyyyyyyyyk.',
+    '.kyyyyyyyyyyyyyk.',
+    '..kyyyyyyyyyyyk..',
+    '...kkyyyyyyykk...',
+    '.....kkkkkkk.....',
+  ],
+  win: [
+    '.....kkkkkkk.....',
+    '...kkyyyyyyykk...',
+    '..kywwyyyyyyyyk..',
+    '.kywyyyyyyyyyyyk.',
+    '.kkkkkkkkkkkkkkk.',
+    'kyykkkkkykkkkkyyk',
+    'kyyykkkyyykkkyyyk',
+    'kyyyyyyyyyyyyyyyk',
+    'kyyyyyyyyyyyyyyyk',
+    'kyykyyyyyyyyykyyk',
+    'kyyykyyyyyyykyyyk',
+    'kyyyykkkkkkkyyyyk',
+    '.kyyyyyyyyyyyyyk.',
+    '.kyyyyyyyyyyyyyk.',
+    '..kyyyyyyyyyyyk..',
+    '...kkyyyyyyykk...',
+    '.....kkkkkkk.....',
+  ],
+}
 
-export const mineIcon = pixelArt(mineRows)
-export const wrongFlagIcon = pixelArt(
-  mineRows.map((row, y) => [...row].map((pixel, x) => (x === y || x === 15 - y ? 'r' : pixel)).join('')),
-)
+const segments: Readonly<Record<string, string>> = {
+  '0': 'abcdef',
+  '1': 'bc',
+  '2': 'abdeg',
+  '3': 'abcdg',
+  '4': 'bcfg',
+  '5': 'acdfg',
+  '6': 'acdefg',
+  '7': 'abc',
+  '8': 'abcdefg',
+  '9': 'abcdfg',
+  '-': 'g',
+}
+const segmentRows = [
+  '..aaaaaaaaa..',
+  '.f.aaaaaaa.b.',
+  '.ff.aaaaa.bb.',
+  '.fff.....bbb.',
+  '.fff.....bbb.',
+  '.fff.....bbb.',
+  '.fff.....bbb.',
+  '.fff.....bbb.',
+  '.fff.....bbb.',
+  '.ff.......bb.',
+  '.f..ggggg..b.',
+  '...ggggggg...',
+  '.e..ggggg..c.',
+  '.ee.......cc.',
+  '.eee.....ccc.',
+  '.eee.....ccc.',
+  '.eee.....ccc.',
+  '.eee.....ccc.',
+  '.eee.....ccc.',
+  '.eee.....ccc.',
+  '.ee.ddddd.cc.',
+  '.e.ddddddd.c.',
+  '..ddddddddd..',
+]
+
+function gameArt(color: boolean) {
+  const palette = color ? PALETTE : monochromePalette
+  const draw = (rows: readonly string[]) => pixelArt(rows, palette)
+  const numbers = numberRows.map((rows) =>
+    draw([
+      ...Array<string>(3).fill('................'),
+      ...rows.map((row) => `....${row}....`),
+      ...Array<string>(3).fill('................'),
+    ]),
+  )
+  const wrong = mineRows.map((row, y) =>
+    [...row]
+      .map((pixel, x) =>
+        x >= 2 && x <= 13 && (x === y || x === 15 - y || x === y + 1 || x === 14 - y) ? 'r' : pixel,
+      )
+      .join(''),
+  )
+  return {
+    numbers,
+    mine: draw(mineRows),
+    exploded: pixelArt(
+      mineRows.map((row) => row.replaceAll('.', 'r')),
+      color
+        ? PALETTE
+        : {
+            ...monochromePalette,
+            k: PALETTE.w,
+            w: PALETTE.k,
+          },
+    ),
+    wrong: pixelArt(wrong, color ? PALETTE : { ...monochromePalette, k: PALETTE.w, w: PALETTE.k }),
+    flag: draw(flagRows),
+    question: draw(questionRows),
+    faces: {
+      smile: draw(faceRows.smile),
+      surprised: draw(faceRows.surprised),
+      dead: draw(faceRows.dead),
+      win: draw(faceRows.win),
+    },
+    digits: Object.fromEntries(
+      Object.entries(segments).map(([digit, active]) => [
+        digit,
+        pixelArt(
+          segmentRows.map((row) =>
+            [...row]
+              .map((segment) => (segment === '.' ? 'k' : active.includes(segment) ? 'r' : 'R'))
+              .join(''),
+          ),
+          color ? PALETTE : { ...PALETTE, r: PALETTE.w, R: PALETTE.g },
+        ),
+      ]),
+    ),
+  }
+}
+
+export const artwork = { color: gameArt(true), monochrome: gameArt(false) }
+export const mineIcon = artwork.color.mine
 export const largeMineIcon = pixelArt(
   mineRows.flatMap((row) => {
     const doubled = [...row].map((pixel) => pixel + pixel).join('')
     return [doubled, doubled]
   }),
 )
-
-export const flagIcon = pixelArt([
-  '................',
-  '................',
-  '.......r........',
-  '.....rrr........',
-  '...rrrrr........',
-  '.....rrr........',
-  '.......k........',
-  '.......k........',
-  '.......k........',
-  '.....kkkk.......',
-  '...kkkkkkkk.....',
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-])
-
-const faceBase = [
-  '.....kkkkkk.....',
-  '...kkyyyyyykk...',
-  '..kyyyyyyyyyyk..',
-  '.kyyyyyyyyyyyyk.',
-  '.kyyyyyyyyyyyyk.',
-  'kyyykkyyyykkyyyk',
-  'kyyykkyyyykkyyyk',
-  'kyyyyyyyyyyyyyyk',
-  'kyyyyyyyyyyyyyyk',
-  'kyyyyyyyyyyyyyyk',
-  'kyykyyyyyyyykyyk',
-  '.kyykyyyyyykyyk.',
-  '.kyyykkkkkkyyyk.',
-  '..kyyyyyyyyyyk..',
-  '...kkyyyyyykk...',
-  '.....kkkkkk.....',
-]
-
-function face(variant: 'smile' | 'surprised' | 'dead' | 'win'): string {
-  const rows = [...faceBase]
-  if (variant === 'surprised' || variant === 'dead') {
-    rows[10] = 'kyyyyyyyyyyyyyyk'
-    rows[11] = '.kyyyyyyyyyyyyk.'
-    rows[12] = '.kyyyyyyyyyyyyk.'
-  }
-  if (variant === 'surprised') {
-    rows[9] = 'kyyyyyykkyyyyyyk'
-    rows[10] = 'kyyyyykyykyyyyyk'
-    rows[11] = '.kyyyykyykyyyyk.'
-    rows[12] = '.kyyyyykkyyyyyk.'
-  }
-  if (variant === 'dead') {
-    rows[4] = '.kykykyyykykyyk.'
-    rows[5] = 'kyyykyyyyykyyyyk'
-    rows[6] = 'kyykykyyykykyyyk'
-    rows[10] = 'kyyyykkkkkkyyyyk'
-    rows[11] = '.kyykyyyyyykyyk.'
-  }
-  if (variant === 'win') {
-    rows[4] = '.kkkkkkkkkkkkkk.'
-    rows[5] = 'kyykkkkyykkkkyyk'
-    rows[6] = 'kyyykkyyyykkyyyk'
-  }
-  return pixelArt(rows)
-}
-
-export const faces = {
-  smile: face('smile'),
-  surprised: face('surprised'),
-  dead: face('dead'),
-  win: face('win'),
-}
