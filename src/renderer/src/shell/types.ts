@@ -13,6 +13,7 @@ export interface Size {
 
 /** What a launch hands an app. Files and folders are virtual file system node ids. */
 export interface LaunchArgs {
+  readonly book?: string
   readonly file?: NodeId
   readonly folder?: NodeId
   readonly book?: string
