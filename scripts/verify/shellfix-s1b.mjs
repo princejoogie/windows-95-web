@@ -515,6 +515,27 @@ try {
       `document.querySelector('[aria-label="Start menu"]') !== null`,
       'Run leaves Start interactive',
     )
+  } else if (phase === 'maximized-restore') {
+    await run('notepad')
+    await click('[data-window] button[aria-label="Maximize"]')
+    await wait(`document.querySelector('[data-window]').style.left==='-4px'`)
+    await click('[data-window] button[aria-label="Minimize"]')
+    await wait(`getComputedStyle(document.querySelector('[data-window]')).display==='none'`)
+    await evaluate(
+      `globalThis.zoomWidths=[];globalThis.zoomObserver=new MutationObserver(()=>{const bar=document.querySelector('[data-caption-zoom]');if(bar)globalThis.zoomWidths.push(bar.getBoundingClientRect().width)});globalThis.zoomObserver.observe(document.body,{subtree:true,attributes:true,attributeFilter:['style']})`,
+    )
+    await click('[data-task="1"]')
+    await wait(`getComputedStyle(document.querySelector('[data-window]')).display!=='none'`)
+    await evaluate('globalThis.zoomObserver.disconnect()')
+    await check(
+      `Math.max(...globalThis.zoomWidths)===document.querySelector('[data-desktop]').getBoundingClientRect().width && document.querySelector('[data-window]').style.left==='-4px'`,
+      'Restoring a minimized maximized window zooms to the full desktop caption',
+    )
+    await shot('maximized-taskbar-restore')
+    writeFileSync(
+      join(proof, 'maximized-restore-widths.json'),
+      JSON.stringify(await evaluate('globalThis.zoomWidths'), null, 2),
+    )
   } else if (phase === 'surfaces') {
     await click('[data-start-button]')
     await shot('start-complete')

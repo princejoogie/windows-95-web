@@ -33,7 +33,7 @@ export async function animateWindow(action: TransitionAction) {
   const from = window.minimized ? taskRect : caption
   const to = minimizing
     ? taskRect
-    : maximizing && desktop
+    : (maximizing || (window.minimized && window.maximized)) && desktop
       ? { x: desktop.x, y: desktop.y, width: desktop.width, height: 18 }
       : normal
   if ((minimizing || restoring || maximizing) && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
