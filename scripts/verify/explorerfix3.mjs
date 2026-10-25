@@ -673,7 +673,87 @@ async function drive() {
   await shot('14-drive-labeled', await boxOf(mc))
 }
 
-const phases = { panes, explorer, sizes, deletion, bin, shared, tree, drive }
+async function options() {
+  await fresh()
+  await openOnDesktop('My Computer')
+  await openIn(windowNamed('My Computer'), '(C:)', '(C:)')
+  const c = windowNamed('(C:)')
+  await openMenu('View', 'Options...', c)
+  await app.waitFor(`!!${dialog('Options')}`)
+  const sheet = dialog('Options')
+  const tab = (index) => clickExpr(`[...${sheet}.querySelectorAll('[role="tab"]')][${index}]`)
+  const page = () => app.eval(`${sheet}.querySelector('[role="tabpanel"]').innerText`)
+  const tabs = await app.eval(`[...${sheet}.querySelectorAll('[role="tab"]')].map(t => t.textContent)`)
+  const folder = await page()
+  check(
+    tabs.join('|') === 'Folder|View|File Types' &&
+      folder.includes('Browsing options') &&
+      folder.includes('Browse folders using a separate window for each folder.') &&
+      (await app.eval(`${sheet}.querySelectorAll('[role="tabpanel"] img').length`)) === 2,
+    '22',
+    'Options has Folder, View, and File Types, and Folder pictures both browsing options',
+    { tabs, folder },
+  )
+  await shot('22-options-folder', await dialogBox('Options'))
+  await tab(1)
+  const view = await page()
+  check(
+    [
+      'Hidden files',
+      'Show all files',
+      'Hide files of these types:',
+      'Display the full MS-DOS path in the title bar',
+      'Hide MS-DOS file extensions for file types that are registered',
+      'Include description bar for right and left panes',
+    ].every((text) => view.includes(text)),
+    '22',
+    'the View page has the hidden-files list and the three Windows 95 options',
+    view,
+  )
+  await shot('22-options-view', await dialogBox('Options'))
+  await tab(2)
+  await app.eval(
+    "[...document.querySelectorAll('[role=option]')].find(o => o.textContent.trim() === 'Text Document').scrollIntoView({ block: 'nearest' })",
+  )
+  await clickExpr(
+    `[...${sheet}.querySelectorAll('[role="option"]')].find(o => o.textContent.trim() === 'Text Document')`,
+  )
+  const types = await page()
+  check(
+    types.includes('Registered file types:') &&
+      /Extension:\s+TXT/.test(types) &&
+      /Opens with:\s+NOTEPAD/.test(types),
+    '22',
+    'File Types lists registered types and details Text Document as TXT opened with NOTEPAD',
+    types,
+  )
+  await shot('22-options-file-types', await dialogBox('Options'))
+  await tab(1)
+  await clickExpr(
+    `[...${sheet}.querySelectorAll('label')].find(l => l.textContent === 'Display the full MS-DOS path in the title bar')`,
+  )
+  await clickExpr(
+    `[...${sheet}.querySelectorAll('label')].find(l => l.textContent === 'Include description bar for right and left panes')`,
+  )
+  await clickExpr(buttonIn(sheet, 'OK'))
+  await app.waitFor(`!!${windowNamed('C:\\')}`)
+  await openIn(windowNamed('C:\\'), 'My Documents', 'C:\\My Documents')
+  check(true, '22', 'with the full path option, folder windows are titled C:\\ and C:\\My Documents')
+  await run('explorer')
+  await app.waitFor(`!!${windowNamed('Exploring - C:\\')}`)
+  const headings = await app.eval(
+    `${windowNamed('Exploring - C:\\')}.querySelectorAll('.explorer-pane-heading').length`,
+  )
+  check(
+    headings === 0,
+    '22',
+    'without the description bar, Explorer drops All Folders and Contents of',
+    headings,
+  )
+  await shot('22-options-applied')
+}
+
+const phases = { panes, explorer, sizes, deletion, bin, shared, tree, drive, options }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {

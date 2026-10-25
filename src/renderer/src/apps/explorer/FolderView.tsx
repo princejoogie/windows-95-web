@@ -191,10 +191,8 @@ export function FolderView({
           : 'Folder')
   const setTitle = window.setTitle
   const path = folder ? pathOf(state, folder.id) : title
-  useEffect(
-    () => setTitle(exploring ? `Exploring - ${folder?.kind === 'drive' ? path : title}` : title),
-    [setTitle, title, path, exploring, folder?.kind],
-  )
+  const shown = folder && (settings.fullPath || (exploring && folder.kind === 'drive')) ? path : title
+  useEffect(() => setTitle(exploring ? `Exploring - ${shown}` : shown), [setTitle, shown, exploring])
   const detailColumns = recycled ? recycleColumns : columns.slice(0, 4)
   const mutable = selected.length > 0 && selected.every((node) => !isProtected(node.id))
   const performShell = (action: ShellAction) => {
@@ -1108,7 +1106,7 @@ export function FolderView({
         {exploring && (
           <>
             <div className="explorer-tree-pane" style={{ width: treeWidth }}>
-              <div className="explorer-pane-heading">All Folders</div>
+              {settings.descriptionBar && <div className="explorer-pane-heading">All Folders</div>}
               <FolderTree
                 state={state}
                 location={location}
@@ -1127,7 +1125,9 @@ export function FolderView({
           </>
         )}
         <div className="explorer-content-pane">
-          {exploring && <div className="explorer-pane-heading">Contents of '{path}'</div>}
+          {exploring && settings.descriptionBar && (
+            <div className="explorer-pane-heading">Contents of '{path}'</div>
+          )}
           <div className={`explorer-files explorer-${view} bevel-sunken`}>
             {view === 'details' && (
               <div
