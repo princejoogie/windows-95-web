@@ -50,11 +50,11 @@ describe('Minesweeper rules', () => {
   })
 
   it('keeps the first click safe even at the maximum custom density', () => {
-    const size = customSize({ width: 9, height: 9, mines: 999 })
+    const size = customSize({ width: 8, height: 8, mines: 999 })
     for (let seed = 0; seed < 20; seed++) {
-      const game = reveal(createGame(size, seed), 40)
-      expect(game.cells[40]?.mine).toBe(false)
-      expect(game.cells.filter((cell) => cell.mine)).toHaveLength(64)
+      const game = reveal(createGame(size, seed), 27)
+      expect(game.cells[27]?.mine).toBe(false)
+      expect(game.cells.filter((cell) => cell.mine)).toHaveLength(49)
     }
   })
 
@@ -66,7 +66,11 @@ describe('Minesweeper rules', () => {
   })
 
   it('flood fills connected zeros and their border without opening flags', () => {
-    const game = reveal(mark(createGame(LEVELS.beginner, 42), 39, true), 40)
+    let game = reveal(mark(createGame(LEVELS.beginner, 42), 39, true), 40)
+    const zero = game.cells.findIndex((cell, index) => !cell.mine && cell.adjacent === 0 && index !== 39)
+    expect(zero).toBeGreaterThanOrEqual(0)
+    game = reveal(game, zero)
+    expect(game.cells[zero]).toMatchObject({ adjacent: 0, cover: 'open' })
     expect(game.cells[39]?.cover).toBe('flag')
     for (const [index, cell] of game.cells.entries()) {
       if (cell.cover === 'open' && cell.adjacent === 0) {
