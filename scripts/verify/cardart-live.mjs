@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 // Drives the built Electron app over CDP to prove the card art in Solitaire, FreeCell, and Hearts, and
 // the FreeCell right-button preview. Usage: node scripts/verify/cardart-live.mjs [cdp port] [proof dir]
 import { appendFileSync, mkdirSync } from 'node:fs'

@@ -377,7 +377,14 @@ try {
   else if (phase === 'shortcut') await shortcut()
   else if (phase === 'capacity') await capacity()
   else if (phase === 'abouts') await abouts()
-  else throw new Error(`Unknown phase ${phase}`)
+  else if (phase === 'desktop') {
+    await fresh()
+    await check(
+      `location.protocol === 'file:' && !document.querySelector('[data-window]') && !!document.querySelector('[data-start-button]')`,
+      'Final production Electron build opens a clean desktop',
+    )
+    await shot('06-final-desktop')
+  } else throw new Error(`Unknown phase ${phase}`)
 } finally {
   c.close()
 }

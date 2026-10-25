@@ -1,4 +1,5 @@
 #!/bin/sh
+# Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 # Usage: scripts/verify/cardart-shot.sh <sheet name> <width> <height>
 # Rebuilds the sheets from cards.ts and screenshots one with headless Chrome into the proof dir.
 set -e

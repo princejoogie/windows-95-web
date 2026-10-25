@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 // Live verification of WordPad and Character Map against a running Electron build.
 // Usage: node scripts/verify/wordpad.mjs <cdp port> <proof dir>
 // Start the app first:

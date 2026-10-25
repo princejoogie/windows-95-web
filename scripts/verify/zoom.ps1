@@ -1,3 +1,4 @@
+# Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 param([string]$In, [string]$Out, [int]$X, [int]$Y, [int]$W, [int]$H, [int]$Scale = 6)
 Add-Type -AssemblyName System.Drawing
 $src = [System.Drawing.Bitmap]::FromFile($In)

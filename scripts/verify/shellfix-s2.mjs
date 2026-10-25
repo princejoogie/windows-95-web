@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 // Live proof for shell fix S2. Run against `scripts/verify/relaunch.sh --fresh`:
 //   node scripts/verify/shellfix-s2.mjs [controls|desktop|dialog|all]
 import assert from 'node:assert/strict'

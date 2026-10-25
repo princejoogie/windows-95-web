@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 // Live proof for apps fix round 3, unit U3 (Explorer, My Computer, Recycle Bin). Run against a fresh app:
 //   W95_CDP_PORT=9412 W95_DATA_DIR=D:/tmp/explorerfix3-data bash scripts/verify/relaunch.sh --fresh
 //   node scripts/verify/explorerfix3.mjs <phase>

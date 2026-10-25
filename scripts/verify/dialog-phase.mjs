@@ -1,3 +1,4 @@
+// Historical proof from an earlier rebuild round. See scripts/verify/README.md.
 // The Open/Save dialog phase of shellfix-s2.mjs: findings 26, 27, 28, 41, and 42.
 import { sleep } from './cdp.mjs'
 
