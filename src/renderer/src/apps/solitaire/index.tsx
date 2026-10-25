@@ -1,9 +1,22 @@
 import { type CSSProperties, type PointerEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useKeyDown } from '../../shell/context'
+import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
 import { Button, Checkbox, Dialog, GroupBox, MenuBar, Radio, StatusBar, StatusPane } from '../../ui'
+import { About } from './About'
 import { Cascade } from './Cascade'
-import { BACKS, type Back, backImage, cardImage, cardName, icon, smallIcon } from './cards'
+import {
+  ANIMATED_BACKS,
+  BACKS,
+  type Back,
+  backImage,
+  cardImage,
+  cardName,
+  icon,
+  slotImage,
+  smallIcon,
+  stockImage,
+} from './cards'
 import { proofDeal } from './fixtures'
 import {
   type Action,
@@ -218,7 +231,7 @@ function DeckDialog({
     gallery.current?.querySelector<HTMLInputElement>('input:checked')?.focus()
   }, [])
   return (
-    <Dialog title="Select Card Back" onClose={onClose}>
+    <Dialog title="Select Card Back" onClose={onClose} className="w-[544px]">
       <form
         className="p-3"
         onSubmit={(event) => {
@@ -294,6 +307,7 @@ function Solitaire({ window }: AppProps) {
   const [dialog, setDialog] = useState<'options' | 'deck' | 'about' | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
   const [cascadeStopped, setCascadeStopped] = useState(false)
+  const [backFrame, setBackFrame] = useState(0)
   const root = useRef<HTMLDivElement>(null)
   const suppressClick = useRef(false)
   const [size, setSize] = useState({ width: 620, height: 400 })
@@ -343,32 +357,36 @@ function Solitaire({ window }: AppProps) {
     if (!active) setDrag(null)
   }, [active])
   useEffect(() => {
+    if (!active || !game.options.timed || game.phase !== 'playing' || !ANIMATED_BACKS.includes(back)) return
+    const interval = setInterval(() => setBackFrame((frame) => (frame + 1) % 4), 350)
+    return () => clearInterval(interval)
+  }, [active, game.options.timed, game.phase, back])
+  useEffect(() => {
     if (game.options.scoring === 'vegas') vegasBalance.current = game.score
     savePreferences({ options: game.options, back, vegasBalance: vegasBalance.current })
   }, [game.options, game.score, back])
 
-  const scale = Math.max(0.75, Math.min(size.width / 620, size.height / 360, 1.75))
-  const cardWidth = 71 * scale
-  const cardHeight = 96 * scale
-  const margin = 12 * scale
+  const cardWidth = 71
+  const cardHeight = 96
+  const margin = 12
   const gap = (size.width - margin * 2 - cardWidth) / 6
-  const tableauY = 130 * scale
-  const columnX = (column: number) => margin + column * gap
+  const tableauY = 130
+  const columnX = (column: number) => Math.round(margin + column * gap)
   const offsets = game.tableau.map((column) => {
-    const natural = column.slice(0, -1).reduce((sum, card) => sum + (card.faceUp ? 21 : 9) * scale, 0)
+    const natural = column.slice(0, -1).reduce((sum, card) => sum + (card.faceUp ? 21 : 9), 0)
     const compression = natural
       ? Math.min(1, Math.max(0, size.height - tableauY - cardHeight - margin) / natural)
       : 1
     let top = tableauY
     return column.map((card) => {
       const value = top
-      top += (card.faceUp ? 21 : 9) * scale * compression
-      return value
+      top += (card.faceUp ? 21 : 9) * compression
+      return Math.round(value)
     })
   })
   const rect = (x: number, y: number): CSSProperties => ({
-    left: x,
-    top: y,
+    left: Math.round(x),
+    top: Math.round(y),
     width: cardWidth,
     height: cardHeight,
   })
@@ -459,7 +477,7 @@ function Solitaire({ window }: AppProps) {
         if (faceUp && !suppressClick.current) autoFoundation(source)
       }}
     >
-      <img src={faceUp ? cardImage(card) : backImage(back)} alt="" draggable={false} />
+      <img src={faceUp ? cardImage(card) : backImage(back, backFrame)} alt="" draggable={false} />
     </button>
   )
   const fan = Math.min(game.waste.length, Math.max(1, game.wasteFan))
@@ -484,7 +502,14 @@ function Solitaire({ window }: AppProps) {
               { label: 'E&xit', onSelect: window.close },
             ],
           },
-          { label: '&Help', items: [{ label: '&About Solitaire', onSelect: () => setDialog('about') }] },
+          {
+            label: '&Help',
+            items: [
+              { label: '&Help Topics', onSelect: () => launch('help', { book: 'solitaire' }) },
+              'separator',
+              { label: '&About Solitaire', onSelect: () => setDialog('about') },
+            ],
+          },
         ]}
       />
       <div
@@ -524,15 +549,13 @@ function Solitaire({ window }: AppProps) {
           onClick={() => dispatch({ type: 'stock' })}
         >
           {game.stock.length ? (
-            <img src={backImage(back)} alt="" draggable={false} />
+            <img src={backImage(back, backFrame)} alt="" draggable={false} />
           ) : (
-            <span style={{ color: canRecycle(game) ? '#00ff00' : '#800000', fontSize: 50 * scale }}>
-              {canRecycle(game) ? '↻' : '×'}
-            </span>
+            <img src={stockImage(canRecycle(game))} alt="" draggable={false} />
           )}
         </button>
         {game.waste.slice(-fan).map((card, index) => {
-          const x = columnX(1) + index * 14 * scale
+          const x = columnX(1) + index * 14
           if (index === fan - 1) return cardButton(card, { kind: 'waste' }, x, margin)
           return (
             <img
@@ -557,7 +580,9 @@ function Solitaire({ window }: AppProps) {
                 aria-label={`${card ? card.suit : 'Empty'} foundation ${pile + 1}`}
                 data-foundation={pile}
                 data-count={game.foundations[pile].length}
-              />
+              >
+                <img src={slotImage} alt="" draggable={false} />
+              </div>
               {card && cardButton(card, { kind: 'foundation', pile }, columnX(pile + 3), margin)}
             </div>
           )
@@ -573,7 +598,9 @@ function Solitaire({ window }: AppProps) {
                 aria-label={`Tableau column ${columnIndex + 1}`}
                 data-column={columnIndex}
                 data-count={column.length}
-              />
+              >
+                <img src={slotImage} alt="" draggable={false} />
+              </div>
               {column.map((card, index) =>
                 cardButton(
                   card,
@@ -593,7 +620,7 @@ function Solitaire({ window }: AppProps) {
                 <div
                   key={`${card.suit}-${card.rank}`}
                   className="absolute border border-white outline outline-black"
-                  style={rect(drag.x - drag.offsetX, drag.y - drag.offsetY + index * 21 * scale)}
+                  style={rect(drag.x - drag.offsetX, drag.y - drag.offsetY + index * 21)}
                 />
               ) : (
                 <img
@@ -601,7 +628,7 @@ function Solitaire({ window }: AppProps) {
                   src={cardImage(card)}
                   alt=""
                   className="absolute"
-                  style={rect(drag.x - drag.offsetX, drag.y - drag.offsetY + index * 21 * scale)}
+                  style={rect(drag.x - drag.offsetX, drag.y - drag.offsetY + index * 21)}
                 />
               ),
             )}
@@ -611,7 +638,7 @@ function Solitaire({ window }: AppProps) {
           <Cascade
             width={size.width}
             height={size.height}
-            scale={scale}
+            foundations={game.foundations}
             active={active}
             onStop={() => setCascadeStopped(true)}
           />
@@ -662,26 +689,7 @@ function Solitaire({ window }: AppProps) {
           }}
         />
       )}
-      {dialog === 'about' && (
-        <Dialog title="About Solitaire" onClose={() => setDialog(null)} className="w-[310px]">
-          <div className="flex gap-3 p-4">
-            <img src={icon} alt="" className="size-8" />
-            <div>
-              Microsoft Solitaire
-              <br />
-              Windows 95
-              <br />
-              <br />
-              Klondike
-              <br />
-              Build each foundation from Ace to King.
-            </div>
-          </div>
-          <div className="flex justify-end p-3 pt-0">
-            <Button onClick={() => setDialog(null)}>OK</Button>
-          </div>
-        </Dialog>
-      )}
+      {dialog === 'about' && <About onClose={() => setDialog(null)} />}
     </div>
   )
 }
