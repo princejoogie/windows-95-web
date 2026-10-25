@@ -236,6 +236,16 @@ export const clickText = async (d, selector, text, opts) => {
   await d.click(p.x, p.y, opts)
 }
 export const menuItem = (d, text, opts) => clickText(d, '[role="menu"] [role="menuitem"]', text, opts)
+export async function run(d, command) {
+  await d.clickSel('[data-taskbar] button')
+  await menuItem(d, 'Run...')
+  await d.type(command)
+  await d.key('Enter')
+  await d.wait(300)
+}
+export async function appMenu(d, name) {
+  await clickText(d, '[data-window] [role=menubar] button', name)
+}
 export const hoverMenuItem = async (d, text) => {
   const p = await centerOf(d, '[role="menu"] [role="menuitem"]', text)
   await d.move(p.x, p.y)
