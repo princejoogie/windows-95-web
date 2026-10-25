@@ -1,11 +1,13 @@
-import { useState } from 'react'
-import { Button, Checkbox, Dialog, GroupBox, Radio } from '../../ui'
+import { useId, useState } from 'react'
+import { Button, Checkbox, ComboBox, Dialog, GroupBox, Radio, TextBox } from '../../ui'
+import { Tabs } from '../help/controls'
 import { dosSmallIcon } from './icons'
 
 export const FONTS = [
   { label: '8 x 12', width: 8, height: 12, size: 12 },
   { label: '8 x 16', width: 8, height: 16, size: 16 },
   { label: '10 x 18', width: 10, height: 18, size: 18 },
+  { label: 'Auto', width: 8, height: 16, size: 16 },
 ] as const
 
 export interface Settings {
@@ -14,77 +16,121 @@ export interface Settings {
   readonly toolbar: boolean
 }
 
+const tabs = ['Program', 'Font', 'Memory', 'Screen', 'Misc'] as const
+
 export function Properties({
   settings,
+  initialTab,
   onApply,
   onClose,
 }: {
   settings: Settings
+  initialTab: 'Program' | 'Font'
   onApply: (settings: Settings, full: boolean) => void
   onClose: () => void
 }) {
   const [draft, setDraft] = useState(settings)
-  const [tab, setTab] = useState('Font')
+  const [tab, setTab] = useState<(typeof tabs)[number]>(initialTab)
   const [full, setFull] = useState(false)
+  const id = useId()
+  const auto = [{ key: 'auto', label: 'Auto' }]
   return (
-    <Dialog title="MS-DOS Prompt Properties" icon={dosSmallIcon} onClose={onClose} className="w-[340px]">
+    <Dialog title="MS-DOS Prompt Properties" icon={dosSmallIcon} onClose={onClose} className="w-[390px]">
       <div className="p-[8px]">
-        <div
-          role="tablist"
-          aria-label="Properties"
-          className="flex"
-          onKeyDown={(event) => {
-            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-              event.preventDefault()
-              const next = tab === 'Font' ? 'Screen' : 'Font'
-              setTab(next)
-              event.currentTarget.querySelector<HTMLButtonElement>(`[data-tab="${next}"]`)?.focus()
-            }
-          }}
-        >
-          {['Font', 'Screen'].map((name) => (
-            <button
-              key={name}
-              type="button"
-              role="tab"
-              data-tab={name}
-              aria-selected={tab === name}
-              tabIndex={tab === name ? 0 : -1}
-              className={`px-[10px] h-[22px] bevel-raised ${tab === name ? 'relative top-px bg-face' : ''}`}
-              onClick={() => setTab(name)}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
+        <Tabs items={tabs} value={tab} onChange={setTab} />
         <div
           role="tabpanel"
           aria-label={tab}
-          className="bevel-raised p-[12px] h-[196px] flex flex-col gap-[12px]"
+          className="bevel-raised p-[12px] h-[252px] flex flex-col gap-[12px]"
         >
-          {tab === 'Font' ? (
+          {tab === 'Program' && (
             <>
-              <GroupBox label="Font size" className="flex flex-col gap-[6px]">
-                {FONTS.map((font, index) => (
-                  <Radio
-                    key={font.label}
-                    name="dos-font"
-                    label={font.label}
-                    checked={draft.font === index}
-                    onChange={() => setDraft({ ...draft, font: index })}
-                  />
-                ))}
-              </GroupBox>
-              <div
-                className="bg-black text-[#c0c0c0] p-[8px] font-mono"
-                style={{ fontSize: FONTS[draft.font]?.size }}
-              >
-                C:\WINDOWS&gt;_
+              <div className="flex items-center gap-3">
+                <img src={dosSmallIcon} alt="" className="size-8" />
+                <TextBox aria-label="Program name" value="MS-DOS Prompt" readOnly className="flex-1" />
+              </div>
+              <label htmlFor={`${id}-command`} className="flex gap-2 items-center">
+                Cmd line:
+                <TextBox
+                  id={`${id}-command`}
+                  value={'C:\\WINDOWS\\COMMAND.COM'}
+                  readOnly
+                  className="flex-1"
+                />
+              </label>
+              <label htmlFor={`${id}-working`} className="flex gap-2 items-center">
+                Working:
+                <TextBox id={`${id}-working`} value={'C:\\WINDOWS'} readOnly className="flex-1" />
+              </label>
+              <label htmlFor={`${id}-batch`} className="flex gap-2 items-center">
+                Batch file:
+                <TextBox id={`${id}-batch`} value="" readOnly className="flex-1" />
+              </label>
+              <Checkbox label="Close on exit" checked readOnly />
+              <div className="flex justify-end gap-2">
+                <Button disabled>Change Icon...</Button>
+                <Button disabled>Advanced...</Button>
               </div>
             </>
-          ) : (
+          )}
+          {tab === 'Font' && (
             <>
-              <GroupBox label="Usage" className="flex flex-col gap-[8px]">
+              <div className="flex gap-3">
+                <GroupBox label="Font size" className="w-[110px] flex flex-col gap-2">
+                  {[3, 0, 1, 2].map((index) => (
+                    <Radio
+                      key={index}
+                      name="dos-font"
+                      label={FONTS[index]?.label}
+                      checked={draft.font === index}
+                      onChange={() => setDraft({ ...draft, font: index })}
+                    />
+                  ))}
+                </GroupBox>
+                <GroupBox label="Window preview" className="flex-1">
+                  <div className="bevel-window bg-face p-[3px] h-[90px]">
+                    <div className="h-[10px] bg-title" />
+                    <div className="bg-black text-white h-[65px] p-1 font-mono text-[8px]">
+                      Microsoft Windows 95
+                      <br />
+                      C:\WINDOWS&gt;_
+                    </div>
+                  </div>
+                </GroupBox>
+              </div>
+              <GroupBox label="Font preview">
+                <div
+                  className="bg-black text-[#c0c0c0] p-2 font-mono h-[54px]"
+                  style={{ fontSize: FONTS[draft.font]?.size }}
+                >
+                  C:\WINDOWS&gt;_
+                  <br />
+                  AaBbYyZz 0123456789
+                </div>
+              </GroupBox>
+            </>
+          )}
+          {tab === 'Memory' &&
+            [
+              'Conventional memory',
+              'Expanded (EMS) memory',
+              'Extended (XMS) memory',
+              'MS-DOS protected-mode (DPMI) memory',
+            ].map((label) => (
+              <GroupBox key={label} label={label} className="flex items-center gap-3 py-1!">
+                <span>Total:</span>
+                <ComboBox
+                  aria-label={label}
+                  className="w-[105px]"
+                  value="auto"
+                  options={auto}
+                  onChange={() => undefined}
+                />
+              </GroupBox>
+            ))}
+          {tab === 'Screen' && (
+            <>
+              <GroupBox label="Usage" className="flex flex-col gap-2">
                 <Radio name="dos-screen" label="Window" checked={!full} onChange={() => setFull(false)} />
                 <Radio name="dos-screen" label="Full-screen" checked={full} onChange={() => setFull(true)} />
               </GroupBox>
@@ -98,6 +144,22 @@ export function Properties({
                 checked={draft.blink}
                 onChange={(event) => setDraft({ ...draft, blink: event.target.checked })}
               />
+            </>
+          )}
+          {tab === 'Misc' && (
+            <>
+              <GroupBox label="Foreground">
+                <Checkbox label="Allow screen saver" checked readOnly />
+              </GroupBox>
+              <GroupBox label="Background">
+                <Checkbox label="Always suspend" checked={false} readOnly />
+              </GroupBox>
+              <GroupBox label="Termination">
+                <Checkbox label="Warn if still active" checked readOnly />
+              </GroupBox>
+              <GroupBox label="Other">
+                <Checkbox label="Fast pasting" checked readOnly />
+              </GroupBox>
             </>
           )}
         </div>
