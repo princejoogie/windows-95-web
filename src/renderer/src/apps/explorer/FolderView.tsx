@@ -60,6 +60,7 @@ function Rename({ node, finish }: { node: FsNode; finish: (name: string | null) 
       onDoubleClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
         event.stopPropagation()
+        if (event.key === 'Enter' || event.key === 'Escape') event.preventDefault()
         if (event.key === 'Enter') commit(event.currentTarget.value)
         if (event.key === 'Escape') commit(null)
       }}
@@ -98,7 +99,11 @@ export function FolderView({ initial, window }: { initial: Location; window: Win
   const mutable = selected.length > 0 && selected.every((node) => !isProtected(node.id))
 
   const selectAll = () =>
-    setSelection({ ids: new Set(nodes.map((node) => node.id)), anchor: nodes[0]?.id ?? null })
+    setSelection({
+      ids: new Set(nodes.map((node) => node.id)),
+      anchor: nodes[0]?.id ?? null,
+      focus: nodes[0]?.id ?? null,
+    })
   const rename = () => {
     if (writable && single && !isProtected(single.id)) setRenaming(single.id)
   }
@@ -134,7 +139,7 @@ export function FolderView({ initial, window }: { initial: Location; window: Win
       setPrompt({ kind: 'error', message: result.error })
       return
     }
-    setSelection({ ids: new Set([result.id]), anchor: result.id })
+    setSelection({ ids: new Set([result.id]), anchor: result.id, focus: result.id })
     setRenaming(result.id)
   }
   const deleteSelected = () => {
@@ -190,7 +195,7 @@ export function FolderView({ initial, window }: { initial: Location; window: Win
     const key = event.key.toLowerCase()
     if (['ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft', 'Home', 'End'].includes(event.key)) {
       event.preventDefault()
-      const current = nodes.findIndex((node) => node.id === selection.anchor)
+      const current = nodes.findIndex((node) => node.id === selection.focus)
       const forward = event.key === 'ArrowDown' || event.key === 'ArrowRight'
       const index =
         event.key === 'Home'

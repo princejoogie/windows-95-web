@@ -12,6 +12,7 @@ export const app: AppManifest = {
   title: 'Windows Explorer',
   icon: icons.folderOpened,
   exe: 'EXPLORER.EXE',
+  installDir: 'C:\\WINDOWS',
   startMenu: [],
   window: { kind: 'resizable', width: 420, height: 300, minWidth: 240, minHeight: 180 },
   component: Explorer,

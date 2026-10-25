@@ -94,6 +94,8 @@ describe('Explorer selection', () => {
   it('extends in both directions from the anchor and shrinks a previous range', () => {
     const first = click()
     const range = click(first, WINDOWS_DIR, false, true)
+    expect(range.focus).toBe(WINDOWS_DIR)
+    expect(range.anchor).toBe(ROOT)
     expect([...range.ids]).toEqual(order)
     expect([...click(range, DOCUMENTS_DIR, false, true).ids]).toEqual([ROOT, DOCUMENTS_DIR])
     expect([...click(click(emptySelection, WINDOWS_DIR), ROOT, false, true).ids]).toEqual(order)

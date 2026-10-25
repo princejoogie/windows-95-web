@@ -14,6 +14,7 @@ export const app: AppManifest = {
   title: 'Recycle Bin',
   icon: icons.binEmpty,
   exe: 'RECYCLE.EXE',
+  installDir: 'C:\\WINDOWS',
   desktop: {
     order: 1,
     icon: (state) => (children(state, RECYCLED_DIR).length ? icons.binFull : icons.binEmpty),

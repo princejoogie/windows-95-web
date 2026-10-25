@@ -11,8 +11,9 @@ export interface Sort {
 export interface Selection {
   ids: ReadonlySet<NodeId>
   anchor: NodeId | null
+  focus: NodeId | null
 }
-export const emptySelection: Selection = { ids: new Set(), anchor: null }
+export const emptySelection: Selection = { ids: new Set(), anchor: null, focus: null }
 export const columns: readonly { id: Column; label: string; width: number }[] = [
   { id: 'name', label: 'Name', width: 170 },
   { id: 'size', label: 'Size', width: 65 },
@@ -122,12 +123,12 @@ export function selectNode({
   if (shift && anchorIndex >= 0) {
     const index = order.indexOf(id)
     const range = order.slice(Math.min(anchorIndex, index), Math.max(anchorIndex, index) + 1)
-    return { ids: new Set(ctrl ? [...retained, ...range] : range), anchor: selection.anchor }
+    return { ids: new Set(ctrl ? [...retained, ...range] : range), anchor: selection.anchor, focus: id }
   }
   if (ctrl) {
     if (retained.has(id)) retained.delete(id)
     else retained.add(id)
-    return { ids: retained, anchor: id }
+    return { ids: retained, anchor: id, focus: id }
   }
-  return { ids: new Set([id]), anchor: id }
+  return { ids: new Set([id]), anchor: id, focus: id }
 }
