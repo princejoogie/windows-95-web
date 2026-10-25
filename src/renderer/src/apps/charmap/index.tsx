@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { useKeyDown } from '../../shell/context'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { Button, MessageBox, StatusBar, StatusPane, TextBox } from '../../ui'
+import { Button, ComboBox, MessageBox, StatusBar, StatusPane, TextBox } from '../../ui'
 import { FONTS, isSymbolFont } from '../wordpad/fonts'
 import { COLUMNS, cellCode, cellIndex, glyphFor, keystroke, LAST_CODE, moveSelection, ROWS } from './chars'
 import { charmapIcon, charmapSmallIcon } from './icon'
@@ -67,18 +67,14 @@ export function CharacterMap({ window: windowApi }: AppProps) {
         <label htmlFor={`${id}-font`}>
           <span className="underline">F</span>ont:
         </label>
-        <select
+        <ComboBox
           id={`${id}-font`}
-          className="h-[21px] w-[150px] bg-white bevel-sunken px-[2px] outline-none"
+          aria-label="Font"
+          className="w-[150px]"
           value={font}
-          onChange={(event) => setFont(event.target.value)}
-        >
-          {FONTS.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
+          onChange={setFont}
+          options={FONTS.map((name) => ({ key: name, label: name }))}
+        />
         <label htmlFor={`${id}-chars`} className="ml-[6px]">
           Ch<span className="underline">a</span>racters to copy:
         </label>

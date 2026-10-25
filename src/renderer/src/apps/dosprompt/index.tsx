@@ -1,11 +1,11 @@
-import { type CSSProperties, type PointerEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type CSSProperties, type PointerEvent, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { fsStore, useFs } from '../../fs/store'
 import { WINDOWS_DIR } from '../../fs/types'
 import { useKeyDown } from '../../shell/context'
 import { launch, openNode, windowsStore } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { AboutDialog, MessageBox } from '../../ui'
+import { AboutDialog, ComboBox, MessageBox } from '../../ui'
 import { ConsoleMenu, type ConsoleMenuItem } from './ConsoleMenu'
 import { dosIcon, dosSmallIcon, toolbarIcons } from './icons'
 import { BANNER, execute, newSession, prompt } from './interpreter'
@@ -24,9 +24,10 @@ function DosPrompt({ window: api, args }: AppProps) {
   const [settings, setSettings] = useState<Settings>({ font: 1, blink: true, toolbar: true })
   const [full, setFull] = useState(false)
   const [viewport, setViewport] = useState({ width: innerWidth, height: innerHeight })
-  const [mark, setMark] = useState<Mark | null>(null)
+  const [mark, setMark] = useState<(Mark & { kind: 'mark' | 'select' }) | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [dialog, setDialog] = useState<'none' | 'properties' | 'help' | 'about'>('none')
+  const [propertyTab, setPropertyTab] = useState<'Program' | 'Font'>('Program')
   const [error, setError] = useState('')
   const commandInput = useRef<HTMLInputElement>(null)
   const consoleRef = useRef<HTMLDivElement>(null)
@@ -59,13 +60,16 @@ function DosPrompt({ window: api, args }: AppProps) {
     addEventListener('resize', resize)
     return () => removeEventListener('resize', resize)
   }, [])
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (api.focused && !api.minimized && dialog === 'none' && !menu && !error)
       commandInput.current?.focus({ preventScroll: !fullVisible })
   }, [api.focused, api.minimized, dialog, menu, error, fullVisible])
   useEffect(() => {
     if (!api.focused) setMenu(null)
   }, [api.focused])
+  useEffect(() => {
+    api.setTitle(mark ? `${mark.kind === 'mark' ? 'Mark' : 'Select'} - MS-DOS Prompt` : 'MS-DOS Prompt')
+  }, [api, mark])
 
   const editLine = (value: string) => {
     setInput(value.slice(0, 127))
@@ -132,9 +136,10 @@ function DosPrompt({ window: api, args }: AppProps) {
       else setError('The Clipboard is not available. You can paste text with Shift+Insert or Ctrl+V.')
     }
   }
-  const markText = () => setMark({ anchor: { row: 0, column: 0 }, end: { row: 0, column: 0 } })
+  const markText = () => setMark({ kind: 'mark', anchor: { row: 0, column: 0 }, end: { row: 0, column: 0 } })
   const properties = () => {
     setFull(false)
+    setPropertyTab('Program')
     setDialog('properties')
   }
   const toggleFull = () => {
@@ -152,6 +157,14 @@ function DosPrompt({ window: api, args }: AppProps) {
     { label: 'Full Screen', action: toggleFull },
     { label: 'Properties', action: properties },
     { label: 'Background', action: background },
+    {
+      label: 'Font',
+      action: () => {
+        setFull(false)
+        setPropertyTab('Font')
+        setDialog('properties')
+      },
+    },
   ] satisfies {
     label: keyof typeof toolbarIcons
     action: () => void
@@ -239,7 +252,7 @@ function DosPrompt({ window: api, args }: AppProps) {
             ),
           ),
         }
-        setMark({ anchor: event.shiftKey ? mark.anchor : end, end })
+        setMark({ kind: event.shiftKey ? 'select' : 'mark', anchor: event.shiftKey ? mark.anchor : end, end })
       }
       return
     }
@@ -312,7 +325,7 @@ function DosPrompt({ window: api, args }: AppProps) {
         if (!mark) return
         event.preventDefault()
         const cell = cellAt(event)
-        setMark({ anchor: cell, end: cell })
+        setMark({ kind: 'select', anchor: cell, end: cell })
         dragging.current = true
         event.currentTarget.setPointerCapture(event.pointerId)
       }}
@@ -399,18 +412,13 @@ function DosPrompt({ window: api, args }: AppProps) {
             setMenu({ x: event.clientX, y: event.clientY })
           }}
         >
-          <select
+          <ComboBox
             aria-label="Font size"
-            value={settings.font}
-            className="bevel-sunken"
-            onChange={(event) => setSettings({ ...settings, font: Number(event.target.value) })}
-          >
-            {FONTS.map((font, index) => (
-              <option key={font.label} value={index}>
-                {font.label}
-              </option>
-            ))}
-          </select>
+            value={String(settings.font)}
+            className="w-[80px]"
+            onChange={(value) => setSettings({ ...settings, font: Number(value) })}
+            options={FONTS.map((font, index) => ({ key: String(index), label: font.label }))}
+          />
           {tools.map((tool) => (
             <button
               key={tool.label}
@@ -438,6 +446,7 @@ function DosPrompt({ window: api, args }: AppProps) {
       {menu && <ConsoleMenu at={menu} items={menuItems} onClose={() => setMenu(null)} />}
       {dialog === 'properties' && (
         <Properties
+          initialTab={propertyTab}
           settings={settings}
           onApply={(settings, fullscreen) => {
             setSettings(settings)
@@ -455,7 +464,7 @@ function DosPrompt({ window: api, args }: AppProps) {
           buttons={['OK']}
           icon="info"
           message={
-            'Type HELP for a list of commands, or HELP followed by a command name.\n\nUp and Down recall commands. F3 repeats the last command. Esc clears the line. Ctrl+C cancels a command.\n\nAlt+Enter switches between a window and full screen. Right-click or press Shift+F10 for the menu and toolbar setting.\n\nMark selects a rectangle of text. Enter copies it. Shift+Insert pastes.\n\nType EXIT to close this window.'
+            'Type a built-in command followed by /? for help.\n\nUp and Down recall commands. F3 repeats the last command. Esc clears the line. Ctrl+C cancels a command.\n\nAlt+Enter switches between a window and full screen. Right-click or press Shift+F10 for the menu and toolbar setting.\n\nMark selects a rectangle of text. Enter copies it. Shift+Insert pastes.\n\nType EXIT to close this window.'
           }
           onClose={() => setDialog('none')}
         />

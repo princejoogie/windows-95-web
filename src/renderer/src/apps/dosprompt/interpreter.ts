@@ -87,9 +87,7 @@ const HELP: Readonly<Record<string, string>> = {
   DEL: 'DEL filename\nDeletes files permanently. * and ? select matching names. ERASE is an alias.',
   DIR: 'DIR [path] [filename] [/P] [/W] [/S]\n/P Pauses after each screen. /W Uses wide format. /S Includes subdirectories.',
   ECHO: 'ECHO [ON | OFF]\nECHO [message]\nECHO. prints a blank line. > writes a file and >> appends.',
-  EDIT: 'EDIT [filename]\nOpens a text file in Notepad.',
   EXIT: 'EXIT\nCloses the MS-DOS Prompt window.',
-  HELP: 'HELP [command]\nDisplays help for MS-DOS commands.',
   MD: 'MD path\nCreates a directory. MKDIR is an alias.',
   MEM: 'MEM\nDisplays the virtual machine memory configuration.',
   MORE: 'MORE [filename]\nDisplays one screen at a time. Also accepts command | MORE or MORE < file.',
@@ -584,16 +582,8 @@ export function execute(session: Session, filesystem: FsState, input: string, no
       setEnv('PROMPT', tail || '$p$g')
       break
     case 'HELP':
-      output.push(
-        ...(path
-          ? (HELP[ALIASES[path.toUpperCase()] ?? path.toUpperCase()] ??
-            'Help not available for this command.')
-          : Object.entries(HELP)
-              .map(([name, help]) => `${name.padEnd(9)}${help.split('\n')[1] ?? ''}`)
-              .join('\n')
-        ).split('\n'),
-      )
-      paginate = true
+    case 'EDIT':
+      fail('Bad command or file name')
       break
     case 'EXIT':
       effects.push({ kind: 'exit' })
@@ -606,25 +596,6 @@ export function execute(session: Session, filesystem: FsState, input: string, no
         else fail('Bad command or file name')
       }
       break
-    case 'EDIT': {
-      if (!path) {
-        effects.push({ kind: 'launch', app: 'notepad', args: {} })
-        break
-      }
-      const node = resolveDosPath(state, next.cwd, path)
-      if (node?.kind === 'file') effects.push({ kind: 'launch', app: 'notepad', args: { file: node.id } })
-      else if (node) fail('Access denied')
-      else {
-        const target = destination(state, next.cwd, path)
-        if (!target) fail('Invalid directory')
-        else {
-          const error = nameError(state, target.parent, target.name)
-          if (error) fail(error)
-          else effects.push({ kind: 'launch', app: 'notepad', args: { file: createFile(target, '') } })
-        }
-      }
-      break
-    }
     default:
       if (/^[A-Z]:$/.test(command)) {
         if (command !== 'C:') fail('Invalid drive specification')

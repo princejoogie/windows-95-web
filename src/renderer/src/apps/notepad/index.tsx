@@ -2,6 +2,7 @@ import { useEffect, useReducer, useRef, useState } from 'react'
 import { createNode, fs, useFs } from '../../fs/store'
 import { DOCUMENTS_DIR, type NodeId } from '../../fs/types'
 import { useKeyDown } from '../../shell/context'
+import { rememberDocument } from '../../shell/recent'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
 import {
@@ -21,6 +22,7 @@ import {
 import { type DocumentState, documentReducer, findText } from './document'
 import { notepadIcon } from './icon'
 import { defaultPageSettings, PageSetup } from './PageSetup'
+import { PrinterPrompt } from './PrinterPrompt'
 import { revealSelection } from './revealSelection'
 import './notepad.css'
 
@@ -29,6 +31,7 @@ type Prompt =
   | { kind: 'confirm'; next: PendingAction }
   | { kind: 'file'; mode: 'open' | 'save'; next: PendingAction | null }
   | { kind: 'pageSetup' }
+  | { kind: 'printer' }
   | { kind: 'about' }
   | { kind: 'error'; message: string }
 
@@ -57,11 +60,13 @@ export function Notepad({ window: windowApi, args }: AppProps) {
   const [matchCase, setMatchCase] = useState(false)
   const [direction, setDirection] = useState<'up' | 'down'>('down')
   const editor = useRef<HTMLTextAreaElement>(null)
+  const findInput = useRef<HTMLInputElement>(null)
   const closeResult = useRef<((closed: boolean) => void) | null>(null)
   const cancel = () => {
     setPrompt(null)
     closeResult.current?.(false)
     closeResult.current = null
+    if (findOpen) requestAnimationFrame(() => findInput.current?.focus())
   }
   useEffect(() => {
     editor.current?.focus()
@@ -108,6 +113,7 @@ export function Notepad({ window: windowApi, args }: AppProps) {
       return
     }
     fs.write(file.id, document.text)
+    rememberDocument(file.id)
     dispatch({ type: 'save', file: file.id })
     setPrompt(null)
     if (next) act(next)
@@ -119,6 +125,7 @@ export function Notepad({ window: windowApi, args }: AppProps) {
       const node = result.kind === 'existing' ? fs.get().nodes[result.id] : undefined
       if (node?.kind !== 'file') return
       dispatch({ type: 'load', file: node.id, text: node.content })
+      rememberDocument(node.id)
     } else {
       let id: NodeId
       if (result.kind === 'existing') {
@@ -133,6 +140,7 @@ export function Notepad({ window: windowApi, args }: AppProps) {
         id = created.id
       }
       dispatch({ type: 'save', file: id })
+      rememberDocument(id)
     }
     const next = prompt.next
     setPrompt(null)
@@ -232,13 +240,8 @@ export function Notepad({ window: windowApi, args }: AppProps) {
               'separator',
               { label: 'Page Set&up...', onSelect: () => setPrompt({ kind: 'pageSetup' }) },
               {
-                label: '&Print...',
-                onSelect: () =>
-                  setPrompt({
-                    kind: 'error',
-                    message:
-                      'No printers are installed. To install a printer, choose Settings from the Start menu, click Printers, and then double-click Add Printer.',
-                  }),
+                label: '&Print',
+                onSelect: () => setPrompt({ kind: 'printer' }),
               },
               'separator',
               { label: 'E&xit', onSelect: () => request('close') },
@@ -335,7 +338,7 @@ export function Notepad({ window: windowApi, args }: AppProps) {
         <FileDialog
           mode={prompt.mode}
           initialFolder={file?.parent ?? DOCUMENTS_DIR}
-          initialName={prompt.mode === 'save' ? (file?.name ?? 'Untitled.txt') : ''}
+          initialName={prompt.mode === 'save' ? (file?.name ?? '*.txt') : ''}
           filters={FILTERS}
           defaultExtension="txt"
           onSelect={acceptFile}
@@ -372,6 +375,7 @@ export function Notepad({ window: windowApi, args }: AppProps) {
               <label htmlFor={`find-${windowApi.id}`} className="flex items-center gap-[6px]">
                 Find what:
                 <TextBox
+                  ref={findInput}
                   id={`find-${windowApi.id}`}
                   className="min-w-0 flex-1"
                   autoFocus
@@ -427,6 +431,7 @@ export function Notepad({ window: windowApi, args }: AppProps) {
           onCancel={() => setPrompt(null)}
         />
       )}
+      {prompt?.kind === 'printer' && <PrinterPrompt onClose={cancel} />}
       {prompt?.kind === 'about' && (
         <AboutDialog app="Notepad" icon={notepadIcon} onClose={() => setPrompt(null)} />
       )}

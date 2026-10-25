@@ -1,5 +1,5 @@
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
-import { Button, TitleBar, TitleButton } from '../../ui'
+import { Button, ComboBox, TitleBar, TitleButton } from '../../ui'
 import type { Bitmap } from './bitmap'
 import { drawBitmap } from './Canvas'
 import { fonts, sizes, type TextStyle } from './text'
@@ -63,28 +63,14 @@ function Combo({
   onChange: (value: string) => void
 }) {
   return (
-    <span className="relative inline-block h-[21px] bg-white bevel-sunken" style={{ width }}>
-      <select
+    <div style={{ width }}>
+      <ComboBox
         aria-label={label}
         value={value}
-        className="absolute inset-0 appearance-none bg-transparent pl-[3px] pr-[18px] outline-none"
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute top-[2px] right-[2px] grid h-[17px] w-[16px] place-items-center bg-face bevel-raised"
-      >
-        <svg aria-hidden="true" width="7" height="4" viewBox="0 0 7 4" shapeRendering="crispEdges">
-          <path d="M0 0h7v1H6v1H5v1H4v1H3V3H2V2H1V1H0z" />
-        </svg>
-      </span>
-    </span>
+        onChange={onChange}
+        options={options.map((option) => ({ key: option, label: option }))}
+      />
+    </div>
   )
 }
 

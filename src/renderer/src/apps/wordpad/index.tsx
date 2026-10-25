@@ -3,6 +3,7 @@ import { pathOf } from '../../fs/fs'
 import { createNode, fs, useFs } from '../../fs/store'
 import { DOCUMENTS_DIR, type NodeId } from '../../fs/types'
 import { useKeyDown } from '../../shell/context'
+import { rememberDocument } from '../../shell/recent'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
 import {
@@ -222,6 +223,7 @@ export function WordPad({ window: windowApi, args }: AppProps) {
   )
 
   const remember = useCallback((id: NodeId) => {
+    rememberDocument(id)
     setRecent((current) => {
       const next = [id, ...current.filter((other) => other !== id)].slice(0, 4)
       localStorage.setItem(RECENT_KEY, JSON.stringify(next))

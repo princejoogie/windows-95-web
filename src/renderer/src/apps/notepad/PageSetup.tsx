@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
-import { Button, Dialog, GroupBox, Radio, TextBox } from '../../ui'
+import { Button, ComboBox, Dialog, GroupBox, Radio, TextBox } from '../../ui'
+import { PrinterPrompt } from './PrinterPrompt'
 
 export interface PageSettings {
   paper: string
@@ -28,6 +29,7 @@ export function PageSetup({
 }) {
   const [draft, setDraft] = useState(settings)
   const id = useId()
+  const [printer, setPrinter] = useState(false)
   return (
     <Dialog title="Page Setup" onClose={onCancel} className="w-[395px]">
       <form
@@ -40,20 +42,23 @@ export function PageSetup({
         <GroupBox label="Paper">
           <div className="grid grid-cols-[50px_1fr] gap-[6px] items-center">
             <label htmlFor={`${id}-paper`}>Size:</label>
-            <select
+            <ComboBox
               id={`${id}-paper`}
-              className="bevel-sunken bg-white h-[21px]"
+              aria-label="Paper size"
               value={draft.paper}
-              onChange={(event) => setDraft({ ...draft, paper: event.target.value })}
-            >
-              {['Letter', 'Legal', 'A4', 'A5', 'B5'].map((paper) => (
-                <option key={paper}>{paper}</option>
-              ))}
-            </select>
+              onChange={(paper) => setDraft({ ...draft, paper })}
+              options={['Letter', 'Legal', 'A4', 'A5', 'B5'].map((paper) => ({ key: paper, label: paper }))}
+            />
             <label htmlFor={`${id}-source`}>Source:</label>
-            <select id={`${id}-source`} disabled className="bevel-sunken h-[21px]">
-              <option>Automatically Select</option>
-            </select>
+            <div inert className="opacity-50">
+              <ComboBox
+                id={`${id}-source`}
+                aria-label="Paper source"
+                value="auto"
+                onChange={() => undefined}
+                options={[{ key: 'auto', label: 'Automatically Select' }]}
+              />
+            </div>
           </div>
         </GroupBox>
         <div className="flex gap-[12px]">
@@ -112,12 +117,16 @@ export function PageSetup({
           />
         </label>
         <div className="flex justify-end gap-[6px]">
+          <Button className="mr-auto" onClick={() => setPrinter(true)}>
+            Printer...
+          </Button>
           <Button isDefault type="submit">
             OK
           </Button>
           <Button onClick={onCancel}>Cancel</Button>
         </div>
       </form>
+      {printer && <PrinterPrompt onClose={() => setPrinter(false)} />}
     </Dialog>
   )
 }
