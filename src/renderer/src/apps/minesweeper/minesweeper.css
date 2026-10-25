@@ -160,14 +160,23 @@
   justify-content: center;
 }
 .mine-about {
-  width: 300px;
+  width: 348px;
   display: grid;
   grid-template-columns: 32px 1fr;
-  gap: 16px;
+  gap: 14px;
   padding: 16px;
 }
 .mine-about p {
-  margin-bottom: 8px;
+  margin-bottom: 2px;
+}
+.mine-about-product p:last-child {
+  margin-top: 12px;
+}
+.mine-about-rule {
+  grid-column: 1 / -1;
+  height: 2px;
+  border-top: 1px solid #808080;
+  border-bottom: 1px solid #fff;
 }
 .mine-about button {
   grid-column: 2;

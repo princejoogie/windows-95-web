@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import windowsLogo from '../../assets/win-icons/windows-logo.ico'
 import { useKeyDown } from '../../shell/context'
+import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
 import { Button, MenuBar, TextBox } from '../../ui'
 import { artwork, largeMineIcon, mineIcon } from './art'
@@ -231,6 +233,10 @@ function Minesweeper({ window: appWindow }: AppProps) {
       event.preventDefault()
       newGame()
     }
+    if (event.key === 'F1' && dialog.kind === 'none') {
+      event.preventDefault()
+      launch('help', { book: 'minesweeper' })
+    }
   })
 
   const finished = game.phase.kind === 'won' || game.phase.kind === 'lost'
@@ -278,7 +284,11 @@ function Minesweeper({ window: appWindow }: AppProps) {
           },
           {
             label: '&Help',
-            items: [{ label: '&About Minesweeper', onSelect: () => setDialog({ kind: 'about' }) }],
+            items: [
+              { label: '&Help Topics', onSelect: () => launch('help', { book: 'minesweeper' }) },
+              'separator',
+              { label: '&About Minesweeper', onSelect: () => setDialog({ kind: 'about' }) },
+            ],
           },
         ]}
       />
@@ -439,13 +449,15 @@ function Minesweeper({ window: appWindow }: AppProps) {
       {dialog.kind === 'about' && (
         <Dialog title="About Minesweeper" onClose={closeDialog}>
           <div className="mine-about">
-            <img src={largeMineIcon} alt="" width="32" height="32" />
-            <div>
+            <img src={windowsLogo} alt="" width="32" height="32" />
+            <div className="mine-about-product">
+              <p>Microsoft Windows 95</p>
               <p>Minesweeper</p>
-              <p>Windows 95</p>
-              <p>Find all the mines without uncovering one.</p>
+              <p>Version 4.0</p>
+              <p>Copyright © 1981-1995 Microsoft Corp.</p>
             </div>
-            <Button isDefault onClick={closeDialog}>
+            <div className="mine-about-rule" />
+            <Button isDefault autoFocus onClick={closeDialog}>
               OK
             </Button>
           </div>

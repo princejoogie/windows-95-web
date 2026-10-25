@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-const [port = '9340', proofDir = 'D:/codes/worktrees/windows-95-web/proof/minesfix', mode = 'rules'] =
+const [port = '9340', proofDir = 'D:/codes/worktrees/windows-95-web/proof/minesfix', mode = 'full'] =
   process.argv.slice(2)
 mkdirSync(proofDir, { recursive: true })
 const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()
@@ -91,10 +91,11 @@ async function textClick(text, selector = 'button', double = false) {
 async function key(key, modifiers = 0) {
   const codes = { Escape: 27, Enter: 13, F1: 112, F2: 113 }
   await send('Input.dispatchKeyEvent', {
-    type: 'rawKeyDown',
+    type: key === 'Enter' ? 'keyDown' : 'rawKeyDown',
     key,
     windowsVirtualKeyCode: codes[key] || key.toUpperCase().charCodeAt(0),
     modifiers,
+    ...(key === 'Enter' ? { code: 'Enter', text: '\r', unmodifiedText: '\r' } : {}),
   })
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key, modifiers })
   await pause()
@@ -280,6 +281,52 @@ try {
     await pause(1100)
     assert.equal((await state()).elapsedMs, wonTime)
     log('Win freezes time', true)
+    await menu('Help')
+    await check(
+      'Finding 7: Help Topics and About menu',
+      `JSON.stringify([...document.querySelectorAll('[role="menuitem"]')].map(e=>e.textContent.trim()))===JSON.stringify(['Help Topics','About Minesweeper'])`,
+    )
+    await shot('after-help-menu')
+    await textClick('Help Topics', '[role="menuitem"]')
+    await check(
+      'Help Topics is harmless before viewer integration',
+      `!!document.querySelector('.minesweeper') && !document.querySelector('[role="dialog"]')`,
+    )
+    await key('F1')
+    await check(
+      'F1 is harmless before viewer integration',
+      `!!document.querySelector('.minesweeper') && !document.querySelector('[role="dialog"]')`,
+    )
+    await menu('Help', 'About Minesweeper')
+    await check(
+      'Finding 15: product, version, copyright and Windows artwork',
+      `(() => {const d=document.querySelector('[role="dialog"]');return d.textContent.includes('Microsoft Windows 95') && d.textContent.includes('Version 4.0') && d.textContent.includes('1981-1995 Microsoft Corp.') && !d.textContent.includes('Find all the mines') && d.querySelector('img').complete})()`,
+    )
+    await shot('after-about')
+    await key('Enter')
+    await check('About default OK accepts Enter', `!document.querySelector('[role="dialog"]')`)
+    await menu('Game', 'Intermediate')
+    assert.deepEqual((await state()).size, { width: 16, height: 16, mines: 40 })
+    await shot('after-intermediate')
+    await menu('Game', 'Expert')
+    assert.deepEqual((await state()).size, { width: 30, height: 16, mines: 99 })
+    await shot('after-expert')
+    await menu('Game', 'Custom...')
+    for (const [label, value] of [
+      ['Height', 9],
+      ['Width', 9],
+      ['Mines', 10],
+    ])
+      await fill(label, value)
+    await textClick('OK')
+    await menu('Game', 'Beginner')
+    await menu('Game', 'Exit')
+    await textClick('Minesweeper', '[role="option"]', true)
+    await check(
+      'Finding 5: saved 9 by 9 Custom cannot override Beginner',
+      `JSON.parse(localStorage.getItem('win95.minesweeper')).custom.width===9 && document.querySelectorAll('.mine-cell').length===64`,
+    )
+    await shot('after-relaunch')
   }
   await menu('Game', 'Exit')
 } finally {
