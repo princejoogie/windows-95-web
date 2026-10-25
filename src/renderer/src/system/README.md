@@ -16,11 +16,11 @@ Electron enables Blink's `NoFontAntialiasing` feature before creating a window. 
 
 The global stylesheet applies the imported arrow and text cursor. It also handles the existing resize handles. The importer reads each cursor's hotspot from its 32px CUR directory entry.
 
-Import `cursors` from `./cursors` for inline styles. The keys are `arrow`, `busy`, `wait`, `text`, `move`, `no`, `help`, `ns`, `ew`, `nwse`, and `nesw`. For example, use `style={{ cursor: cursors.busy }}` while launching an app.
+Use `cursorClassNames` from `./cursors` on elements that need a system cursor. A stylesheet cursor resolves its asset URL relative to the generated stylesheet. Assigning the same CSS variable to an inline cursor resolves the URL relative to the document and loses the `assets` directory in packaged builds.
 
 `cursorClassNames` provides matching classes for busy, wait, move, no, help, and the four resize directions. The stylesheet also defines the CSS variables `--cursor-default`, `--cursor-progress`, `--cursor-wait`, `--cursor-text`, `--cursor-move`, `--cursor-not-allowed`, `--cursor-help`, and `--cursor-<direction>-resize`.
 
-The four selectors matching literal inline resize cursors support the current shell. Once the shell uses `cursors` or `cursorClassNames`, remove those selectors and their `!important` declarations.
+Window edges, corners, and the taskbar sizing edge use these classes. No copies of cursor assets belong beside `index.html`.
 
 ## Sounds
 

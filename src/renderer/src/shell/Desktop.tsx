@@ -59,6 +59,7 @@ import {
   typeAhead,
 } from './desktopModel'
 import { deletesForGood, folderOptions, useNaming } from './folderOptions'
+import { type DocumentTemplate, documentContent, documentNames } from './newDocuments'
 import { nodeIcon } from './nodeIcon'
 import { apps, getApp } from './registry'
 import { launch, openNode, useWindows, windowsStore } from './system'
@@ -382,9 +383,13 @@ export function Desktop({ size }: { size: Size }) {
     else remember(before, fs.get(), 'Rename')
   }
 
-  const createOnDesktop = (kind: 'folder' | 'file', at: Point | null) => {
-    const name = uniqueName(fs.get(), DESKTOP_DIR, kind === 'folder' ? 'New Folder' : 'New Text Document.txt')
-    const result = createNode(DESKTOP_DIR, name, kind === 'folder' ? { kind } : { kind, content: '' })
+  const createOnDesktop = (kind: 'folder' | DocumentTemplate, at: Point | null) => {
+    const name = uniqueName(fs.get(), DESKTOP_DIR, kind === 'folder' ? 'New Folder' : documentNames[kind])
+    const result = createNode(
+      DESKTOP_DIR,
+      name,
+      kind === 'folder' ? { kind } : { kind: 'file', content: documentContent(kind) },
+    )
     if (!('id' in result)) return
     if (at) savePositions({ ...saved, [result.id]: freeSpot(at, positions.values(), size) })
     select([result.id], result.id)
@@ -444,7 +449,13 @@ export function Desktop({ size }: { size: Size }) {
         else if (item?.kind === 'shell' && item.app.id === 'mycomputer') launch('explorer', { folder: ROOT })
         else if (item) openItem(item)
       },
-      find: () => launch('find', folder ? { folder: folder.id } : {}),
+      find: () =>
+        item?.kind === 'shell' && item.app.id === 'network'
+          ? launch('findcomputer')
+          : launch('find', {
+              folder:
+                folder?.id ?? (item?.kind === 'shell' && item.app.id === 'mycomputer' ? ROOT : DESKTOP_DIR),
+            }),
       cut: () => putOnClipboard('cut', scope),
       copy: () => putOnClipboard('copy', scope),
       paste: () => paste(clipboard.get(), folder?.id ?? DESKTOP_DIR, folder ? null : at),
@@ -484,7 +495,9 @@ export function Desktop({ size }: { size: Size }) {
       lineUp: () => savePositions(Object.fromEntries([...positions].map(([k, p]) => [k, snap(p)]))),
       newFolder: () => createOnDesktop('folder', at),
       newShortcut: () => setPrompt({ kind: 'shortcut', at }),
-      newTextDocument: () => createOnDesktop('file', at),
+      newTextDocument: () => createOnDesktop('text', at),
+      newBitmapDocument: () => createOnDesktop('bitmap', at),
+      newWordpadDocument: () => createOnDesktop('wordpad', at),
       desktopProperties: () => desktopProperties?.(),
     }
   }
@@ -575,6 +588,7 @@ export function Desktop({ size }: { size: Size }) {
       dragRef.current = null
       setDrag(null)
       if (!current?.started) {
+        if (e.type === 'pointerup' && !e.ctrlKey && !e.shiftKey) select([item.key], item.key)
         if (armed) slowClick.current = setTimeout(() => startRename(item.key), SLOW_CLICK_MS)
         return
       }

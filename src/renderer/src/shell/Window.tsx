@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { cursors } from '../system/cursors'
+import { cursorClassNames as cursors } from '../system/cursors'
 import { useModalCount } from '../ui/Dialog'
 import { TitleBar, TitleButton } from '../ui/TitleBar'
 import { registerCloseRequest } from './closeRequests'
@@ -393,8 +393,7 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
         HANDLES.map((handle) => (
           <div
             key={handle.className}
-            className={`absolute ${handle.className}`}
-            style={{ cursor: handle.cursor }}
+            className={`absolute ${handle.className} ${handle.cursor}`}
             onPointerDown={begin({ kind: 'resize', edges: handle.edges })}
             {...gestureHandlers}
           />

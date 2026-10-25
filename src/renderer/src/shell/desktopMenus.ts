@@ -1,6 +1,7 @@
 import type { FsNode } from '../fs/types'
 import { icons } from '../icons'
 import type { MenuEntry } from '../ui/Menu'
+import { getApp } from './registry'
 
 export type ArrangeBy = 'name' | 'type' | 'size' | 'date'
 
@@ -27,6 +28,8 @@ export interface DesktopActions {
   readonly newFolder: () => void
   readonly newShortcut: () => void
   readonly newTextDocument: () => void
+  readonly newBitmapDocument?: () => void
+  readonly newWordpadDocument?: () => void
   readonly desktopProperties: () => void
 }
 
@@ -72,6 +75,24 @@ export const backgroundMenu: Build = (facts, act) => [
       { label: '&Shortcut', onSelect: act.newShortcut },
       'separator',
       { label: 'Text Document', icon: icons.small.textDocument, onSelect: act.newTextDocument },
+      ...(act.newBitmapDocument
+        ? [
+            {
+              label: 'Bitmap Image',
+              icon: getApp('paint')?.smallIcon ?? icons.small.document,
+              onSelect: act.newBitmapDocument,
+            },
+          ]
+        : []),
+      ...(act.newWordpadDocument
+        ? [
+            {
+              label: 'WordPad Document',
+              icon: getApp('wordpad')?.smallIcon ?? icons.small.document,
+              onSelect: act.newWordpadDocument,
+            },
+          ]
+        : []),
     ],
   },
   'separator',
@@ -107,7 +128,7 @@ const SHELL_MENUS: Readonly<Record<string, Build>> = {
     { label: 'Create &Shortcut', onSelect: act.createShortcut },
     { label: 'Rena&me', disabled: !facts.single, onSelect: act.rename },
     'separator',
-    properties(facts, act, false),
+    properties(facts, act),
   ],
   network: (facts, act) => [
     open(act),
@@ -119,7 +140,7 @@ const SHELL_MENUS: Readonly<Record<string, Build>> = {
     { label: 'Create &Shortcut', onSelect: act.createShortcut },
     { label: 'Rena&me', disabled: !facts.single, onSelect: act.rename },
     'separator',
-    properties(facts, act, false),
+    properties(facts, act),
   ],
   recyclebin: (facts, act) => [
     open(act),

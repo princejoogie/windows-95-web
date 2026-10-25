@@ -26,6 +26,8 @@ Drag a title bar to move a window. The outline moves until you release the mouse
 
 Use Ctrl+Esc to toggle Start and Escape to dismiss it. F2 renames a selected desktop file. Delete asks for confirmation before moving the file to `C:\RECYCLED`. F11 toggles the Electron host's full screen mode.
 
+Windows opens Start when tapped. Windows+R opens Run, Windows+E opens Explorer, Windows+F opens Find, Windows+M minimizes all windows, and Shift+Windows+M restores them. These bindings apply in windowed and full screen mode when Electron receives the keys. The app uses no global keyboard hook and does not suppress the host Windows shell. A physical Windows key or Windows shortcut consumed by the host opens the host's Start menu or command instead, even in full screen mode. Ctrl+Esc and the in-app Start button remain available. CDP key injection checks app routing and does not verify physical host key capture.
+
 The launch wrapper clears `ELECTRON_RUN_AS_NODE`, which Electron-based terminals can inherit. Clear this variable yourself if you launch an Electron executable directly.
 
 ## Run the web renderer
