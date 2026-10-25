@@ -191,7 +191,7 @@
 .explorer-large .explorer-item {
   flex-direction: column;
   width: 75px;
-  min-height: 68px;
+  min-height: 70px;
   padding-top: 5px;
   text-align: center;
   gap: 4px;

@@ -520,7 +520,20 @@ export function FolderView({
         setAutoArrange(!autoArrange)
         setPositions({})
       },
-      lineUp: () => setPositions({}),
+      lineUp: () => {
+        const cell = view === 'large' ? { width: 75, height: 75 } : { width: 160, height: 22 }
+        setPositions(
+          Object.fromEntries(
+            Object.entries(positions).map(([id, point]) => [
+              id,
+              {
+                x: Math.round(point.x / cell.width) * cell.width,
+                y: Math.round(point.y / cell.height) * cell.height,
+              },
+            ]),
+          ),
+        )
+      },
       newFolder: () => create('folder'),
       newShortcut: () => setPrompt({ kind: 'shortcut' }),
       newTextDocument: () => create('file'),

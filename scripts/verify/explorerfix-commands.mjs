@@ -103,12 +103,13 @@ try {
     `document.querySelector('${root} [data-node-id="config"]').style.transform.includes('translate(')`,
   )
   await shot('manual-icon-placement')
+  const manual = await d.rect(`${root} [data-node-id="config"]`)
   await clickText(d, `${root} [role="menubar"] button`, 'View')
   await menuItem(d, 'Line up Icons')
   await check(
     10,
-    'Line up Icons restores grid positions',
-    `!document.querySelector('${root} [data-node-id="config"]').style.transform`,
+    'Line up Icons snaps near the current position',
+    `(()=>{const r=document.querySelector('${root} [data-node-id="config"]').getBoundingClientRect();return Math.abs(r.x-${manual.x})<=37.5 && Math.abs(r.y-${manual.y})<=37.5 && Math.abs((r.x-${item.x})%75)<0.01 && Math.abs((r.y-${item.y})%75)<0.01})()`,
   )
   await d.clickSel(`${root} [data-node-id="documents"]`, { button: 'right' })
   await menuItem(d, 'Explore')
