@@ -157,8 +157,7 @@ export class DoomRuntime {
     this.held.clear()
     this.mouseFire = false
     if (document.pointerLockElement === this.canvas) document.exitPointerLock()
-    this.draw()
-    if (this.session.screen.kind === 'playing' && !this.session.menu) drawPaused(this.frame)
+    this.draw(true)
     this.present()
   }
 
@@ -301,7 +300,7 @@ export class DoomRuntime {
     if (document.pointerLockElement === this.canvas) document.exitPointerLock()
   }
 
-  private draw(): void {
+  private draw(paused = false): void {
     const { session, frame, assets } = this
     const { screen, world } = session
     if (screen.kind === 'title') {
@@ -315,6 +314,7 @@ export class DoomRuntime {
       drawMessage(frame, world)
     }
     if (session.menu) drawMenu(frame, session.menu, session.skill, this.clock)
+    if (paused && screen.kind === 'playing' && !session.menu) drawPaused(frame)
     if (this.showStats) drawStats(frame, this.statsLines())
   }
 

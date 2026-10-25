@@ -165,17 +165,19 @@ function demon(pose: DemonPose, rng: Rng): Painter {
 }
 
 function deathFrames(stand: Painter, rng: Rng): Bitmap[] {
-  const w = stand.width + 24
   const h = stand.height
+  // Bodies fall to the left about the feet, so the frame must fit a full body length beside them.
+  const w = 2 * h + 8
+  const torso = w / 2 - h * 0.5
   const reel = topple(stand.bitmap, -0.25, w, h)
-  splat(reel, rng, w / 2, h * 0.45, 7, 7, 14)
+  splat(reel, rng, w / 2 - h * 0.15, h * 0.45, 7, 7, 14)
   const fall = topple(stand.bitmap, -0.85, w, h)
-  splat(fall, rng, w / 2 + 6, h * 0.7, 8, 5, 12)
+  splat(fall, rng, w / 2 - h * 0.35, h * 0.65, 8, 5, 12)
   const down = topple(stand.bitmap, -1.45, w, h)
-  pool(down, rng, w / 2 + 8, 14)
+  pool(down, rng, torso, 14)
   const corpse = topple(stand.bitmap, -1.57, w, h)
-  pool(corpse, rng, w / 2 + 8, 18)
-  splat(corpse, rng, w / 2 + 10, h - 6, 14, 3, 16)
+  pool(corpse, rng, torso, 18)
+  splat(corpse, rng, torso, h - 6, 16, 3, 16)
   return [reel.bitmap, fall.bitmap, down.bitmap, corpse.bitmap]
 }
 

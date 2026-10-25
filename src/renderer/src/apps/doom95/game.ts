@@ -51,7 +51,8 @@ export const WALK_SPEED = 3.6
 export const RUN_SPEED = 6.6
 const TURN_SPEED = 2.6
 const RUN_TURN_SPEED = 4.2
-const USE_RANGE = 1.25
+/** Doom reaches one cell to a door face, and door slabs sit half a cell behind it. */
+const USE_RANGE = 1.5
 const SWITCH_TIME = 0.36
 const EXIT_DELAY = 0.6
 const MESSAGE_TIME = 3

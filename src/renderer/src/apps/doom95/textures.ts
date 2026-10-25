@@ -99,9 +99,9 @@ const exitSwitch =
   (on: boolean): Draw =>
   (p, rng) => {
     tech(p, rng)
-    p.rect(20, 14, 24, 36, rgb(52, 52, 50))
-    p.bevel(20, 14, 24, 36, rgb(30, 30, 30), rgb(150, 150, 140))
-    p.rect(23, 17, 18, 8, rgb(20, 20, 20))
+    p.rect(17, 14, 30, 36, rgb(52, 52, 50))
+    p.bevel(17, 14, 30, 36, rgb(30, 30, 30), rgb(150, 150, 140))
+    p.rect(19, 16, 26, 10, rgb(20, 20, 20))
     drawCentered(p.bitmap, 'EXIT', 18, { color: rgb(230, 40, 30) }, 32)
     p.rect(29, 28, 6, 18, rgb(30, 30, 30))
     const knobY = on ? 40 : 30
