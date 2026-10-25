@@ -170,6 +170,15 @@ async function shutdown(restart = false) {
   await named('button', 'Yes')
 }
 
+async function startFolder(name) {
+  await click('[aria-label="Start menu folder"]')
+  const selector = await evaluate(
+    `(()=>{const field=document.querySelector('[aria-label="Start menu folder"]');const list=document.getElementById(field.getAttribute('aria-controls'));const row=[...list.querySelectorAll('[role="option"]')].find(e=>e.textContent.trim().endsWith(${JSON.stringify(name)}));if(!row)return null;row.dataset.proofTarget='folder';return '[data-proof-target="folder"]'})()`,
+  )
+  assert.ok(selector, `Start menu folder ${name}`)
+  await click(selector)
+}
+
 const phase = process.argv[2] ?? 'close'
 try {
   await send('Runtime.enable')
@@ -735,6 +744,7 @@ try {
     await named('button', 'Start Menu Programs')
     await named('button', 'Remove...')
     await named('button', 'Notepad')
+    await named('button', 'Remove')
     await named('button', 'Close')
     await named('button', 'OK')
     await wait(
@@ -745,6 +755,55 @@ try {
       'Remove deletes the StartUp shortcut',
     )
     await click('[data-window] button[aria-label="Close"]')
+  } else if (phase === 'programs') {
+    await click('[data-start-button]')
+    await key('s')
+    await key('t')
+    await named('button', 'Start Menu Programs')
+    await named('button', 'Remove...')
+    await startFolder('Accessories')
+    await named('button', 'Calculator')
+    await named('button', 'Remove')
+    await named('button', 'Close')
+    await named('button', 'OK')
+    await reset()
+    await click('[data-start-button]')
+    await key('p')
+    await key('a')
+    await shot('programs-removed')
+    await check(
+      `![...document.querySelectorAll('[role="menu"]')].at(-1).textContent.includes('Calculator')`,
+      'Removing an installed Programs shortcut persists after a reboot',
+    )
+    await key('Escape')
+    await key('Escape')
+    await key('Escape')
+    await click('[data-start-button]')
+    await key('s')
+    await key('t')
+    await named('button', 'Start Menu Programs')
+    await named('button', 'Add...')
+    await startFolder('Accessories')
+    await fill('[aria-label="Command line"]', 'calc')
+    await key('Enter')
+    await wait(`!document.querySelector('[aria-label="Create Shortcut"]')`)
+    await named('button', 'Advanced...')
+    await wait(`document.querySelector('[data-window][aria-label="Programs"]')`)
+    await shot('programs-advanced')
+    await check(
+      `document.querySelector('[data-window][aria-label="Programs"]') !== null`,
+      'Advanced opens the actual Programs folder in Explorer',
+    )
+    await click('[data-window] button[aria-label="Close"]')
+    await named('button', 'OK')
+    await click('[data-start-button]')
+    await key('p')
+    await key('a')
+    await shot('programs-added')
+    await check(
+      `[...document.querySelectorAll('[role="menu"]')].at(-1).textContent.includes('Calculator')`,
+      'Add writes a shortcut into the chosen Start menu folder and Enter finishes the wizard',
+    )
   } else if (phase === 'feedback') {
     await run('notepad')
     await fill('textarea', 'blocked owner feedback')
@@ -1030,6 +1089,16 @@ try {
       'Restart in MS-DOS mode launches the installed prompt maximized',
     )
     await shot('restart-ms-dos')
+    await click('[data-window] button[aria-label="Close"]')
+    await click('[data-start-button]')
+    await named('menuitem', 'Shut Down...')
+    await named('button', 'Help')
+    await wait(`document.querySelector('[data-window]')`)
+    await check(
+      `!document.querySelector('[aria-label="Shut Down Windows"]') && document.querySelector('[data-window]') !== null`,
+      'Shutdown Help opens the installed Help app without leaving a blocking dim layer',
+    )
+    await shot('shutdown-help')
     await click('[data-window] button[aria-label="Close"]')
   } else throw new Error(`Unknown phase ${phase}`)
 } finally {

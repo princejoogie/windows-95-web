@@ -1,52 +1,37 @@
 import { useMemo } from 'react'
 import { children } from '../fs/fs'
 import { useFs } from '../fs/store'
+import type { FsState, NodeId } from '../fs/types'
 import { icons } from '../icons'
 import { type MenuEntry, MenuList } from '../ui/Menu'
+import { isHidden } from '../ui/properties'
+import { nodeIcon } from './nodeIcon'
 import { useRecentDocuments } from './recent'
-import { apps, smallIcon } from './registry'
+import { getApp, smallIcon } from './registry'
 import { startMenuFolder } from './startup'
-import { launch, openNode } from './system'
-import type { AppManifest } from './types'
+import { openNode } from './system'
 
-interface Folder {
-  readonly folders: Map<string, Folder>
-  readonly apps: AppManifest[]
-}
-export function programsMenu(
-  installed: readonly AppManifest[],
-  startup: readonly MenuEntry[] = [],
-): MenuEntry[] {
-  const root: Folder = { folders: new Map(), apps: [] }
-  for (const app of installed) {
-    if (!app.startMenu) continue
-    let folder = root
-    for (const name of app.startMenu) {
-      let next = folder.folders.get(name)
-      if (!next) {
-        next = { folders: new Map(), apps: [] }
-        folder.folders.set(name, next)
-      }
-      folder = next
-    }
-    folder.apps.push(app)
-  }
-  const entries = (folder: Folder): MenuEntry[] => [
-    ...[...folder.folders]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([name, sub]) => ({ label: name, icon: icons.small.folderClosed, items: entries(sub) })),
-    ...folder.apps
-      .sort((a, b) => a.title.localeCompare(b.title))
-      .map((app) => ({ label: app.title, icon: smallIcon(app), onSelect: () => launch(app.id) })),
-  ]
-  return [
-    ...entries(root),
-    {
-      label: 'Start&Up',
-      icon: icons.small.folderClosed,
-      items: startup.length ? startup : [{ label: '(Empty)', disabled: true }],
-    },
-  ]
+export function programsMenu(state: FsState, folder: NodeId): MenuEntry[] {
+  const entries = children(state, folder)
+    .filter((node) => !isHidden(node))
+    .sort((a, b) => Number(b.kind === 'folder') - Number(a.kind === 'folder') || a.name.localeCompare(b.name))
+  return entries.length
+    ? entries.map((node) => {
+        if (node.kind === 'folder')
+          return {
+            label: node.name === 'StartUp' ? 'Start&Up' : node.name,
+            icon: icons.small.folderClosed,
+            items: programsMenu(state, node.id),
+          }
+        const app =
+          (node.kind === 'program' || node.kind === 'shortcut') && node.app ? getApp(node.app) : undefined
+        return {
+          label: node.name,
+          icon: app ? smallIcon(app) : nodeIcon(node).icon,
+          onSelect: () => openNode(node.id),
+        }
+      })
+    : [{ label: '(Empty)', disabled: true }]
 }
 
 export function StartMenu({
@@ -78,16 +63,13 @@ export function StartMenu({
         .sort((a, b) => a.name.localeCompare(b.name)),
     [state, recent],
   )
-  const startupFolder = useMemo(() => startMenuFolder(), [])
-  const startup = startupFolder
-    ? children(state, startupFolder).map((node) => ({
-        label: node.name,
-        icon: icons.small.document,
-        onSelect: () => openNode(node.id),
-      }))
-    : []
+  const programs = useMemo(() => startMenuFolder(['Start Menu', 'Programs']), [])
   const top: MenuEntry[] = [
-    { label: '&Programs', icon: icons.start.programs, items: programsMenu(apps, startup) },
+    {
+      label: '&Programs',
+      icon: icons.start.programs,
+      items: programs ? programsMenu(state, programs) : [{ label: '(Empty)', disabled: true }],
+    },
     {
       label: '&Documents',
       icon: icons.start.documents,

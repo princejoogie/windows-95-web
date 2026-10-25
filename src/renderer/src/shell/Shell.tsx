@@ -13,11 +13,11 @@ import { Desktop } from './Desktop'
 import { shellEvents } from './events'
 import { PowerScreens } from './PowerScreens'
 import { RunDialog } from './RunDialog'
-import { findAppByExe, getApp, programSpecs } from './registry'
+import { apps, findAppByExe, getApp, programSpecs } from './registry'
 import { type ShutDownChoice, ShutDownDialog } from './ShutDownDialog'
 import { StartMenu } from './StartMenu'
 import { openSystemMenu, SystemMenu } from './SystemMenu'
-import { startMenuFolder } from './startup'
+import { installStartMenu, startMenuFolder } from './startup'
 import { launch, openNode, useWindows, windowsStore } from './system'
 import { Taskbar } from './Taskbar'
 import { TaskbarProperties } from './TaskbarProperties'
@@ -103,7 +103,7 @@ export function Shell() {
   useEffect(() => window.win95?.onEvent((event) => hostAction.current(event)), [])
   useEffect(() => {
     installPrograms(programSpecs)
-    startMenuFolder()
+    installStartMenu(apps)
   }, [])
   useEffect(() => {
     if (power === 'running') {
@@ -284,7 +284,10 @@ export function Shell() {
               void shutDown(choice)
             }}
             onClose={() => setDialog(null)}
-            onHelp={() => openApp('help')}
+            onHelp={() => {
+              setDialog(null)
+              openApp('help')
+            }}
           />
         )}
         {dialog === 'taskbar' && <TaskbarProperties onClose={() => setDialog(null)} />}

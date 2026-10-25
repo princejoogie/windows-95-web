@@ -1,9 +1,10 @@
-import { useState } from 'react'
-import { children } from '../fs/fs'
+import { useMemo, useState } from 'react'
+import { children, isInside, pathOf, resolvePath } from '../fs/fs'
 import { createNode, fs, useFs } from '../fs/store'
-import { Button, Checkbox, Dialog, GroupBox, MessageBox, TextBox } from '../ui'
+import type { NodeId } from '../fs/types'
+import { Button, Checkbox, ComboBox, Dialog, GroupBox, MessageBox, TextBox } from '../ui'
 import { clearDocuments } from './recent'
-import { findAppByExe } from './registry'
+import { findAppByExe, getApp } from './registry'
 import { startMenuFolder } from './startup'
 import { launch } from './system'
 import { setTaskbarSettings, useTaskbarSettings } from './taskbarSettings'
@@ -16,7 +17,14 @@ export function TaskbarProperties({ onClose }: { onClose: () => void }) {
   const [command, setCommand] = useState('')
   const [error, setError] = useState<string | null>(null)
   const state = useFs((state) => state)
-  const folder = startMenuFolder()
+  const programs = useMemo(() => startMenuFolder(['Start Menu', 'Programs']), [])
+  const [folder, setFolder] = useState(startMenuFolder)
+  const [selected, setSelected] = useState<NodeId | null>(null)
+  const folders = programs
+    ? Object.values(state.nodes)
+        .filter((node) => node.kind === 'folder' && isInside(state, node.id, programs))
+        .map((node) => ({ key: node.id, label: pathOf(state, node.id) }))
+    : []
   const items = folder ? children(state, folder) : []
   const apply = () => setTaskbarSettings(draft)
   return (
@@ -73,7 +81,9 @@ export function TaskbarProperties({ onClose }: { onClose: () => void }) {
               <div className="flex gap-[8px]">
                 <Button onClick={() => setManage('add')}>Add...</Button>
                 <Button onClick={() => setManage('remove')}>Remove...</Button>
-                <Button onClick={() => folder && launch('explorer', { folder })}>Advanced...</Button>
+                <Button onClick={() => programs && launch('explorer', { folder: programs })}>
+                  Advanced...
+                </Button>
               </div>
               <GroupBox label="Documents menu">
                 <p className="mb-[12px]">Click Clear to remove the contents of the Documents menu.</p>
@@ -105,9 +115,25 @@ export function TaskbarProperties({ onClose }: { onClose: () => void }) {
           className="w-[330px]"
         >
           <div className="p-[12px] flex flex-col gap-[10px]">
+            <label htmlFor="start-menu-folder">Select a folder:</label>
+            <ComboBox
+              id="start-menu-folder"
+              aria-label="Start menu folder"
+              options={folders}
+              value={folder ?? ''}
+              onChange={(id) => {
+                const node = Object.values(state.nodes).find(
+                  (node) => node.id === id && node.kind === 'folder',
+                )
+                if (node) {
+                  setFolder(node.id)
+                  setSelected(null)
+                }
+              }}
+            />
             {manage === 'add' ? (
               <>
-                <p>Type the program to add to Programs\StartUp.</p>
+                <p>Type the program to add to the Start menu.</p>
                 <TextBox
                   aria-label="Command line"
                   autoFocus
@@ -116,13 +142,24 @@ export function TaskbarProperties({ onClose }: { onClose: () => void }) {
                 />
                 <div className="flex justify-end gap-[6px]">
                   <Button
+                    isDefault
                     onClick={() => {
                       const app = findAppByExe(command)
-                      if (!app || !folder) {
+                      const node = resolvePath(state, command)
+                      if ((!app && !node) || !folder) {
                         setError(`Cannot find the file '${command}'.`)
                         return
                       }
-                      const created = createNode(folder, app.title, { kind: 'shortcut', app: app.id })
+                      const created = node
+                        ? createNode(
+                            folder,
+                            node.kind === 'program' ? (getApp(node.app)?.title ?? node.name) : node.name,
+                            { kind: 'shortcut', target: node.id },
+                          )
+                        : app
+                          ? createNode(folder, app.title, { kind: 'shortcut', app: app.id })
+                          : null
+                      if (!created) return
                       if ('error' in created) setError(created.error)
                       else setManage(null)
                     }}
@@ -135,21 +172,49 @@ export function TaskbarProperties({ onClose }: { onClose: () => void }) {
             ) : (
               <>
                 <p>Select a shortcut to remove.</p>
-                <div className="bg-white bevel-sunken p-[3px] min-h-[80px]">
+                <div
+                  role="listbox"
+                  aria-label="Start menu shortcuts"
+                  tabIndex={0}
+                  className="bg-white bevel-sunken p-[3px] h-[120px] overflow-auto"
+                  onKeyDown={(event) => {
+                    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+                    event.preventDefault()
+                    const current = items.findIndex((node) => node.id === selected)
+                    const next =
+                      items[(current + (event.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]
+                    if (next) setSelected(next.id)
+                  }}
+                >
                   {items.length
                     ? items.map((node) => (
                         <button
                           key={node.id}
                           type="button"
-                          className="block w-full text-left px-[3px] focus:bg-select focus:text-white"
-                          onClick={() => fs.purge(node.id)}
+                          role="option"
+                          tabIndex={-1}
+                          aria-selected={selected === node.id}
+                          className={`block w-full text-left px-[3px] ${selected === node.id ? 'bg-select text-white' : ''}`}
+                          onClick={() => setSelected(node.id)}
                         >
                           {node.name}
                         </button>
                       ))
                     : '(Empty)'}
                 </div>
-                <Button onClick={() => setManage(null)}>Close</Button>
+                <div className="flex justify-end gap-[6px]">
+                  <Button
+                    isDefault
+                    disabled={selected === null}
+                    onClick={() => {
+                      if (selected) fs.purge(selected)
+                      setSelected(null)
+                    }}
+                  >
+                    Remove
+                  </Button>
+                  <Button onClick={() => setManage(null)}>Close</Button>
+                </div>
               </>
             )}
           </div>
