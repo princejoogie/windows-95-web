@@ -10,6 +10,8 @@ const c = await connect(Number(process.env.W95_CDP_PORT ?? 9420))
 const q = JSON.stringify
 const phase = process.argv[2] ?? 'menu'
 const top = `[...document.querySelectorAll('[data-window]')].filter(w => !w.classList.contains('hidden')).sort((a,b) => Number(b.style.zIndex)-Number(a.style.zIndex))[0]`
+const button = (label, scope = 'document') =>
+  `[...(${scope}).querySelectorAll('button')].find(e => e.getAttribute('aria-label') === ${q(label)} || e.textContent.trim() === ${q(label)})`
 const menuItem = (label) =>
   `[...document.querySelectorAll('[role="menuitem"], [role="menuitemcheckbox"]')].find(e => e.textContent.replace('Checked','').replace(/\\s+/g,' ').trim().startsWith(${q(label)}))`
 async function click(expression, options) {
@@ -114,8 +116,32 @@ async function menu() {
   await shot('01-dos-properties')
 }
 
+async function help() {
+  await fresh()
+  await run('winhlp32')
+  await check(
+    `JSON.stringify([...(${top}).children[0].querySelectorAll('button')].map(e=>e.getAttribute('aria-label'))) === JSON.stringify(['Help','Close'])`,
+    'Help Topics caption has only Help and Close',
+  )
+  await check(
+    `getComputedStyle(${top}).padding === '3px' && !(${top}).querySelector('[style*="cursor:"]')`,
+    'Help Topics has a fixed dialog frame without resize handles',
+  )
+  await shot('02-help-topics-caption')
+  await click(button('Help', top))
+  await check(
+    `!!document.querySelector('[role="dialog"][aria-label="Windows Help"]')`,
+    'Caption Help explains the Help Topics tabs',
+  )
+  await shot('02-help-caption-help')
+  await click(button('OK'))
+  await click(button('Close', top))
+  await check(`!document.querySelector('[data-window]')`, 'Help Topics closes from the caption')
+}
+
 try {
   if (phase === 'menu') await menu()
+  else if (phase === 'help') await help()
   else throw new Error(`Unknown phase ${phase}`)
 } finally {
   c.close()

@@ -436,6 +436,14 @@ function Help({ args, window: appWindow }: AppProps) {
     appWindow.setTitle(showTopics ? `Help Topics: ${book.title}` : book.title)
   }, [appWindow, book.title, showTopics])
   useEffect(() => {
+    if (!showTopics) return
+    return appWindow.onHelpRequest(() =>
+      setMessage(
+        'Click Contents to browse Help topics, Index to look up a keyword, or Find to search for words.',
+      ),
+    )
+  }, [appWindow, showTopics])
+  useEffect(() => {
     if (!popup) return
     const previous = document.activeElement
     popupRef.current?.focus()
