@@ -153,6 +153,7 @@ function serialize(doc: Document, type: DocumentType): string {
 
 export function WordPad({ window: windowApi, args }: AppProps) {
   const editor = useRef<HTMLDivElement>(null)
+  const closeResult = useRef<((closed: boolean) => void) | null>(null)
   const keeper = useMemo(() => new SelectionKeeper(() => editor.current), [])
   const [file, setFile] = useState<NodeId | null>(null)
   const [docType, setDocType] = useState<DocumentType>('word6')
@@ -257,6 +258,8 @@ export function WordPad({ window: windowApi, args }: AppProps) {
   /** Closes any dialog and hands focus and the selection back to the document. */
   const closeDialog = () => {
     setDialog(null)
+    closeResult.current?.(false)
+    closeResult.current = null
     requestAnimationFrame(() => keeper.restore())
   }
 
@@ -278,6 +281,8 @@ export function WordPad({ window: windowApi, args }: AppProps) {
         openFile(command.id)
         break
       case 'exit':
+        closeResult.current?.(true)
+        closeResult.current = null
         windowApi.close()
         break
     }
@@ -285,7 +290,15 @@ export function WordPad({ window: windowApi, args }: AppProps) {
 
   const request = (command: Command) => (dirty ? setDialog({ kind: 'confirm', next: command }) : run(command))
 
-  useEffect(() => windowApi.onCloseRequest(() => request({ kind: 'exit' })))
+  useEffect(() =>
+    windowApi.onCloseRequest(
+      () =>
+        new Promise<boolean>((resolve) => {
+          closeResult.current = resolve
+          request({ kind: 'exit' })
+        }),
+    ),
+  )
 
   const writeTo = (target: SaveTarget, type: DocumentType, next: Command | null) => {
     const content = serialize(currentDocument(), type)
