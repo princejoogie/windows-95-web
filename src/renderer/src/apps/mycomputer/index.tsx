@@ -7,6 +7,7 @@ function MyComputer({ args, window }: AppProps) {
     <FolderView
       initial={args.folder ? { kind: 'folder', id: args.folder } : { kind: 'computer' }}
       window={window}
+      select={args.select}
     />
   )
 }

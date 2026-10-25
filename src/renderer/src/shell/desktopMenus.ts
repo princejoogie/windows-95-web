@@ -128,7 +128,7 @@ const SHELL_MENUS: Readonly<Record<string, Build>> = {
     'separator',
     { label: 'Create &Shortcut', onSelect: act.createShortcut },
     'separator',
-    properties(facts, act, false),
+    properties(facts, act),
   ],
 }
 

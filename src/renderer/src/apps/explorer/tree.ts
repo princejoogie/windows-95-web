@@ -1,5 +1,6 @@
 import { children } from '../../fs/fs'
 import { DESKTOP_DIR, type FsState, RECYCLED_DIR, ROOT } from '../../fs/types'
+import { displayName } from '../../shell/naming'
 import type { Location } from './model'
 
 export const TREE_DESKTOP = 'shell:desktop'
@@ -19,7 +20,7 @@ export interface TreeRow extends TreeEntry {
 export function folderTree(state: FsState): TreeEntry {
   const folder = (id: keyof FsState['nodes']): TreeEntry => ({
     key: id,
-    label: state.nodes[id]?.kind === 'drive' ? '(C:)' : (state.nodes[id]?.name ?? ''),
+    label: state.nodes[id] ? displayName(state.nodes[id], false, new Set()) : '',
     location: { kind: 'folder', id },
     children: children(state, id)
       .filter((node) => node.kind === 'folder' && node.id !== RECYCLED_DIR && !node.attributes?.hidden)

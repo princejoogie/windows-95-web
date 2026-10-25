@@ -25,7 +25,19 @@
 .explorer-splitter {
   width: 4px;
   flex-shrink: 0;
+  align-self: stretch;
+  height: auto;
+  margin: 0;
+  border: 0;
   cursor: col-resize;
+}
+.explorer-splitter-bar {
+  position: fixed;
+  z-index: 11000;
+  width: 4px;
+  pointer-events: none;
+  mix-blend-mode: difference;
+  background: repeating-conic-gradient(#fff 0 25%, transparent 0 50%) 0 0 / 2px 2px;
 }
 .explorer-tree {
   flex: 1;
@@ -89,13 +101,15 @@
 .explorer-toolbar {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
   gap: 3px;
   padding: 3px;
   border-top: 1px solid white;
   border-bottom: 1px solid #808080;
 }
 .explorer-toolbar > button {
+  flex-shrink: 0;
   width: 23px;
   height: 22px;
   font-size: 16px;

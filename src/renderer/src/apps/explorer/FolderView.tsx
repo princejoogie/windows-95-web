@@ -1,5 +1,15 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { children, fileSize, isInside, isProtected, pathOf, resolvePath, uniqueName } from '../../fs/fs'
+import {
+  children,
+  DRIVE_CAPACITY,
+  driveUsed,
+  fileSize,
+  isInside,
+  isProtected,
+  pathOf,
+  resolvePath,
+  uniqueName,
+} from '../../fs/fs'
 import { createNode, fs, fsStore, newNodeId, useFs } from '../../fs/store'
 import { DESKTOP_DIR, DOCUMENTS_DIR, type FsNode, type NodeId, RECYCLED_DIR } from '../../fs/types'
 import { icons } from '../../icons'
@@ -9,7 +19,7 @@ import { type Clip, clipboard, type Plan, planPaste, planShortcuts } from '../..
 import { useKeyDown } from '../../shell/context'
 import { DeleteConfirmation } from '../../shell/DeleteConfirmation'
 import { backgroundMenu, type DesktopActions, type MenuFacts, nodeMenu } from '../../shell/desktopMenus'
-import { folderOptions, useNaming } from '../../shell/folderOptions'
+import { deletesForGood, folderOptions, useNaming } from '../../shell/folderOptions'
 import { getApp } from '../../shell/registry'
 import { launch, openNode, useWindows, windowsStore } from '../../shell/system'
 import type { WindowApi } from '../../shell/types'
@@ -29,8 +39,9 @@ import {
 } from '../../ui'
 import type { MenuEntry } from '../../ui/Menu'
 import { formatSize, isHidden } from '../../ui/properties'
+import { RecycleBinProperties } from '../recyclebin/Properties'
 import { fileIcon, floppyIcon, printerIcon, radioDot } from './art'
-import { FolderOptions, RecycleProperties } from './dialogs'
+import { FolderOptions } from './dialogs'
 import { FolderTree, treeIcon } from './FolderTree'
 import { DragGhost, useFileDrag } from './fileDrag'
 import {
@@ -47,6 +58,7 @@ import {
 } from './model'
 import { folderPreferences, saveFolderPreferences } from './preferences'
 import { useRubberBand } from './rubberBand'
+import { Splitter } from './Splitter'
 import { type ShellAction, shellFolder } from './shellFolders'
 import { toolbarIcons } from './toolbar'
 import { folderTree, TREE_DESKTOP, treeRows } from './tree'
@@ -104,10 +116,13 @@ export function FolderView({
   initial,
   window,
   exploring = false,
+  select,
 }: {
   initial: Location
   window: WindowApi
   exploring?: boolean
+  /** Selected and scrolled into view when the window opens. */
+  select?: NodeId | undefined
 }) {
   const state = useFs((s) => s)
   const clip = useStore(clipboard, (s) => s)
@@ -115,6 +130,7 @@ export function FolderView({
   const settings = useStore(folderOptions, (s) => s)
   const naming = useNaming()
   const labelOf = naming.label
+  const root = useRef<HTMLDivElement>(null)
   const list = useRef<HTMLDivElement>(null)
   const typed = useRef({ text: '', at: 0 })
   const [location, setLocation] = useState(initial)
@@ -129,7 +145,15 @@ export function FolderView({
   )
   const [view, setView] = useState<View>(initialPrefs.view)
   const [sort, setSort] = useState<Sort>(initialPrefs.sort)
-  const [selection, setSelection] = useState<Selection>(emptySelection)
+  const [selection, setSelection] = useState<Selection>(() =>
+    select ? { ids: new Set([select]), anchor: select, focus: select } : emptySelection,
+  )
+  useEffect(() => {
+    if (select)
+      list.current
+        ?.querySelector(`[data-node-id="${CSS.escape(select)}"]`)
+        ?.scrollIntoView({ block: 'nearest' })
+  }, [select])
   const [renaming, setRenaming] = useState<NodeId | null>(null)
   const [status, setStatus] = useState(initialPrefs.status)
   const [toolbar, setToolbar] = useState(initialPrefs.toolbar)
@@ -167,10 +191,8 @@ export function FolderView({
           : 'Folder')
   const setTitle = window.setTitle
   const path = folder ? pathOf(state, folder.id) : title
-  useEffect(
-    () => setTitle(exploring ? `Exploring - ${folder?.kind === 'drive' ? path : title}` : title),
-    [setTitle, title, path, exploring, folder?.kind],
-  )
+  const shown = folder && (settings.fullPath || (exploring && folder.kind === 'drive')) ? path : title
+  useEffect(() => setTitle(exploring ? `Exploring - ${shown}` : shown), [setTitle, shown, exploring])
   const detailColumns = recycled ? recycleColumns : columns.slice(0, 4)
   const mutable = selected.length > 0 && selected.every((node) => !isProtected(node.id))
   const performShell = (action: ShellAction) => {
@@ -225,7 +247,8 @@ export function FolderView({
     setAutoArrange(saved.autoArrange)
     setPositions(saved.positions)
     setLoadedKey(preferenceKey)
-    if (saved.geometry) windowsStore.dispatch({ type: 'resize', id: window.id, ...saved.geometry })
+    if (saved.geometry && !geometryRestored.current)
+      windowsStore.dispatch({ type: 'resize', id: window.id, ...saved.geometry })
     geometryRestored.current = preferenceKey
   }, [preferenceKey, exploring, recycled, window.id])
   useEffect(() => {
@@ -311,23 +334,18 @@ export function FolderView({
     setSelection({ ids: new Set([result.id]), anchor: result.id, focus: result.id })
     setRenaming(result.id)
   }
+  const askDelete = (ids: readonly NodeId[]) => {
+    if (!ids.length) return
+    const permanent = recycled || deletesForGood(settings)
+    if (!permanent && !settings.confirmDelete) removeNodes(ids, false)
+    else setPrompt({ kind: 'confirm', action: permanent ? 'purge' : 'recycle', ids })
+  }
   const deleteSelected = () => {
-    if (!mutable || (!recycled && !writable)) return
-    if (!recycled && !settings.confirmDelete) {
-      removeNodes(
-        selected.map((node) => node.id),
-        false,
-      )
-      return
-    }
-    setPrompt({
-      kind: 'confirm',
-      action: recycled ? 'purge' : 'recycle',
-      ids: selected.map((node) => node.id),
-    })
+    if (mutable && (recycled || writable)) askDelete(selected.map((node) => node.id))
   }
   const cutSelected = () => {
-    if (writable && mutable) clipboard.dispatch({ op: 'cut', ids: selected.map((node) => node.id) })
+    if ((writable || recycled) && mutable)
+      clipboard.dispatch({ op: 'cut', ids: selected.map((node) => node.id) })
   }
   const copySelected = () => {
     if (!recycled && selected.length) clipboard.dispatch({ op: 'copy', ids: selected.map((node) => node.id) })
@@ -352,7 +370,7 @@ export function FolderView({
     if (!destination || recycled) return
     const done = carry(
       planPaste(fs.get(), source, destination, Date.now(), newNodeId),
-      source?.op === 'cut' ? 'Move' : undefined,
+      source?.op === 'cut' ? 'Move' : 'Copy',
     )
     if (done && source?.op === 'cut') clipboard.dispatch(null)
   }
@@ -378,6 +396,28 @@ export function FolderView({
   }
 
   useKeyDown((event) => {
+    if ((event.key === 'Tab' || event.key === 'F6') && !prompt && !context && !shellMenu && !renaming) {
+      if (event.target instanceof Element && event.target.closest('[role="menubar"], [role="menu"]')) return
+      const panes = [
+        root.current?.querySelector<HTMLElement>('.explorer-toolbar [role="combobox"]'),
+        root.current?.querySelector<HTMLElement>('[role="tree"]'),
+        list.current,
+      ].flatMap((pane) => (pane ? [pane] : []))
+      if (!panes.length) return
+      event.preventDefault()
+      const at = panes.findIndex((pane) => event.target instanceof Node && pane.contains(event.target))
+      const next =
+        at < 0
+          ? panes[event.shiftKey ? panes.length - 1 : 0]
+          : panes[(at + (event.shiftKey ? -1 : 1) + panes.length) % panes.length]
+      if (next?.role === 'tree')
+        (
+          next.querySelector<HTMLElement>('[role="treeitem"][tabindex="0"]') ??
+          next.querySelector<HTMLElement>('[role="treeitem"]')
+        )?.focus()
+      else next?.focus()
+      return
+    }
     if (
       prompt ||
       context ||
@@ -420,6 +460,7 @@ export function FolderView({
           : view === 'list'
             ? { ArrowDown: 1, ArrowUp: -1, ArrowLeft: -rows, ArrowRight: rows }
             : { ArrowDown: 1, ArrowUp: -1, ArrowLeft: -1, ArrowRight: 1 }
+      const step = current + (steps[event.key] ?? 0)
       const index =
         event.key === 'Home'
           ? 0
@@ -427,7 +468,9 @@ export function FolderView({
             ? order.length - 1
             : current < 0
               ? 0
-              : Math.max(0, Math.min(order.length - 1, current + (steps[event.key] ?? 0)))
+              : step < 0 || step >= order.length
+                ? current
+                : step
       const id = order[index]
       if (id) {
         setSelection(
@@ -521,10 +564,7 @@ export function FolderView({
       paste: () => paste(destination),
       pasteShortcut: () => shortcuts(clip?.ids ?? []),
       createShortcut: () => shortcuts(ids, folder?.id ?? DESKTOP_DIR),
-      remove: () => {
-        if (!recycled && !settings.confirmDelete) removeNodes(ids, false)
-        else setPrompt({ kind: 'confirm', action: recycled ? 'purge' : 'recycle', ids })
-      },
+      remove: () => askDelete(ids),
       rename: () => node && setRenaming(node.id),
       properties: () => {
         const target = node ?? folder
@@ -611,10 +651,13 @@ export function FolderView({
     }
     if (recycled && node)
       return [
-        { label: '&Restore', bold: true, onSelect: restore },
+        { label: 'R&estore', bold: true, onSelect: restore },
+        'separator',
+        { label: 'Cu&t', onSelect: act.cut },
+        'separator',
         { label: '&Delete', onSelect: act.remove },
         'separator',
-        { label: 'P&roperties', onSelect: act.properties },
+        { label: 'P&roperties', disabled: !facts.single, onSelect: act.properties },
       ]
     if (node?.kind === 'drive')
       return [
@@ -858,10 +901,7 @@ export function FolderView({
   const drag = useFileDrag(list, {
     error: (title, message) => setPrompt({ kind: 'error', title, message }),
     select: (ids) => setSelection({ ids: new Set(ids), anchor: ids[0] ?? null, focus: ids[0] ?? null }),
-    recycle: (ids) => {
-      if (settings.confirmDelete) setPrompt({ kind: 'confirm', action: 'recycle', ids })
-      else removeNodes(ids, false)
-    },
+    recycle: askDelete,
     place: (ids, offset) => {
       if (autoArrange || (view !== 'large' && view !== 'small')) return
       setPositions((old) => ({
@@ -874,7 +914,7 @@ export function FolderView({
   })
   const band = useRubberBand(selection, setSelection)
   return (
-    <div className="explorer h-full w-full flex flex-col" data-location={title}>
+    <div ref={root} className="explorer h-full w-full flex flex-col" data-location={title}>
       <MenuBar
         menus={[
           { label: '&File', items: virtual ? shellFileItems : fileItems },
@@ -888,7 +928,12 @@ export function FolderView({
                 onSelect: undo,
               },
               'separator',
-              { label: 'Cu&t', shortcut: 'Ctrl+X', disabled: !writable || !mutable, onSelect: cutSelected },
+              {
+                label: 'Cu&t',
+                shortcut: 'Ctrl+X',
+                disabled: !(writable || recycled) || !mutable,
+                onSelect: cutSelected,
+              },
               {
                 label: '&Copy',
                 shortcut: 'Ctrl+C',
@@ -1026,7 +1071,7 @@ export function FolderView({
           />
           {[
             { label: 'Up One Level', disabled: location.kind !== 'folder' && !virtual, run: up },
-            { label: 'Cut', disabled: !mutable || !writable, run: cutSelected },
+            { label: 'Cut', disabled: !mutable || !(writable || recycled), run: cutSelected },
             { label: 'Copy', disabled: !selected.length || recycled, run: copySelected },
             { label: 'Paste', disabled: !writable || !clip, run: () => paste() },
             { label: 'Undo', disabled: !undoStack.length, run: undo },
@@ -1045,6 +1090,7 @@ export function FolderView({
             <button
               key={item.label}
               type="button"
+              tabIndex={-1}
               aria-label={item.label}
               title={item.label}
               className="bevel-raised"
@@ -1060,7 +1106,7 @@ export function FolderView({
         {exploring && (
           <>
             <div className="explorer-tree-pane" style={{ width: treeWidth }}>
-              <div className="explorer-pane-heading">All Folders</div>
+              {settings.descriptionBar && <div className="explorer-pane-heading">All Folders</div>}
               <FolderTree
                 state={state}
                 location={location}
@@ -1075,40 +1121,13 @@ export function FolderView({
                 }}
               />
             </div>
-            <hr
-              aria-label="Folder pane width"
-              aria-orientation="vertical"
-              aria-valuenow={treeWidth}
-              tabIndex={0}
-              className="explorer-splitter"
-              onKeyDown={(event) => {
-                if (event.key === 'ArrowLeft') setTreeWidth(Math.max(100, treeWidth - 10))
-                if (event.key === 'ArrowRight') setTreeWidth(treeWidth + 10)
-              }}
-              onPointerDown={(event) => {
-                const start = event.clientX
-                const width = treeWidth
-                const target = event.currentTarget
-                target.setPointerCapture(event.pointerId)
-                const move = (e: PointerEvent) =>
-                  setTreeWidth(
-                    Math.max(
-                      100,
-                      Math.min(width + e.clientX - start, (target.parentElement?.clientWidth ?? 600) - 120),
-                    ),
-                  )
-                const end = () => {
-                  target.removeEventListener('pointermove', move)
-                  target.removeEventListener('pointerup', end)
-                }
-                target.addEventListener('pointermove', move)
-                target.addEventListener('pointerup', end)
-              }}
-            />
+            <Splitter width={treeWidth} onResize={setTreeWidth} />
           </>
         )}
         <div className="explorer-content-pane">
-          {exploring && <div className="explorer-pane-heading">Contents of '{path}'</div>}
+          {exploring && settings.descriptionBar && (
+            <div className="explorer-pane-heading">Contents of '{path}'</div>
+          )}
           <div className={`explorer-files explorer-${view} bevel-sunken`}>
             {view === 'details' && (
               <div
@@ -1119,6 +1138,7 @@ export function FolderView({
                   <button
                     type="button"
                     key={column.id}
+                    tabIndex={-1}
                     className="bevel-raised"
                     style={{ width: column.width }}
                     aria-label={`Sort by ${column.label}`}
@@ -1283,10 +1303,12 @@ export function FolderView({
             {virtual
               ? (virtual.items.find((item) => item.key === singleShell?.key)?.help ?? '')
               : single?.kind === 'drive'
-                ? `Free Space: ${formatSize(Math.max(0, 536870912 - Object.values(state.nodes).reduce((sum, node) => sum + fileSize(node), 0))).split(' (')[0]}, Capacity: 512MB`
-                : formatSize(
-                    (selectedCount ? selected : nodes).reduce((sum, node) => sum + fileSize(node), 0),
-                  ).split(' (')[0]}
+                ? `Free Space: ${formatSize(DRIVE_CAPACITY - driveUsed(state)).split(' (')[0]}, Capacity: ${formatSize(DRIVE_CAPACITY).split(' (')[0]}`
+                : location.kind === 'computer'
+                  ? ''
+                  : formatSize(
+                      (selectedCount ? selected : nodes).reduce((sum, node) => sum + fileSize(node), 0),
+                    ).split(' (')[0]}
           </StatusPane>
         </StatusBar>
       )}
@@ -1323,6 +1345,8 @@ export function FolderView({
                 id={`goto-${window.id}`}
                 aria-label="Go to folder"
                 value={goPath}
+                autoFocus
+                onFocus={(event) => event.currentTarget.select()}
                 onChange={(event) => setGoPath(event.target.value)}
                 className="flex-1"
               />
@@ -1384,10 +1408,10 @@ export function FolderView({
         <AboutDialog app="Windows 95" icon={icons.windowsLogo} onClose={() => setPrompt(null)} />
       )}
       {prompt?.kind === 'options' && <FolderOptions onClose={() => setPrompt(null)} />}
-      {prompt?.kind === 'bin-properties' && <RecycleProperties onClose={() => setPrompt(null)} />}
+      {prompt?.kind === 'bin-properties' && <RecycleBinProperties onClose={() => setPrompt(null)} />}
       {prompt?.kind === 'floppy' && (
         <MessageBox
-          title="A:\\"
+          title={'A:\\'}
           message={'A:\\ is not accessible.\n\nThe device is not ready.'}
           icon="error"
           buttons={['Retry', 'Cancel']}

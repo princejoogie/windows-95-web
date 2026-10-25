@@ -8,8 +8,12 @@ import {
   type ProgramSpec,
   RECYCLED_DIR,
   ROOT,
+  type ShortcutSettings,
   WINDOWS_DIR,
 } from './types'
+
+/** What a shortcut opens: an installed app, or a node. */
+export type ShortcutTarget = { readonly app: string } | { readonly node: NodeId }
 
 export type FsAction =
   | { type: 'create'; node: FsNode }
@@ -21,6 +25,9 @@ export type FsAction =
   | { type: 'purge'; id: NodeId }
   | { type: 'emptyRecycleBin' }
   | { type: 'setAttributes'; id: NodeId; attributes: Attributes }
+  | { type: 'setLabel'; id: NodeId; label: string }
+  /** Re-points a shortcut and sets its Shortcut tab fields. Empty fields go back to their defaults. */
+  | { type: 'setShortcut'; id: NodeId; target: ShortcutTarget; settings: ShortcutSettings }
   /** `shortcuts` also puts desktop shortcuts down. The shell passes it only on first boot. */
   | { type: 'installPrograms'; programs: readonly ProgramSpec[]; shortcuts: boolean; at: number }
 
@@ -127,6 +134,24 @@ export function uniqueName(state: FsState, parent: NodeId, base: string): string
     const name = ext ? `${stem} (${n}).${base.slice(-ext.length)}` : `${stem} (${n})`
     if (!findChild(state, parent, name)) return name
   }
+}
+
+/** Why a volume label is not allowed, or null: FAT labels are at most 11 characters, without punctuation. */
+export function volumeLabelError(label: string): string | null {
+  return label.trim().length > 11 || /[*?/\\|.,;:+=[\]<>"]/.test(label)
+    ? 'The volume label is not valid. A label can have up to 11 characters and cannot contain any of the following characters: * ? / \\ | . , ; : + = [ ] < > "'
+    : null
+}
+
+/** C: is a 512 MB disk. */
+export const DRIVE_CAPACITY = 536870912
+
+/** Bytes in use on C:, counting every node, the Recycle Bin's included. */
+export function driveUsed(state: FsState): number {
+  return Math.min(
+    DRIVE_CAPACITY,
+    Object.values(state.nodes).reduce((sum, node) => sum + fileSize(node), 0),
+  )
 }
 
 function put(state: FsState, node: FsNode): FsState {
@@ -243,7 +268,10 @@ export function fsReducer(state: FsState, action: FsAction): FsState {
       if (target.kind !== 'folder' && target.kind !== 'drive') return state
       if (isInside(state, target.id, node.id)) return state
       if (findChild(state, target.id, node.name)) return state
-      return put(state, { ...node, parent: target.id, modified: action.at })
+      const moved = put(state, { ...node, parent: target.id, modified: action.at })
+      if (!state.recycled[node.id] || isInside(state, target.id, RECYCLED_DIR)) return moved
+      const { [node.id]: _, ...recycled } = state.recycled
+      return { ...moved, recycled }
     }
     case 'recycle': {
       const node = state.nodes[action.id]
@@ -267,6 +295,30 @@ export function fsReducer(state: FsState, action: FsAction): FsState {
       return children(state, RECYCLED_DIR).reduce((next, node) => remove(next, node.id), state)
     case 'installPrograms':
       return installPrograms(state, action.programs, action.shortcuts, action.at)
+    case 'setShortcut': {
+      const node = state.nodes[action.id]
+      if (node?.kind !== 'shortcut') return state
+      if ('node' in action.target && (!state.nodes[action.target.node] || action.target.node === node.id))
+        return state
+      const { app: _app, target: _target, startIn: _startIn, run: _run, icon: _icon, ...base } = node
+      const settings = Object.fromEntries(
+        Object.entries(action.settings).filter(
+          ([key, value]) => value && !(key === 'run' && value === 'normal'),
+        ),
+      ) as ShortcutSettings
+      const link: FsNode =
+        'node' in action.target
+          ? { ...base, ...settings, kind: 'shortcut', target: action.target.node }
+          : { ...base, ...settings, kind: 'shortcut', app: action.target.app }
+      return put(state, link)
+    }
+    case 'setLabel': {
+      const node = state.nodes[action.id]
+      if (node?.kind !== 'drive' || volumeLabelError(action.label)) return state
+      const { label: _, ...rest } = node
+      const label = action.label.trim().toUpperCase()
+      return put(state, label ? { ...rest, label } : rest)
+    }
     case 'setAttributes': {
       const node = state.nodes[action.id]
       return node ? put(state, { ...node, attributes: { ...node.attributes, ...action.attributes } }) : state

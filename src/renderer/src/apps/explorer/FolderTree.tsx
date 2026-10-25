@@ -82,6 +82,7 @@ export function FolderTree({
           }}
           onDoubleClick={() => row.children.length && toggle(row.key)}
           onKeyDown={(event) => {
+            if (event.key === 'Tab' || event.key === 'F6') return
             event.stopPropagation()
             const next = (offset: number) => {
               const entry = rows[index + offset]
@@ -128,6 +129,7 @@ export function FolderTree({
           {row.children.length > 0 && (
             <button
               type="button"
+              tabIndex={-1}
               className="explorer-tree-expander"
               style={{ left: row.depth * 16 + 4 }}
               aria-label={`${expanded.has(row.key) ? 'Collapse' : 'Expand'} ${row.label}`}

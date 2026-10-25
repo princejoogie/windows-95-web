@@ -1,9 +1,15 @@
 import { extension } from '../fs/fs'
 import type { FsNode } from '../fs/types'
 
+/** A drive as Explorer names it: `(C:)`, or `Work disk (C:)` with only the label's first letter capital. */
+export function driveName(node: FsNode): string {
+  const label = node.kind === 'drive' ? node.label : undefined
+  return label ? `${label[0]}${label.slice(1).toLowerCase()} (${node.name})` : `(${node.name})`
+}
+
 /** The name a folder window shows: registered extensions hidden when the option is on. */
 export function displayName(node: FsNode, hideExtensions: boolean, known: ReadonlySet<string>): string {
-  if (node.kind === 'drive') return '(C:)'
+  if (node.kind === 'drive') return driveName(node)
   const ext = extension(node.name)
   return hideExtensions && node.kind !== 'folder' && node.kind !== 'shortcut' && known.has(ext)
     ? node.name.slice(0, -(ext.length + 1))

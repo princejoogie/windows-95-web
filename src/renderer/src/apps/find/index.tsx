@@ -240,7 +240,7 @@ function Find({ window: appWindow, args }: AppProps) {
   }
   const copy = () => clipboard.dispatch({ op: 'copy', ids: [...selected] })
   const containingFolder = (result: SearchResult) => {
-    if (result.node.parent) launch('mycomputer', { folder: result.node.parent })
+    if (result.node.parent) launch('mycomputer', { folder: result.node.parent, select: result.node.id })
   }
   const newSearch = () => setConfirmReset(true)
   const shortcut = (result: SearchResult, parent: NodeId) => {

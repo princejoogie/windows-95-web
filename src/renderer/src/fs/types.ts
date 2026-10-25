@@ -19,16 +19,31 @@ interface NodeBase {
   readonly attributes?: Attributes
 }
 
+export type RunAs = 'normal' | 'minimized' | 'maximized'
+
+/** What a shortcut's Shortcut tab edits besides its target. */
+export interface ShortcutSettings {
+  /** The working folder, as a path. Absent means the target's own folder. */
+  readonly startIn?: string
+  /** How the window opens. Absent means a normal window. */
+  readonly run?: RunAs
+  /** A Change Icon choice: a key of the shell's 32x32 icons, or `app:<id>` for an app's icon. */
+  readonly icon?: string
+}
+
 export type FsNode =
-  | (NodeBase & { readonly kind: 'drive' })
+  /** `label` is the volume label, stored uppercase as FAT keeps it. */
+  | (NodeBase & { readonly kind: 'drive'; readonly label?: string })
   | (NodeBase & { readonly kind: 'folder' })
   | (NodeBase & { readonly kind: 'file'; readonly content: string })
   /** An installed app's executable, such as `C:\WINDOWS\CALC.EXE`. */
   | (NodeBase & { readonly kind: 'program'; readonly app: string })
   /** A link that launches an app. Its name has no extension, as Windows hides `.lnk`. */
-  | (NodeBase & { readonly kind: 'shortcut'; readonly app: string; readonly target?: undefined })
+  | (NodeBase &
+      ShortcutSettings & { readonly kind: 'shortcut'; readonly app: string; readonly target?: undefined })
   /** A link to a file, folder, or drive. Opening it opens the target. */
-  | (NodeBase & { readonly kind: 'shortcut'; readonly target: NodeId; readonly app?: undefined })
+  | (NodeBase &
+      ShortcutSettings & { readonly kind: 'shortcut'; readonly target: NodeId; readonly app?: undefined })
 
 export type NodeKind = FsNode['kind']
 

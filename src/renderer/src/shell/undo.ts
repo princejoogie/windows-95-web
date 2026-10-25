@@ -9,6 +9,8 @@ interface Change {
 export interface UndoEntry {
   readonly label: string
   readonly changes: readonly Change[]
+  /** Top-level nodes the operation made, such as a copy's new files. Undo deletes them. */
+  readonly created?: readonly FsNode[]
 }
 export const history = createStore<readonly UndoEntry[], readonly UndoEntry[]>((_state, next) => next, [])
 
@@ -19,7 +21,12 @@ export function undoEntry(before: FsState, after: FsState, label: string): UndoE
     if (next && (node.name !== next.name || node.parent !== next.parent))
       changes.push({ before: node, after: next })
   }
-  return changes.length ? { label, changes } : null
+  const created = Object.values(after.nodes).filter(
+    (node) =>
+      !before.nodes[node.id] && !(node.parent && after.nodes[node.parent] && !before.nodes[node.parent]),
+  )
+  if (!changes.length && !created.length) return null
+  return created.length ? { label, changes, created } : { label, changes }
 }
 
 export function planUndo(
@@ -32,6 +39,12 @@ export function planUndo(
   const add = (action: FsAction) => {
     actions.push(action)
     working = fsReducer(working, action)
+  }
+  for (const node of entry.created ?? []) {
+    const current = working.nodes[node.id]
+    if (!current || current.name !== node.name || current.parent !== node.parent)
+      return { ok: false, message: 'The item has changed since the last operation and cannot be undone.' }
+    add({ type: 'purge', id: node.id })
   }
   for (const { before, after } of [...entry.changes].reverse()) {
     const current = working.nodes[before.id]

@@ -1,9 +1,10 @@
 import { type KeyboardEvent, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { extension, uniqueName } from '../fs/fs'
+import { extension, pathOf, uniqueName } from '../fs/fs'
 import { createNode, fs, useFs } from '../fs/store'
 import { DOCUMENTS_DIR, type FsNode, type NodeId } from '../fs/types'
 import { icons } from '../icons'
 import { typeAhead } from '../shell/desktopModel'
+import { useNaming } from '../shell/folderOptions'
 import { Button } from './Button'
 import { ComboBox, type ComboOption } from './ComboBox'
 import { Dialog } from './Dialog'
@@ -172,7 +173,14 @@ export function FileDialog({
   const typed = useRef({ text: '', at: 0 })
   const id = useId()
   const filter = filters[filterIndex] ?? filters[0] ?? ALL_FILES
-  const entries = useMemo(() => listEntries(state, place, filter, pickable), [state, place, filter, pickable])
+  const naming = useNaming()
+  const entries = useMemo(
+    () =>
+      listEntries(state, place, filter, pickable).map((entry) =>
+        entry.kind === 'file' ? { ...entry, label: naming.label(entry.node) } : entry,
+      ),
+    [state, place, filter, pickable, naming],
+  )
   const rows = useMemo(() => lookInRows(state, place), [state, place])
   const lookIn: ComboOption[] = rows.map((row) => ({
     key: row.key,
@@ -200,7 +208,15 @@ export function FileDialog({
   }
 
   const submit = (input = name) => {
-    const choice = chooseFile(fs.get(), folderOf(place), input, mode, defaultExtension, pickable)
+    const choice = chooseFile(
+      fs.get(),
+      folderOf(place),
+      input,
+      mode,
+      defaultExtension,
+      pickable,
+      naming.label,
+    )
     switch (choice.kind) {
       case 'folder':
         enter(placeOf(choice.id))
@@ -221,7 +237,7 @@ export function FileDialog({
 
   const activate = (entry: ListEntry) => {
     if (entry.kind === 'place') enter(entry.place)
-    else submit(entry.label)
+    else submit(entry.node.name)
   }
 
   const choose = (entry: ListEntry | undefined) => {
@@ -523,7 +539,7 @@ export function FileDialog({
         <MessageBox
           title={title}
           icon="warning"
-          message={`${overwrite.name} already exists.\nDo you want to replace it?`}
+          message={`${pathOf(state, overwrite.id)}\nThis file already exists.\n\nReplace existing file?`}
           buttons={['Yes', 'No']}
           onClose={(answer) => {
             if (answer === 'Yes') onSelect(overwrite, filter)

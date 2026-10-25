@@ -25,6 +25,39 @@ const newFile = (id: string, name: string, parent: NodeId = DOCUMENTS_DIR): FsAc
 const names = (state: FsState, parent: NodeId) => children(state, parent).map((n) => n.name)
 
 describe('file system', () => {
+  it('re-points a shortcut and keeps only the settings that differ from the defaults', () => {
+    const link = 'lnk:doom' as NodeId
+    const pointed = run(fresh(), {
+      type: 'setShortcut',
+      id: link,
+      target: { node: 'readme' as NodeId },
+      settings: { startIn: 'C:\\My Documents', run: 'maximized', icon: 'drive' },
+    })
+    expect(pointed.nodes[link]).toMatchObject({
+      kind: 'shortcut',
+      target: 'readme',
+      startIn: 'C:\\My Documents',
+      run: 'maximized',
+      icon: 'drive',
+    })
+    expect(pointed.nodes[link]).not.toHaveProperty('app')
+    const back = run(pointed, {
+      type: 'setShortcut',
+      id: link,
+      target: { app: 'calc' },
+      settings: { run: 'normal' },
+    })
+    expect(back.nodes[link]).toMatchObject({ app: 'calc' })
+    expect(back.nodes[link]).not.toHaveProperty('run')
+    expect(back.nodes[link]).not.toHaveProperty('target')
+    expect(run(back, { type: 'setShortcut', id: link, target: { node: link }, settings: {} })).toBe(back)
+  })
+  it('labels C: in uppercase, clears an empty label, and refuses an invalid one', () => {
+    const labeled = run(fresh(), { type: 'setLabel', id: ROOT, label: 'Work disk' })
+    expect(labeled.nodes[ROOT]).toMatchObject({ label: 'WORK DISK' })
+    expect(run(labeled, { type: 'setLabel', id: ROOT, label: 'too.long.label' })).toBe(labeled)
+    expect(run(labeled, { type: 'setLabel', id: ROOT, label: '' }).nodes[ROOT]).not.toHaveProperty('label')
+  })
   it('seeds a C: drive with installed programs and desktop shortcuts', () => {
     const state = fresh()
     expect(resolvePath(state, 'c:\\windows\\calc.exe')).toMatchObject({ kind: 'program', app: 'calc' })

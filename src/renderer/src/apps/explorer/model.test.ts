@@ -47,7 +47,7 @@ describe('Explorer view model', () => {
     const [readme] = children(state, DOCUMENTS_DIR)
     if (!readme) throw new Error('Missing seeded document')
     expect(cellValue(state, readme, 'type')).toBe('Text Document')
-    expect(cellValue(state, readme, 'size')).toBe('1 KB')
+    expect(cellValue(state, readme, 'size')).toBe('1KB')
     expect(sizeOf({ ...readme, kind: 'file', content: 'é' })).toBe(2)
     const recycled = fsReducer(state, { type: 'recycle', id: readme.id, at: 2000 })
     expect(visibleNodes(recycled, { kind: 'recycle' }, sort).map((n) => n.id)).toEqual([readme.id])
