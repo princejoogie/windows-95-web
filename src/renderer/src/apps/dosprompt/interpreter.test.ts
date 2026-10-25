@@ -127,7 +127,7 @@ describe('COMMAND.COM', () => {
     expect(output).toContain(' Directory of C:\\WINDOWS')
     expect(output).toMatch(/DESKTOP\s+<DIR>\s+08-24-95\s+1:05p Desktop/)
     expect(output).toMatch(/A\s+TXT\s+4\s+08-24-95\s+1:05p A.TXT/)
-    expect(output).toMatch(/4 file\(s\)\s+4 bytes/)
+    expect(output).toMatch(/4 file\(s\)\s+187,512 bytes/)
     expect(output).toContain(freeBytes(dos.state).toLocaleString('en-US'))
     expect(output).toContain('bytes free')
   })
