@@ -125,7 +125,7 @@ async function go(tx, ty) {
   return false
 }
 
-async function useExit(angle) {
+async function pressExit(angle) {
   await face(angle)
   await hold(' ', 40)
   await sleep(900)
@@ -194,7 +194,7 @@ async function playLevel(index) {
     }
     if (ok) {
       await fight()
-      await useExit(route.exit)
+      await pressExit(route.exit)
       const s = await read()
       if (s.screen === 'intermission') return true
     }
