@@ -32,6 +32,8 @@ const send = (method, params = {}) =>
     ws.send(JSON.stringify({ id, method, params }))
   })
 const pause = (ms) => new Promise((done) => setTimeout(done, ms))
+// Headless Chrome denies clipboard reads unless the permission is granted. Electron grants it already.
+await send('Browser.grantPermissions', { permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] })
 
 async function evaluate(expression) {
   // A block keeps each snippet's declarations out of the page's global scope.
