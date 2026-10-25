@@ -441,7 +441,7 @@ export function MenuBar({
           <button
             type="button"
             tabIndex={-1}
-            className={`h-[19px] px-[6px] outline-none ${state.kind !== 'closed' && state.title === title ? (state.kind === 'bar-armed' ? 'bg-select text-white' : 'bevel-shallow') : ''}`}
+            className={`h-[19px] px-[6px] outline-none ${state.kind !== 'closed' && state.title === title ? 'bg-select text-white' : ''}`}
             onPointerDown={(event) => {
               event.preventDefault()
               event.stopPropagation()

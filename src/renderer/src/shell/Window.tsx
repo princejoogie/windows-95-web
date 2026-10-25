@@ -130,7 +130,8 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
     }),
     [id, focused, minimized],
   )
-  const context = useMemo(() => ({ api, dialogHost }), [api, dialogHost])
+  const [dialogFocused, setDialogFocused] = useState(false)
+  const context = useMemo(() => ({ api, dialogHost, setDialogFocused }), [api, dialogHost])
 
   useEffect(() => {
     const frame = frameRef.current
@@ -329,7 +330,7 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
     >
       <TitleBar
         title={state.title}
-        active={focused && modalCount === 0}
+        active={focused && modalCount === 0 && !dialogFocused}
         icon={smallIcon(app)}
         onPointerDown={(event) => {
           if (event.target instanceof HTMLImageElement) {

@@ -7,6 +7,7 @@ export { Checkbox, GroupBox, Radio, Separator, StatusBar, StatusPane, TextArea, 
 export { ListBox } from './ListBox'
 export { ContextMenu, MenuBar, type MenuBarMenu, type MenuEntry, MenuList } from './Menu'
 export { MessageBox } from './MessageBox'
+export { ModelessDialog } from './ModelessDialog'
 export { PropertiesSheet } from './PropertiesSheet'
 export { Tabs } from './Tabs'
 export { TitleBar, TitleButton } from './TitleBar'

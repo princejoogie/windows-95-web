@@ -652,7 +652,9 @@ async function properties() {
   await app.type('Notes')
   await app.key('Enter')
   await sleep(300)
-  const nodes = await app.eval(`Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).filter(n => n.parent === 'desktop').map(n => n.name)`)
+  const nodes = await app.eval(
+    `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).filter(n => n.parent === 'desktop').map(n => n.name)`,
+  )
   const labels = await desktopLabels()
   check(
     editing === 'New Text Document' && labels.includes('Notes') && nodes.includes('Notes.txt'),
@@ -664,12 +666,18 @@ async function properties() {
   await clickExpr(desktopItem('Minesweeper'), { button: 'right' })
   await pickMenu('Properties')
   await app.waitFor(`!!${dialog('Minesweeper Properties')}`)
-  const tabs = await app.eval(`[...${dialog('Minesweeper Properties')}.querySelectorAll('[role="tab"]')].map(t => t.textContent.trim())`)
-  await clickExpr(`[...${dialog('Minesweeper Properties')}.querySelectorAll('[role="tab"]')].find(t => t.textContent.trim() === 'Shortcut')`)
+  const tabs = await app.eval(
+    `[...${dialog('Minesweeper Properties')}.querySelectorAll('[role="tab"]')].map(t => t.textContent.trim())`,
+  )
+  await clickExpr(
+    `[...${dialog('Minesweeper Properties')}.querySelectorAll('[role="tab"]')].find(t => t.textContent.trim() === 'Shortcut')`,
+  )
   const fields = await app.eval(
     `Object.fromEntries([...${dialog('Minesweeper Properties')}.querySelectorAll('input[aria-label]')].map(i => [i.getAttribute('aria-label'), i.value]))`,
   )
-  const run = await app.eval(`${dialog('Minesweeper Properties')}.querySelector('[role="combobox"]').textContent.trim()`)
+  const run = await app.eval(
+    `${dialog('Minesweeper Properties')}.querySelector('[role="combobox"]').textContent.trim()`,
+  )
   check(
     tabs.join('|') === 'General|Shortcut' &&
       /WINMINE\.EXE$/i.test(fields.Target) &&
@@ -688,15 +696,21 @@ async function properties() {
   await app.key('Enter')
   await sleep(300)
   await clickExpr(desktopItem('Recycle Bin'), { count: 2 })
-  await app.waitFor(`[...document.querySelectorAll('[data-window]')].some(w => w.getAttribute('aria-label') === 'Recycle Bin')`)
+  await app.waitFor(
+    `[...document.querySelectorAll('[data-window]')].some(w => w.getAttribute('aria-label') === 'Recycle Bin')`,
+  )
   await sleep(400)
   const item = `[...${topWindow}.querySelectorAll('*')].find(e => e.children.length === 0 && e.textContent.trim() === 'Notes')`
   await clickExpr(item, { button: 'right' })
   await pickMenu('Properties')
   await app.waitFor(`!!${dialog('Notes Properties')}`)
   const rows = await rowsOf('Notes Properties')
-  const renamable = await app.eval(`!!${dialog('Notes Properties')}.querySelector('input[aria-label="Name"]')`)
-  const attributes = await app.eval(`[...${dialog('Notes Properties')}.querySelectorAll('input[type="checkbox"]')].every(c => c.disabled)`)
+  const renamable = await app.eval(
+    `!!${dialog('Notes Properties')}.querySelector('input[aria-label="Name"]')`,
+  )
+  const attributes = await app.eval(
+    `[...${dialog('Notes Properties')}.querySelectorAll('input[type="checkbox"]')].every(c => c.disabled)`,
+  )
   check(
     rows[0]?.startsWith('Origin:C:\\WINDOWS\\Desktop') &&
       rows.some((row) => row.startsWith('Deleted:')) &&
@@ -712,7 +726,64 @@ async function properties() {
   await closeWindows()
 }
 
-const phases = { fileDialog, dialogs, about, kit, systemMenu, sounds, properties }
+async function captions() {
+  await closeWindows()
+  await run('notepad')
+  await app.waitFor(`!!document.querySelector('[data-window] textarea')`)
+  const file = `[...${topWindow}.querySelectorAll('[role="menubar"] button')].find(b => b.textContent.trim() === 'File')`
+  await clickExpr(file)
+  await app.waitFor(`!!document.querySelector('[role="menu"]')`)
+  const open = await app.eval(
+    `(() => { const s = getComputedStyle(${file}); return [s.backgroundColor, s.color, s.boxShadow] })()`,
+  )
+  await shot(
+    'a2-open-menu-title',
+    await app.eval(
+      `(()=>{const b=(${topWindow}).getBoundingClientRect();return {x:b.x,y:b.y,width:260,height:140}})()`,
+    ),
+  )
+  await app.key('Escape')
+  await app.key('Escape')
+  check(
+    open[0] === 'rgb(0, 0, 128)' && open[1] === 'rgb(255, 255, 255)' && open[2] === 'none',
+    'A2',
+    'an open menu title is navy with white text, not sunken',
+    open,
+  )
+
+  await app.key('f', ['Control'])
+  await app.waitFor(`!!${dialog('Find')}`)
+  await sleep(150)
+  const captionsNow = () =>
+    app.eval(
+      `({ owner: (${topWindow}).querySelector('.bg-title, .bg-title-inactive').className.includes('bg-title-inactive') ? 'inactive' : 'active', find: ${dialog('Find')}.querySelector('.bg-title, .bg-title-inactive').className.includes('bg-title-inactive') ? 'inactive' : 'active' })`,
+    )
+  const withFind = await captionsNow()
+  await shot(
+    'a19-find-focused',
+    await app.eval(
+      `(()=>{const b=(${topWindow}).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height}})()`,
+    ),
+  )
+  const box = await app.eval(
+    `document.querySelector('[data-window] textarea').getBoundingClientRect().toJSON()`,
+  )
+  await app.click(box.x + 20, box.y + box.height - 20)
+  await sleep(150)
+  const withOwner = await captionsNow()
+  check(
+    withFind.owner === 'inactive' &&
+      withFind.find === 'active' &&
+      withOwner.owner === 'active' &&
+      withOwner.find === 'inactive',
+    'A19',
+    'the focused modeless Find owns the active caption, and the owner takes it back on click',
+    { withFind, withOwner },
+  )
+  await closeWindows()
+}
+
+const phases = { fileDialog, dialogs, about, kit, systemMenu, sounds, properties, captions }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {

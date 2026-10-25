@@ -13,13 +13,13 @@ import {
   GroupBox,
   MenuBar,
   MessageBox,
+  ModelessDialog,
   Radio,
   Separator,
   TextBox,
 } from '../../ui'
 import { type DocumentState, documentReducer, findText } from './document'
 import { notepadIcon } from './icon'
-import { ModelessDialog } from './ModelessDialog'
 import { defaultPageSettings, PageSetup } from './PageSetup'
 import { revealSelection } from './revealSelection'
 import './notepad.css'
