@@ -1,0 +1,174 @@
+.hearts-table {
+  background: #008000;
+}
+
+.hearts-hand {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.hearts-card,
+.hearts-opponent,
+.hearts-opponent img,
+.hearts-play,
+.hearts-name {
+  position: absolute;
+}
+
+.hearts-card,
+.hearts-card img,
+.hearts-play {
+  width: 71px;
+  height: 96px;
+  max-width: none;
+}
+
+.hearts-card {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  outline: none;
+}
+
+.hearts-card:focus-visible {
+  outline: 1px dotted white;
+  outline-offset: 1px;
+}
+
+.hearts-opponent img {
+  width: 71px;
+  height: 96px;
+  max-width: none;
+}
+
+.hearts-seat-1 img {
+  transform: rotate(90deg);
+}
+
+.hearts-seat-3 img {
+  transform: rotate(-90deg);
+}
+
+.hearts-name {
+  color: white;
+  line-height: 16px;
+  text-align: center;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hearts-name[data-current="true"] {
+  text-decoration: underline;
+}
+
+.hearts-name-0 {
+  left: 50%;
+  bottom: 3px;
+  transform: translateX(-50%);
+}
+
+.hearts-name-2 {
+  left: 50%;
+  top: 109px;
+  transform: translateX(-50%);
+}
+
+.hearts-name-1 {
+  left: 10px;
+  width: 96px;
+  top: calc(50% + 110px);
+}
+
+.hearts-name-3 {
+  right: 10px;
+  width: 96px;
+  top: calc(50% + 110px);
+}
+
+.hearts-play {
+  z-index: 20;
+}
+
+.hearts-play-0 {
+  left: calc(50% - 35px);
+  top: calc(50% + 10px);
+  --hearts-from: translateY(130px);
+}
+
+.hearts-play-1 {
+  left: calc(50% - 112px);
+  top: calc(50% - 48px);
+  --hearts-from: translateX(-150px);
+}
+
+.hearts-play-2 {
+  left: calc(50% - 35px);
+  top: calc(50% - 108px);
+  --hearts-from: translateY(-110px);
+}
+
+.hearts-play-3 {
+  left: calc(50% + 42px);
+  top: calc(50% - 48px);
+  --hearts-from: translateX(150px);
+}
+
+.hearts-table[data-animation="true"] .hearts-play {
+  animation: hearts-play-card 160ms linear;
+}
+
+.hearts-table[data-active="false"] .hearts-play {
+  animation-play-state: paused;
+}
+
+@keyframes hearts-play-card {
+  from {
+    transform: var(--hearts-from);
+  }
+  to {
+    transform: translate(0, 0);
+  }
+}
+
+.hearts-pass {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.hearts-continue {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  z-index: 30;
+}
+
+.hearts-continue:focus-visible {
+  outline: 1px dotted white;
+  outline-offset: -4px;
+}
+
+.hearts-score-sheet th,
+.hearts-score-sheet td {
+  padding: 3px 6px;
+  font-weight: normal;
+  max-width: 85px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hearts-score-sheet thead {
+  border-bottom: 1px solid black;
+}
+
+.hearts-score-sheet tfoot {
+  border-top: 1px solid black;
+}
