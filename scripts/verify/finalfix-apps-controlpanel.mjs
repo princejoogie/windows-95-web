@@ -8,6 +8,14 @@ const proof =
 mkdirSync(proof, { recursive: true })
 const app = await connect(Number(process.env.W95_CDP_PORT ?? 9452))
 const phase = process.argv[2] ?? 'baseline'
+writeFileSync(
+  join(proof, `${phase}-runtime.json`),
+  JSON.stringify(
+    await app.eval('({url:location.href,title:document.title,userAgent:navigator.userAgent})'),
+    null,
+    2,
+  ),
+)
 const results = []
 const dialog = (name) => `[role="dialog"][aria-label=${JSON.stringify(name)}]`
 const clickText = async (text, within = 'body', options = {}) => {
@@ -57,6 +65,97 @@ const checkbox = async (label, within = 'body') => {
 const inputValue = (label) => `document.querySelector('input[aria-label=${JSON.stringify(label)}]').value`
 const persisted = (path) => `JSON.parse(localStorage.getItem('win95.settings.v1'))?.${path}`
 try {
+  if (phase === 'exit') await app.eval('setTimeout(() => window.win95.shutdown(), 100)')
+  if (process.argv.includes('--fresh')) {
+    await app.eval('localStorage.clear()')
+    await reload()
+  }
+  if (phase === 'shortcuts') {
+    await reload()
+    await run('control')
+    await clickText('Display', '[data-window]')
+    await app.key('f', ['Alt'])
+    await app.key('s')
+    await shot('display-confirmation')
+    await clickText('No', dialog('Shortcut'))
+    await sleep(300)
+    await check(
+      9,
+      'No declines desktop shortcut creation',
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).filter(n=>n.app==='shell:controlpanel:display').length`,
+      0,
+    )
+    await app.key('f', ['Alt'])
+    await app.key('s')
+    await clickText('Yes', dialog('Shortcut'))
+    await sleep(300)
+    await check(
+      9,
+      'File menu creates persisted applet shortcut',
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).filter(n=>n.app==='shell:controlpanel:display').map(n=>({kind:n.kind,name:n.name,parent:n.parent}))`,
+      [{ kind: 'shortcut', name: 'Shortcut to Display', parent: 'desktop' }],
+    )
+    await reload()
+    const display = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.app==='shell:controlpanel:display').id`,
+    )
+    await app.clickOn(`[data-desktop-item="${display}"]`, { count: 2 })
+    await check(
+      9,
+      'desktop applet shortcut launches Display Properties',
+      `!!document.querySelector(${JSON.stringify(dialog('Display Properties'))})`,
+      true,
+    )
+    await shot('desktop-display-launch')
+    await clickText('Cancel', dialog('Display Properties'))
+    await app.clickOn('[data-window] [aria-label="Close"]')
+    await app.clickOn(`[data-desktop-item="${display}"]`)
+    await app.key('Enter', ['Alt'])
+    await clickText('Shortcut', dialog('Shortcut to Display Properties'))
+    await check(
+      9,
+      'special shortcut Properties exposes its named target',
+      `document.querySelector('input[aria-label="Target"]').value`,
+      'Control Panel\\Display',
+    )
+    await clickText('OK', dialog('Shortcut to Display Properties'))
+    await reload()
+    await app.clickOn('[data-desktop-item="app:network"]', { count: 2 })
+    await clickText('Entire Network', '[data-window]')
+    await app.key('F10', ['Shift'])
+    await clickText('Create Shortcut', '[role=menu]')
+    await clickText('Yes', dialog('Shortcut'))
+    await sleep(300)
+    await check(
+      9,
+      'keyboard context menu creates Entire Network shortcut',
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).filter(n=>n.app==='shell:network:entire-network').map(n=>n.name)`,
+      ['Shortcut to Entire Network'],
+    )
+    await reload()
+    const entire = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.app==='shell:network:entire-network').id`,
+    )
+    await app.clickOn(`[data-desktop-item="${entire}"]`)
+    await app.key('Enter')
+    await check(
+      9,
+      'Entire Network desktop shortcut reaches truthful browse error',
+      `document.querySelector(${JSON.stringify(dialog('Network Neighborhood'))}).textContent.includes('Unable to browse the network')`,
+      true,
+    )
+    await shot('entire-network-launch')
+    await clickText('OK', dialog('Network Neighborhood'))
+    await app.key('f', ['Alt'])
+    await clickText('Find Computer...', '[role=menu]')
+    await check(
+      9,
+      'Network folder Find Computer routes to final shell app',
+      `!!document.querySelector('[data-window][aria-label="Find: Computer"]')`,
+      true,
+    )
+    await shot('find-computer')
+  }
   if (phase === 'accessibility') {
     await reload()
     await openPanel('Accessibility Options')

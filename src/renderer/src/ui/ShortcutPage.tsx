@@ -197,6 +197,7 @@ export function ShortcutPage({
           '&Target:',
           <TextBox
             aria-label="Target"
+            readOnly={node.kind === 'shortcut' && node.app?.startsWith('shell:')}
             className="w-full"
             value={draft.target}
             onChange={(event) => onChange({ ...draft, target: event.target.value })}
@@ -209,6 +210,7 @@ export function ShortcutPage({
           '&Start in:',
           <TextBox
             aria-label="Start in"
+            readOnly={node.kind === 'shortcut' && node.app?.startsWith('shell:')}
             className="w-full"
             value={draft.startIn}
             onChange={(event) => onChange({ ...draft, startIn: event.target.value })}

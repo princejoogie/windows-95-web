@@ -6,6 +6,7 @@ import { resolveShortcut } from './clipboard'
 import { shellEvents } from './events'
 import { rememberDocument } from './recent'
 import { appForFile, getApp } from './registry'
+import { shellShortcutApp } from './shellShortcut'
 import type { LaunchArgs, WindowId } from './types'
 import { emptyWindows, type WindowsState, windowsReducer } from './windows'
 
@@ -52,6 +53,8 @@ export function opener(node: FsNode): { appId: string; args: LaunchArgs } | null
     case 'shortcut': {
       const target = resolveShortcut(fsStore.get(), node)
       if (!target) return null
+      if (target.kind === 'shell')
+        return { appId: shellShortcutApp(target.target), args: { shellTarget: target.target } }
       return target.kind === 'app' ? { appId: target.app, args: {} } : opener(target.node)
     }
     case 'drive':

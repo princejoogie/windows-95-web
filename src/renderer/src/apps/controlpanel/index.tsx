@@ -2,7 +2,7 @@ import '../../settings/apply'
 import type { AppManifest, AppProps } from '../../shell/types'
 import { printerIcon } from '../explorer/art'
 import { FolderView } from '../explorer/FolderView'
-import { registerShellFolder, type ShellItem } from '../explorer/shellFolders'
+import { registerShellFolder, type ShellItem, shellFolder } from '../explorer/shellFolders'
 import { networkIcon } from '../network/art'
 import {
   HardwareWizard,
@@ -178,8 +178,18 @@ registerShellFolder({
   ).sort((a, b) => a.label.localeCompare(b.label)),
 })
 
-export function ControlPanel({ window }: AppProps) {
-  return <FolderView initial={{ kind: 'shell', id: 'controlpanel' }} window={window} />
+export function ControlPanel({ window, args }: AppProps) {
+  const target = args.shellTarget
+  const folder = target?.folder ?? 'controlpanel'
+  const item =
+    target?.kind === 'item' ? shellFolder(folder)?.items.find((item) => item.key === target.item) : undefined
+  return (
+    <FolderView
+      initial={{ kind: 'shell', id: folder }}
+      initialDialog={item?.action.kind === 'dialog' ? item.action.id : undefined}
+      window={window}
+    />
+  )
 }
 
 export const app: AppManifest = {

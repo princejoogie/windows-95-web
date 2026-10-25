@@ -1,7 +1,8 @@
 import { type ComponentType, useSyncExternalStore } from 'react'
+import type { ShellFolderId } from '../../fs/types'
 import type { Location } from './model'
 
-export type ShellFolderId = 'controlpanel' | 'printers' | 'network' | 'fonts'
+export type { ShellFolderId } from '../../fs/types'
 export type ShellAction =
   | { kind: 'folder'; id: ShellFolderId }
   | { kind: 'dialog'; id: string }
