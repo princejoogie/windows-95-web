@@ -9,7 +9,6 @@ import { type Actor, EFFECT_TIME, type World } from './world'
 export const SCREEN_W = 320
 export const SCREEN_H = 200
 export const VIEW_H = 168
-const HORIZON = VIEW_H / 2
 /** Pixels per cell at distance 1, which gives a 90 degree horizontal field of view. */
 const PROJ = SCREEN_W / 2
 const FULL = LIGHT_LEVELS - 1
@@ -136,15 +135,20 @@ function gatherSprites(world: World, sprites: SpriteSet, out: SpriteDraw[]): voi
   out.sort((a, b) => b.depth - a.depth)
 }
 
-/** Draws the 3D view into the top `VIEW_H` rows of `frame`. Reuses `zbuf` and `scratch` between frames. */
+/**
+ * Draws the 3D view into the top `viewH` rows of `frame`, and marks each wall it draws as seen for the
+ * automap. Reuses `zbuf` and `scratch` between frames.
+ */
 export function renderView(
   frame: Bitmap,
   world: World,
   assets: Assets,
   zbuf: Float32Array,
+  viewH = VIEW_H,
   scratch: SpriteDraw[] = [],
 ): void {
-  const { player, grid } = world
+  const { player, grid, seen } = world
+  const horizon = viewH / 2
   const { pixels } = frame
   const W = SCREEN_W
   const dirX = Math.cos(player.angle)
@@ -157,9 +161,9 @@ export function renderView(
   const floorTex = assets.textures[TEX.floor] ?? []
   const ceilTex = assets.textures[TEX.ceiling] ?? []
 
-  for (let y = 0; y < VIEW_H; y++) {
-    const below = y + 0.5 > HORIZON
-    const rowDist = below ? (eyeZ * PROJ) / (y + 0.5 - HORIZON) : ((1 - eyeZ) * PROJ) / (HORIZON - y - 0.5)
+  for (let y = 0; y < viewH; y++) {
+    const below = y + 0.5 > horizon
+    const rowDist = below ? (eyeZ * PROJ) / (y + 0.5 - horizon) : ((1 - eyeZ) * PROJ) / (horizon - y - 0.5)
     const texels = (below ? floorTex : ceilTex)[lightAt(rowDist, extra)]
     if (!texels) continue
     const stepX = (rowDist * 2 * planeX) / W
@@ -181,16 +185,17 @@ export function renderView(
       zbuf[x] = Number.POSITIVE_INFINITY
       continue
     }
+    seen[hit.cell] = 1
     const t = Math.max(hit.t, 1e-4)
     zbuf[x] = t
     const lineH = PROJ / t
-    const top = HORIZON - (1 - eyeZ) * lineH
+    const top = horizon - (1 - eyeZ) * lineH
     const level = Math.max(2, lightAt(t, extra) - (hit.side === 1 ? 3 : 0))
     const texels = assets.textures[hit.tex]?.[level]
     if (!texels) continue
     const column = Math.min(TEX_SIZE - 1, Math.floor(hit.u * TEX_SIZE)) * TEX_SIZE
     const y0 = Math.max(0, Math.ceil(top - 0.5))
-    const y1 = Math.min(VIEW_H, Math.ceil(top + lineH - 0.5))
+    const y1 = Math.min(viewH, Math.ceil(top + lineH - 0.5))
     const step = TEX_SIZE / lineH
     let v = (y0 + 0.5 - top) * step
     for (let y = y0; y < y1; y++) {
@@ -200,11 +205,11 @@ export function renderView(
   }
 
   gatherSprites(world, assets.sprites, scratch)
-  for (const sprite of scratch) drawSprite(frame, sprite, eyeZ, extra, assets.lut, zbuf)
-  if (!player.dead) drawWeapon(frame, world, assets)
-  tint(frame, player.damageTint * 0.55, 255, 0, 0)
-  tint(frame, player.bonusTint * 0.35, 255, 220, 80)
-  if (player.dead) tint(frame, Math.min(0.5, player.deadTime * 0.5), 140, 0, 0)
+  for (const sprite of scratch) drawSprite(frame, sprite, eyeZ, extra, assets.lut, zbuf, viewH)
+  if (!player.dead) drawWeapon(frame, world, assets, viewH)
+  tint(frame, viewH, player.damageTint * 0.55, 255, 0, 0)
+  tint(frame, viewH, player.bonusTint * 0.35, 255, 220, 80)
+  if (player.dead) tint(frame, viewH, Math.min(0.5, player.deadTime * 0.5), 140, 0, 0)
 }
 
 function drawSprite(
@@ -214,18 +219,19 @@ function drawSprite(
   extra: number,
   lut: Uint8Array,
   zbuf: Float32Array,
+  viewH: number,
 ): void {
   const { bitmap, depth } = sprite
   const scale = PROJ / depth
   const w = (bitmap.width / TEXELS_PER_CELL) * scale
   const h = (bitmap.height / TEXELS_PER_CELL) * scale
   const left = SCREEN_W / 2 + (sprite.lateral / depth) * PROJ - w / 2
-  const bottom = HORIZON + (eyeZ - sprite.z) * scale
+  const bottom = viewH / 2 + (eyeZ - sprite.z) * scale
   const top = bottom - h
   const x0 = Math.max(0, Math.ceil(left - 0.5))
   const x1 = Math.min(SCREEN_W, Math.ceil(left + w - 0.5))
   const y0 = Math.max(0, Math.ceil(top - 0.5))
-  const y1 = Math.min(VIEW_H, Math.ceil(bottom - 0.5))
+  const y1 = Math.min(viewH, Math.ceil(bottom - 0.5))
   const base = (sprite.bright ? LIGHT_LEVELS - 1 : lightAt(depth, extra)) * 256
   const src = bitmap.pixels
   const dst = frame.pixels
@@ -262,7 +268,7 @@ export function blit(frame: Bitmap, bitmap: Bitmap, x: number, y: number, maxY =
   }
 }
 
-function drawWeapon(frame: Bitmap, world: World, assets: Assets): void {
+function drawWeapon(frame: Bitmap, world: World, assets: Assets, viewH: number): void {
   const { player } = world
   const def = WEAPON_DEFS[player.weapon]
   const frames = assets.sprites.weapons[player.weapon]
@@ -278,18 +284,18 @@ function drawWeapon(frame: Bitmap, world: World, assets: Assets): void {
   const half = 0.18
   const lowered = player.switchTime > 0 ? 1 - Math.abs(player.switchTime - half) / half : 0
   const x = SCREEN_W / 2 - bitmap.width / 2 + bx + (player.weapon === 'fist' ? 20 : 0)
-  const y = VIEW_H - bitmap.height + 6 + by + lowered * 70
-  blit(frame, bitmap, x, y, VIEW_H)
+  const y = viewH - bitmap.height + 6 + by + lowered * 70
+  blit(frame, bitmap, x, y, viewH)
 }
 
-function tint(frame: Bitmap, amount: number, r: number, g: number, b: number): void {
+function tint(frame: Bitmap, viewH: number, amount: number, r: number, g: number, b: number): void {
   if (amount <= 0.01) return
   const keep = 1 - amount
   const pr = r * amount
   const pg = g * amount
   const pb = b * amount
   const { pixels } = frame
-  const end = VIEW_H * SCREEN_W
+  const end = viewH * SCREEN_W
   for (let i = 0; i < end; i++) {
     const c = pixels[i] ?? 0
     pixels[i] =

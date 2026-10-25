@@ -152,7 +152,8 @@ export const MONSTER_DEFS: Readonly<Record<MonsterKind, MonsterDef>> = {
   },
   barrel: {
     hp: 20,
-    radius: 0.25,
+    /** Doom's 10 units, so two barrels a cell apart leave room for the player to pass between them. */
+    radius: 10 / 64,
     speed: 0,
     painChance: 0,
     painTime: 0,

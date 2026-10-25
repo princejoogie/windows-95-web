@@ -1,5 +1,5 @@
 import { moveProjectiles, noiseAlert, thinkActor } from './ai'
-import { slideMove } from './collision'
+import { bumps, slideMove } from './collision'
 import { ageEffects, applyHit, traceAttack } from './combat'
 import {
   ITEM_DEFS,
@@ -80,7 +80,7 @@ function movePlayer(world: World, input: TickInput, dt: number): void {
     world.actors.some(
       (actor) =>
         isSolidActor(actor) &&
-        Math.hypot(actor.x - px, actor.y - py) < MONSTER_DEFS[actor.kind].radius + PLAYER_RADIUS,
+        bumps(actor.x, actor.y, MONSTER_DEFS[actor.kind].radius + PLAYER_RADIUS, player, { x: px, y: py }),
     ),
   )
   player.vx = (player.x - x) / dt

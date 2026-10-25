@@ -18,6 +18,16 @@ function overlapsSolid(grid: Grid, x: number, y: number, r: number): boolean {
 }
 
 /**
+ * Whether a move from `from` to `to` runs into a round thing at `(cx, cy)`. Only a move that ends in
+ * contact and closes the distance counts, so touching a thing never pins anyone. Sliding past it or
+ * backing away always works, even after two things have ended up overlapping.
+ */
+export function bumps(cx: number, cy: number, reach: number, from: Position, to: Position): boolean {
+  const after = Math.hypot(cx - to.x, cy - to.y)
+  return after < reach && after < Math.hypot(cx - from.x, cy - from.y)
+}
+
+/**
  * Moves a circle by `(dx, dy)`, one axis at a time, so a move into a wall keeps the part that runs
  * along it. A blocked axis stops flush against the wall. `blocked` adds things such as monsters and
  * barrels, which cancel the axis instead. Keep each step under one cell.
