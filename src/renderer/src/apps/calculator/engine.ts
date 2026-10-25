@@ -71,7 +71,12 @@ export function reduceCalculator(state: Calculator, action: Action): Calculator 
     const text = action.text.trim().replaceAll(',', '')
     if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(text) || !Number.isFinite(Number(text)))
       return state
-    return { ...state, display: formatted(Number(text)), entry: 'typing' }
+    return {
+      ...state,
+      display: formatted(Number(text)),
+      entry: 'replace',
+      calculation: state.calculation.kind === 'repeat' ? { kind: 'idle' } : state.calculation,
+    }
   }
   if (action.kind === 'digit') {
     if (!/^\d$/.test(action.digit) || state.entry === 'error') return state

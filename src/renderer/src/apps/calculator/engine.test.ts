@@ -66,4 +66,10 @@ describe('Windows standard calculator', () => {
     expect(keyboardAction('Delete')).toEqual({ kind: 'key', key: 'clearEntry' })
     expect(keyboardAction('Backspace')).toEqual({ kind: 'key', key: 'back' })
   })
+  it('keeps pasted exponential numbers valid when editing', () => {
+    const pasted = reduceCalculator(initialCalculator, { kind: 'paste', text: '1e30' })
+    expect(key(pasted, 'back').display).toBe('1e+30')
+    expect(press('7', pasted).display).toBe('7')
+    expect(press('.5', pasted).display).toBe('0.5')
+  })
 })
