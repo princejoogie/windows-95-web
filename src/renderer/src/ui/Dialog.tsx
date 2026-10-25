@@ -189,7 +189,7 @@ export function Dialog({
   }, [active])
   if (!host) return null
   const feedback = () => {
-    shellEvents.emit('question')
+    shellEvents.emit({ type: 'default-beep' })
     clearInterval(flashTimer.current)
     let ticks = 0
     flashTimer.current = setInterval(() => {

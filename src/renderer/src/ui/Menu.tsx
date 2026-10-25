@@ -78,7 +78,7 @@ function useMenu(
       setState(next.state)
       if (next.state.kind === 'closed') latest.current.onClose?.()
       if (next.command) {
-        shellEvents.emit('menu-command')
+        shellEvents.emit({ type: 'menu-command' })
         next.command.onSelect?.()
       }
     }
@@ -113,7 +113,7 @@ function useMenu(
     else {
       restoreFocus()
       close()
-      shellEvents.emit('menu-command')
+      shellEvents.emit({ type: 'menu-command' })
       item.onSelect?.()
     }
   }

@@ -482,7 +482,141 @@ async function systemMenu() {
   await closeWindows()
 }
 
-const phases = { fileDialog, dialogs, about, kit, systemMenu }
+// Records every buffer the real WebAudio graph starts, named by the wav file it was decoded from.
+const audioProbe = `(() => {
+  window.__audio = []
+  const bytes = new WeakMap(), buffers = new WeakMap()
+  const arrayBuffer = Response.prototype.arrayBuffer
+  Response.prototype.arrayBuffer = async function(...args) {
+    const result = await arrayBuffer.apply(this, args)
+    bytes.set(result, this.url.split('/').pop().split(/[-.]/)[0])
+    return result
+  }
+  const decode = AudioContext.prototype.decodeAudioData
+  AudioContext.prototype.decodeAudioData = async function(data, ...args) {
+    const buffer = await decode.call(this, data, ...args)
+    buffers.set(buffer, bytes.get(data))
+    return buffer
+  }
+  const start = AudioBufferSourceNode.prototype.start
+  AudioBufferSourceNode.prototype.start = function(...args) {
+    window.__audio.push(buffers.get(this.buffer))
+    return start.apply(this, args)
+  }
+})()`
+const SCHEME = {
+  'Critical Stop': 'chord',
+  Exclamation: 'notify',
+  Asterisk: 'ding',
+  Question: 'recycle',
+  'Default Sound': 'chimes',
+  'Restore Up': 'tada',
+  'Restore Down': 'chord',
+  'Start Windows': '(None)',
+  'Exit Windows': '(None)',
+  'Empty Recycle Bin': '(None)',
+}
+
+async function played(name, item, label, action) {
+  await app.eval('window.__audio = []')
+  await action()
+  await sleep(900)
+  const log = await app.eval('window.__audio')
+  check(log.length === 1 && log[0] === name, item, label, log)
+}
+
+async function sounds() {
+  await app.send('Page.enable')
+  await app.send('Page.addScriptToEvaluateOnNewDocument', { source: audioProbe })
+  await app.eval(
+    `(() => { const s = JSON.parse(localStorage.getItem('win95.settings.v1') ?? '{}'); s.soundScheme = { ...(s.soundScheme ?? {}), ...${JSON.stringify(SCHEME)} }; localStorage.setItem('win95.settings.v1', JSON.stringify(s)) })()`,
+  )
+  await app.send('Page.reload')
+  await sleep(2500)
+  await app.waitFor(`!!document.querySelector('[data-start-button]') && Array.isArray(window.__audio)`, 15000)
+  await closeWindows()
+
+  await played('chord', 'S1', 'an error box (Run, missing program) plays Critical Stop once', async () => {
+    await run('nosuchprogram')
+    await app.waitFor(`[...document.querySelectorAll('[role="dialog"]')].some(d => d.textContent.includes('Cannot find'))`)
+  })
+  await shot('s1-error-box')
+  await app.key('Enter')
+  await app.key('Escape')
+
+  await run('notepad')
+  await app.waitFor(`!!document.querySelector('[data-window] textarea')`)
+  await openMenu('File', 'Save As...')
+  await app.waitFor(`!!${dialog('Save As')}`)
+  await played('notify', 'S1', 'a warning box (invalid file name) plays Exclamation once', async () => {
+    await clickExpr(`${dialog('Save As')}.querySelector('input')`)
+    await app.key('a', ['Control'])
+    await app.type('bad?.txt')
+    await app.key('Enter')
+    await app.waitFor(`document.querySelectorAll('[role="dialog"]').length >= 2`)
+  })
+  await app.key('Enter')
+  await app.key('Escape')
+  await app.waitFor(`!document.querySelector('[role="dialog"]')`)
+
+  await clickExpr(`document.querySelector('[data-window] textarea')`)
+  await app.type('unsaved')
+  await played('recycle', 'S1', 'a question box (Notepad, save changes) plays Question once', async () => {
+    await openMenu('File', 'New')
+    await app.waitFor(`!!document.querySelector('[role="dialog"]')`)
+  })
+  await played('chimes', 'S1', 'clicking the owner window under the modal box plays Default Sound once', async () => {
+    const box = await app.eval(`document.querySelector('[data-window] textarea').getBoundingClientRect().toJSON()`)
+    await app.click(box.x + 12, box.y + 12)
+  })
+  const [nx, ny] = await centerOf(buttonIn('Notepad', 'No'))
+  await app.click(nx, ny)
+  await closeWindows()
+
+  await run('command')
+  await app.waitFor(`!!document.querySelector('[data-window]')`)
+  await sleep(300)
+  await played('ding', 'S1', 'an information box (DOS Prompt Help) plays Asterisk once', async () => {
+    await app.key('F1')
+    await app.waitFor(`!!${dialog('MS-DOS Prompt Help')}`)
+  })
+  await app.key('Enter')
+  await closeWindows()
+
+  await run('freecell')
+  await app.waitFor(`document.querySelectorAll('[data-card]').length === 52`)
+  const pair = await app.eval(`(() => {
+    const columns = [...Array(8)].map((_, i) => [...document.querySelectorAll('[data-card]')].filter(c => c.getAttribute('aria-label').endsWith('column ' + (i + 1))).at(-1))
+    const red = (c) => /heart|diamond/i.test(c.dataset.card)
+    const rank = (c) => Number(c.dataset.card.split('-')[0])
+    for (const a of columns) for (const b of columns)
+      if (a !== b && !(rank(b) === rank(a) + 1 && red(a) !== red(b))) return [a.getAttribute('aria-label'), b.getAttribute('aria-label')]
+  })()`)
+  await played('notify', 'S1', 'FreeCell illegal move box plays Exclamation once, with no extra chord', async () => {
+    await clickExpr(`document.querySelector('[aria-label=${JSON.stringify(pair[0])}]')`)
+    await clickExpr(`document.querySelector('[aria-label=${JSON.stringify(pair[1])}]')`)
+    await app.waitFor(`!!document.querySelector('[role="dialog"]')`)
+  })
+  await shot('s1-freecell-illegal')
+  await app.key('Enter')
+  await closeWindows()
+
+  await run('notepad')
+  await app.waitFor(`!!document.querySelector('[data-window] textarea')`)
+  await clickExpr(`${topWindow}.querySelector('button[aria-label="Maximize"]')`)
+  await sleep(600)
+  await played('chord', 'S2', 'restoring from maximized plays Restore Down', async () => {
+    await clickExpr(`${topWindow}.querySelector('button[aria-label="Restore"]')`)
+  })
+  await clickExpr(`${topWindow}.querySelector('button[aria-label="Minimize"]')`)
+  await sleep(600)
+  await played('tada', 'S2', 'restoring from the taskbar plays Restore Up', async () => {
+    await clickExpr(`[...document.querySelectorAll('[data-taskbar] button')].find(b => b.textContent.includes('Notepad'))`)
+  })
+  await closeWindows()
+}
+
+const phases = { fileDialog, dialogs, about, kit, systemMenu, sounds }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {

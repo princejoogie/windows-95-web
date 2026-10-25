@@ -97,7 +97,6 @@ function FreeCell({ window: appWindow }: AppProps) {
   const illegal = () => {
     setSelection(null)
     if (preferences.options.illegalMessages) {
-      void playSound('chord')
       setModal({ kind: 'illegal' })
     }
   }

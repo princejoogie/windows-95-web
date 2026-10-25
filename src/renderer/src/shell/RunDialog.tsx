@@ -9,7 +9,6 @@ import { FileDialog, type FileTypeFilter } from '../ui/FileDialog'
 import { TextBox } from '../ui/fields'
 import { MenuList } from '../ui/Menu'
 import { MessageBox } from '../ui/MessageBox'
-import { shellEvents } from './events'
 import { findAppByExe } from './registry'
 import { launch, openNode } from './system'
 
@@ -52,7 +51,6 @@ export function RunDialog({ onClose }: { onClose: () => void }) {
     const app = node ? undefined : findAppByExe(command.split('\\').pop() ?? command)
     const ok = node ? openNode(node.id) : app ? launch(app.id) !== null : false
     if (!ok) {
-      shellEvents.emit('error')
       setError(
         `Cannot find the file '${command}' (or one of its components). Make sure the path and filename are correct and that all required libraries are available.`,
       )
