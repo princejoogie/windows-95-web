@@ -50,6 +50,7 @@ function FreeCell({ window: appWindow }: AppProps) {
   const [selection, setSelection] = useState<Source | null>(null)
   const [modal, setModal] = useState<Modal>({ kind: 'none' })
   const [look, setLook] = useState<'left' | 'right'>('left')
+  const [preview, setPreview] = useState<Source | null>(null)
   const board = useRef<HTMLDivElement>(null)
   const closeResult = useRef<((closed: boolean) => void) | null>(null)
   const position = game.position
@@ -93,6 +94,17 @@ function FreeCell({ window: appWindow }: AppProps) {
   useEffect(() => {
     appWindow.setTitle(`FreeCell Game #${game.number}`)
   }, [appWindow, game.number])
+  useEffect(() => {
+    if (!preview) return
+    const end = () => setPreview(null)
+    for (const type of ['pointerup', 'pointercancel', 'blur']) window.addEventListener(type, end)
+    return () => {
+      for (const type of ['pointerup', 'pointercancel', 'blur']) window.removeEventListener(type, end)
+    }
+  }, [preview])
+  useEffect(() => {
+    if (appWindow.minimized || !appWindow.focused) setPreview(null)
+  }, [appWindow.minimized, appWindow.focused])
 
   const illegal = () => {
     setSelection(null)
@@ -329,8 +341,12 @@ function FreeCell({ window: appWindow }: AppProps) {
                     key={`${card.suit}-${card.rank}`}
                     data-card={`${card.rank}-${card.suit}`}
                     data-index={index}
-                    className={`freecell-card freecell-tableau-card ${selected(source) ? 'freecell-selected' : ''}`}
+                    className={`freecell-card freecell-tableau-card ${selected(source) ? 'freecell-selected' : ''} ${preview?.kind === 'column' && preview.column === column && preview.index === index ? 'freecell-preview' : ''}`}
                     style={{ top: index * 22 }}
+                    onPointerDown={(event) => {
+                      if (event.button === 2) setPreview(source)
+                    }}
+                    onContextMenu={(event) => event.preventDefault()}
                     aria-label={`${cardName(card)}, column ${column + 1}`}
                     aria-pressed={selected(source)}
                     onClick={() => select(source)}

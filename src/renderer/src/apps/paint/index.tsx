@@ -5,6 +5,7 @@ import { createNode, fs, useFs } from '../../fs/store'
 import { DOCUMENTS_DIR, type NodeId } from '../../fs/types'
 import { setPaintWallpaper } from '../../settings/wallpaper'
 import { useKeyDown } from '../../shell/context'
+import { rememberDocument } from '../../shell/recent'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
 import {
@@ -81,6 +82,7 @@ function useRecent() {
     }
   })
   const add = useCallback((id: NodeId) => {
+    rememberDocument(id)
     setRecent((current) => {
       const next = [id, ...current.filter((entry) => entry !== id)].slice(0, 4)
       localStorage.setItem(RECENT_KEY, JSON.stringify(next))
@@ -515,6 +517,7 @@ function Paint({ window: windowApi, args }: AppProps) {
         'separator',
         {
           label: 'Set As &Wallpaper (Tiled)',
+          disabled: file === null,
           onSelect: () =>
             void setPaintWallpaper({ content: encodeBitmap(shown), mode: 'tile', file }).catch((cause) =>
               error(String(cause)),
@@ -522,6 +525,7 @@ function Paint({ window: windowApi, args }: AppProps) {
         },
         {
           label: 'Set As Wa&llpaper (Centered)',
+          disabled: file === null,
           onSelect: () =>
             void setPaintWallpaper({ content: encodeBitmap(shown), mode: 'center', file }).catch((cause) =>
               error(String(cause)),

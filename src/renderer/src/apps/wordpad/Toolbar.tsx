@@ -1,8 +1,8 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { type MenuEntry, MenuList } from '../../ui'
+import { ComboBox, type MenuEntry, MenuList } from '../../ui'
 import type { SelectionState } from './editor'
-import { FONT_SIZES, FONTS, scriptsFor } from './fonts'
+import { FONT_SIZES, FONTS } from './fonts'
 import { type ToolbarIcon, toolbarIcons } from './icons'
 import type { Alignment } from './model'
 
@@ -170,44 +170,25 @@ export function FormatBar({ state, actions }: { state: SelectionState; actions: 
   ]
   return (
     <ToolStrip label="Format Bar">
-      <select
-        aria-label="Font"
-        className="h-[21px] w-[150px] bg-white bevel-sunken px-[2px] outline-none"
-        value={state.font}
-        onPointerDown={actions.onBeforeFocusSteal}
-        onChange={(event) => actions.onFont(event.target.value)}
-      >
-        {fonts.map((font) => (
-          <option key={font} value={font}>
-            {font}
-          </option>
-        ))}
-      </select>
-      <select
-        aria-label="Font Size"
-        className="ml-[2px] h-[21px] w-[44px] bg-white bevel-sunken px-[2px] outline-none"
-        value={state.size}
-        onPointerDown={actions.onBeforeFocusSteal}
-        onChange={(event) => actions.onSize(Number(event.target.value))}
-      >
-        {sizes.map((size) => (
-          <option key={size} value={size}>
-            {size}
-          </option>
-        ))}
-      </select>
-      <select
-        aria-label="Script"
-        className="ml-[2px] h-[21px] w-[88px] bg-white bevel-sunken px-[2px] outline-none"
-        value={scriptsFor(state.font)[0]}
-        onChange={() => undefined}
-      >
-        {scriptsFor(state.font).map((script) => (
-          <option key={script} value={script}>
-            {script}
-          </option>
-        ))}
-      </select>
+      <div onPointerDownCapture={actions.onBeforeFocusSteal} onFocusCapture={actions.onBeforeFocusSteal}>
+        <ComboBox
+          aria-label="Font"
+          className="w-[150px]"
+          value={state.font}
+          onChange={actions.onFont}
+          options={fonts.map((font) => ({ key: font, label: font }))}
+        />
+      </div>
+      <div onPointerDownCapture={actions.onBeforeFocusSteal} onFocusCapture={actions.onBeforeFocusSteal}>
+        <ComboBox
+          aria-label="Font Size"
+          className="ml-[2px] w-[44px]"
+          value={String(state.size)}
+          onChange={(size) => actions.onSize(Number(size))}
+          options={sizes.map((size) => ({ key: String(size), label: String(size) }))}
+        />
+      </div>
+
       <ToolSeparator />
       <ToolButton icon="bold" label="Bold" pressed={state.bold} onClick={() => actions.onToggle('bold')} />
       <ToolButton

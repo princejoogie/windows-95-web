@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useKeyDown } from '../../shell/context'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { AboutDialog, Accel, Button, Dialog, MessageBox, Tabs, TextBox } from '../../ui'
+import { AboutDialog, Accel, Button, Dialog, ListBox, MessageBox, Radio, Tabs, TextBox } from '../../ui'
 import { type HelpBook, type HelpTopic, indexOf, parseParagraph, searchTopics, topicsOf } from './books'
 import { CommandMenu } from './controls'
 import { help } from './help'
@@ -16,10 +16,12 @@ function HelpTopics({
   book,
   onDisplay,
   onCancel,
+  onPrint,
 }: {
   book: HelpBook
   onDisplay: (topic: HelpTopic) => void
   onCancel: () => void
+  onPrint: () => void
 }) {
   const [tab, setTab] = useState<(typeof tabs)[number]>('Contents')
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
@@ -29,9 +31,26 @@ function HelpTopics({
   const [indexChoice, setIndexChoice] = useState('')
   const [findChoice, setFindChoice] = useState('')
   const [disambiguate, setDisambiguate] = useState<readonly HelpTopic[] | null>(null)
+  const [setup, setSetup] = useState(() => localStorage.getItem(`w95.help.find.${book.id}`) === 'ready')
+  const [wizard, setWizard] = useState<'welcome' | 'options' | 'complete' | null>(null)
+  const [indexMode, setIndexMode] = useState('minimum')
+  const [matchingWord, setMatchingWord] = useState('')
   const inputId = useId()
   const index = useMemo(() => indexOf(book), [book])
-  const results = useMemo(() => searchTopics(book, query), [book, query])
+  const results = useMemo(() => searchTopics(book, matchingWord || query), [book, query, matchingWord])
+  const words = useMemo(
+    () =>
+      [
+        ...new Set(
+          topicsOf(book).flatMap(
+            (topic) => `${topic.title} ${topic.body}`.toLowerCase().match(/[a-z]{2,}/g) ?? [],
+          ),
+        ),
+      ]
+        .filter((word) => !query || word.startsWith(query.toLowerCase().split(/\s+/).at(-1) ?? ''))
+        .sort(),
+    [book, query],
+  )
   const rows = book.contents.flatMap<{
     key: string
     entry: HelpBook['contents'][number]
@@ -70,7 +89,10 @@ function HelpTopics({
       <Tabs
         tabs={tabs}
         active={tab}
-        onChange={setTab}
+        onChange={(next) => {
+          setTab(next)
+          if (next === 'Find' && !setup) setWizard('welcome')
+        }}
         className="flex-1 min-h-0"
         pageClassName="flex-1 min-h-0 flex flex-col p-[13px]"
       >
@@ -79,7 +101,7 @@ function HelpTopics({
             ? 'Click a book, and then click Open. Or click another tab.'
             : tab === 'Index'
               ? 'Type the first few letters of the word you are looking for.'
-              : 'Type the words you want to find in this Help book.'}
+              : '1 Type the word(s) you want to find'}
         </p>
         {tab === 'Contents' ? (
           <div role="tree" aria-label="Help contents" className="help-tree bevel-sunken">
@@ -148,6 +170,7 @@ function HelpTopics({
               onChange={(event) => {
                 if (tab === 'Find') {
                   setQuery(event.target.value)
+                  setMatchingWord('')
                   setFindChoice('')
                 } else {
                   setKeyword(event.target.value)
@@ -164,39 +187,55 @@ function HelpTopics({
                 }
               }}
             />
+            {tab === 'Find' && (
+              <>
+                <p className="my-2">2 Select some matching words to narrow your search</p>
+                <ListBox
+                  label="Matching words"
+                  className="h-[48px] shrink-0"
+                  value={matchingWord}
+                  items={['', ...words]}
+                  render={(word) => word || '(All matching words)'}
+                  onChange={setMatchingWord}
+                />
+              </>
+            )}
             <p className="my-2">
               {tab === 'Index'
                 ? 'Click the index entry you want, and then click Display.'
-                : `${results.length} topic(s) found. Select a topic, and then click Display.`}
+                : '3 Click a topic, then click Display'}
             </p>
-            <select
-              size={10}
-              aria-label={tab === 'Index' ? 'Index entries' : 'Matching topics'}
-              className="help-list bevel-sunken"
+            <ListBox
+              label={tab === 'Index' ? 'Index entries' : 'Matching topics'}
+              className="flex-1 min-h-[48px]"
               value={tab === 'Index' ? (currentIndex?.keyword ?? '') : (findTopic?.id ?? '')}
-              onChange={(event) =>
-                tab === 'Index' ? setIndexChoice(event.target.value) : setFindChoice(event.target.value)
+              onChange={(value) => (tab === 'Index' ? setIndexChoice(value) : setFindChoice(value))}
+              onPick={() => display()}
+              items={tab === 'Index' ? index.map((entry) => entry.keyword) : results.map((topic) => topic.id)}
+              render={(value) =>
+                tab === 'Index' ? value : results.find((topic) => topic.id === value)?.title
               }
-              onDoubleClick={display}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  display()
-                }
-              }}
-            >
-              {tab === 'Index'
-                ? index.map((entry) => (
-                    <option key={entry.keyword} value={entry.keyword}>
-                      {entry.keyword}
-                    </option>
-                  ))
-                : results.map((topic) => (
-                    <option key={topic.id} value={topic.id}>
-                      {topic.title}
-                    </option>
-                  ))}
-            </select>
+            />
+            {tab === 'Find' && (
+              <>
+                <p className="my-2">{results.length} topic(s) found.</p>
+                <div className="flex gap-1 flex-wrap">
+                  <Button
+                    onClick={() => {
+                      setQuery('')
+                      setMatchingWord('')
+                      setFindChoice('')
+                    }}
+                  >
+                    Clear
+                  </Button>
+                  <Button disabled>Options...</Button>
+                  <Button disabled>Find Similar...</Button>
+                  <Button onClick={() => setFindChoice(results[0]?.id ?? '')}>Find Now</Button>
+                  <Button onClick={() => setWizard('welcome')}>Rebuild...</Button>
+                </div>
+              </>
+            )}
           </>
         )}
       </Tabs>
@@ -206,28 +245,24 @@ function HelpTopics({
             label={tab === 'Contents' && selectedRow && 'topics' in selectedRow.entry ? '&Open' : '&Display'}
           />
         </Button>
+        <Button onClick={onPrint}>Print...</Button>
         <Button onClick={onCancel}>Cancel</Button>
       </div>
       {disambiguate && (
         <Dialog title="Topics Found" onClose={() => setDisambiguate(null)} className="w-[330px]">
           <p className="p-3">Select a topic, then click Display.</p>
-          <select
-            aria-label="Topics for keyword"
-            className="help-list mx-3 w-auto!"
-            size={6}
-            defaultValue={disambiguate[0]?.id}
-            onChange={(event) => setSelected(event.target.value)}
-            onDoubleClick={(event) => {
-              const topic = disambiguate.find((entry) => entry.id === event.currentTarget.value)
+          <ListBox
+            label="Topics for keyword"
+            className="mx-3 h-[110px]"
+            value={selected || disambiguate[0]?.id || ''}
+            onChange={setSelected}
+            items={disambiguate.map((topic) => topic.id)}
+            render={(id) => disambiguate.find((topic) => topic.id === id)?.title}
+            onPick={(id) => {
+              const topic = disambiguate.find((entry) => entry.id === id)
               if (topic) onDisplay(topic)
             }}
-          >
-            {disambiguate.map((topic) => (
-              <option key={topic.id} value={topic.id}>
-                {topic.title}
-              </option>
-            ))}
-          </select>
+          />
           <div className="flex justify-end gap-2 p-3">
             <Button
               isDefault
@@ -239,6 +274,73 @@ function HelpTopics({
               Display
             </Button>
             <Button onClick={() => setDisambiguate(null)}>Cancel</Button>
+          </div>
+        </Dialog>
+      )}
+      {wizard && (
+        <Dialog
+          title="Find Setup Wizard"
+          onClose={() => {
+            setWizard(null)
+            if (!setup) setTab('Contents')
+          }}
+          className="w-[420px]"
+        >
+          <div className="p-4 min-h-[210px] flex gap-4">
+            <img src={helpIcon} alt="" className="size-8" />
+            <div className="flex flex-col gap-4">
+              <p>
+                {wizard === 'welcome'
+                  ? 'This wizard will create a word list so you can search for words in this Help file.'
+                  : wizard === 'options'
+                    ? 'How do you want to create your word list?'
+                    : 'Click Finish to create the word list and start searching.'}
+              </p>
+              {wizard === 'options' && (
+                <>
+                  <Radio
+                    name="help-index"
+                    label="Minimize database size (recommended)"
+                    checked={indexMode === 'minimum'}
+                    onChange={() => setIndexMode('minimum')}
+                  />
+                  <Radio
+                    name="help-index"
+                    label="Maximize search capabilities"
+                    checked={indexMode === 'maximum'}
+                    onChange={() => setIndexMode('maximum')}
+                  />
+                </>
+              )}
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 p-3">
+            <Button
+              disabled={wizard === 'welcome'}
+              onClick={() => setWizard(wizard === 'complete' ? 'options' : 'welcome')}
+            >
+              {'< Back'}
+            </Button>
+            <Button
+              isDefault
+              onClick={() => {
+                if (wizard === 'complete') {
+                  localStorage.setItem(`w95.help.find.${book.id}`, 'ready')
+                  setSetup(true)
+                  setWizard(null)
+                } else setWizard(wizard === 'welcome' ? 'options' : 'complete')
+              }}
+            >
+              {wizard === 'complete' ? 'Finish' : 'Next >'}
+            </Button>
+            <Button
+              onClick={() => {
+                setWizard(null)
+                if (!setup) setTab('Contents')
+              }}
+            >
+              Cancel
+            </Button>
           </div>
         </Dialog>
       )}
@@ -302,6 +404,7 @@ function Help({ args, window: appWindow }: AppProps) {
       : null,
   )
   const [fontSize, setFontSize] = useState(13)
+  const [historyChoice, setHistoryChoice] = useState('')
   const topic = history.at(-1)
   const article = useRef<HTMLElement>(null)
   const root = useRef<HTMLDivElement>(null)
@@ -386,12 +489,13 @@ function Help({ args, window: appWindow }: AppProps) {
     globalThis.print()
   }
   return (
-    <div ref={root} className="relative flex h-full w-full flex-col">
+    <div ref={root} className="relative flex h-[410px] w-[490px] flex-col">
       {showTopics ? (
         <HelpTopics
           book={book}
           onDisplay={openTopic}
           onCancel={() => (topic ? setShowTopics(false) : appWindow.close())}
+          onPrint={() => setMessage('No printers are installed.')}
         />
       ) : (
         topic && (
@@ -459,22 +563,22 @@ function Help({ args, window: appWindow }: AppProps) {
       )}
       {dialog === 'history' && (
         <Dialog title="History" onClose={() => setDialog(null)} className="w-[340px]">
-          <p className="p-3">Double-click a topic to return to it.</p>
-          <select
-            size={8}
-            aria-label="Topics visited"
-            className="help-list mx-3 w-auto!"
-            onDoubleClick={(event) => jump(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') jump(event.currentTarget.value)
-            }}
+          <p className="p-3">Select a topic, then click Display.</p>
+          <ListBox
+            label="Topics visited"
+            className="mx-3 h-[130px]"
+            value={historyChoice || navigation.visited.at(-1)?.id || ''}
+            onChange={setHistoryChoice}
+            items={[...navigation.visited].reverse().map((entry) => entry.id)}
+            render={(id) => navigation.visited.find((entry) => entry.id === id)?.title}
+            onPick={jump}
+          />
+          <Button
+            className="m-3 self-end"
+            onClick={() => jump(historyChoice || navigation.visited.at(-1)?.id || '')}
           >
-            {[...navigation.visited].reverse().map((entry) => (
-              <option key={entry.id} value={entry.id}>
-                {entry.title}
-              </option>
-            ))}
-          </select>
+            Display
+          </Button>
           <Button className="m-3 self-end" onClick={() => setDialog(null)}>
             Close
           </Button>
@@ -501,6 +605,6 @@ export const app: AppManifest = {
   icon: helpIcon,
   smallIcon: bookClosed,
   exe: 'WINHLP32.EXE',
-  window: { kind: 'resizable', width: 490, height: 365, minWidth: 370, minHeight: 290 },
+  window: { kind: 'fixed' },
   component: Help,
 }

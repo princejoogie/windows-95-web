@@ -320,21 +320,20 @@ describe('COMMAND.COM', () => {
     expect(dos.node('NOTEPAD.EXE')).toMatchObject({ kind: 'program', app: 'notepad' })
   })
 
-  it('supports START EDIT HELP /? and EXIT', () => {
+  it('supports START, built-in /? and EXIT without substituting Windows apps for EDIT or HELP', () => {
     const dos = machine()
     expect(dos.run('START').effects).toEqual([
       { kind: 'launch', app: 'dosprompt', args: { folder: WINDOWS_DIR } },
     ])
     expect(dos.run('START calc').effects).toEqual([{ kind: 'launch', app: 'calculator', args: {} }])
     expect(dos.run('START C:\\').effects).toEqual([{ kind: 'open', id: ROOT }])
-    expect(dos.run('EDIT NEW.TXT').effects).toEqual([
-      { kind: 'launch', app: 'notepad', args: { file: dos.node('NEW.TXT')?.id } },
-    ])
-    expect(dos.node('NEW.TXT')).toMatchObject({ kind: 'file', content: '' })
-    expect(dos.run('EDIT NEW.TXT').effects[0]).toMatchObject({ kind: 'launch', app: 'notepad' })
-    expect(dos.run('EDIT').effects).toEqual([{ kind: 'launch', app: 'notepad', args: {} }])
-    expect(dos.run('HELP').output.join('\n')).toContain('DIR')
-    expect(dos.run('HELP CHDIR').output.join('\n')).toContain('parent directory')
+    for (const command of ['EDIT NEW.TXT', 'EDIT', 'HELP', 'HELP CHDIR']) {
+      const result = dos.run(command)
+      expect(result.output).toEqual(['Bad command or file name'])
+      expect(result.effects).toEqual([])
+      expect(result.actions).toEqual([])
+    }
+    expect(dos.node('NEW.TXT')).toBeUndefined()
     expect(dos.run('DIR/?').output.join('\n')).toContain('/P Pauses')
     expect(dos.run('EXIT').effects).toEqual([{ kind: 'exit' }])
   })
