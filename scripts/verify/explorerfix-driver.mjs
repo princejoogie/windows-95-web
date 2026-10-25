@@ -68,8 +68,14 @@ export async function connect(port = 9322) {
   })
   let id = 0
   const pending = new Map()
+  const diagnostics = []
   ws.addEventListener('message', (event) => {
     const msg = JSON.parse(event.data)
+    if (
+      msg.method === 'Runtime.exceptionThrown' ||
+      (msg.method === 'Runtime.consoleAPICalled' && msg.params?.type === 'error')
+    )
+      diagnostics.push(msg)
     if (msg.id && pending.has(msg.id)) {
       pending.get(msg.id)(msg)
       pending.delete(msg.id)
@@ -221,7 +227,23 @@ export async function connect(port = 9322) {
   }
   const close = () => ws.close()
 
-  return { send, evaluate, rect, click, clickSel, move, moveSel, drag, key, type, shot, wait, close }
+  await send('Runtime.enable')
+  return {
+    send,
+    evaluate,
+    rect,
+    click,
+    clickSel,
+    move,
+    moveSel,
+    drag,
+    key,
+    type,
+    shot,
+    wait,
+    close,
+    diagnostics,
+  }
 }
 
 /** Centre of the first element matching a JS predicate over a selector's matches. */
@@ -245,6 +267,7 @@ export const hoverMenuItem = async (d, text) => {
 
 /** Fresh boot: clears the virtual drive and reloads the renderer. */
 export async function reset(d) {
+  await d.wait(350)
   await d.evaluate('localStorage.clear()')
   await d.send('Page.reload')
   await d.wait(1500)

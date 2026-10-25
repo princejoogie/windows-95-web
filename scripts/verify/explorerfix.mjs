@@ -111,6 +111,7 @@ try {
     console.log(JSON.stringify(results))
   }
 } finally {
+  writeFileSync(join(out, 'p0-runtime-errors.json'), `${JSON.stringify(d.diagnostics, null, 2)}\n`)
   writeFileSync(join(out, 'assertions.json'), `${JSON.stringify(results, null, 2)}\n`)
   await d.close()
 }

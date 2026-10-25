@@ -195,8 +195,43 @@ try {
     `Array.from(document.querySelectorAll('[role="tab"]')).map(e=>e.textContent).join('|')==='Global|(C:)'`,
   )
   await shot('recycle-properties')
+  await d.clickSel('[role="dialog"] input[type="checkbox"]')
+  await clickText(d, '[role="dialog"] button', 'OK')
+  await d.clickSel('[data-window][aria-label="Recycle Bin"] button[aria-label="Close"]')
+  await d.clickSel('[data-desktop-item="app:mycomputer"]', { clickCount: 2 })
+  await d.clickSel('[data-node-id="c"]', { clickCount: 2 })
+  await d.clickSel(`${root} [data-node-id="autoexec"]`)
+  await d.key('Delete')
+  await check(
+    'missing',
+    'Recycle Bin confirmation setting applies to folder deletes',
+    `!document.querySelector('[role="dialog"]') && !document.querySelector('${root} [data-node-id="autoexec"]')`,
+  )
+  await d.clickSel('[data-window][aria-label="(C:)"] button[aria-label="Close"]')
+  await d.clickSel('[data-window][aria-label="My Computer"] button[aria-label="Close"]')
+  await d.clickSel('[data-desktop-item="app:recyclebin"]', { clickCount: 2 })
+  await d.clickSel(`${bin} .explorer-items`)
+  await d.key('a', { ctrl: true })
+  await d.key('Delete')
+  await check(
+    22,
+    'Multiple permanent deletion names the item count',
+    `document.querySelector('[role="dialog"]').innerText.includes('Are you sure you want to delete these 2 items?')`,
+  )
+  await shot('multiple-delete-confirmation')
+  await clickText(d, '[role="dialog"] button', 'No')
+  await clickText(d, `${bin} [role="menubar"] button`, 'File')
+  await menuItem(d, 'Empty Recycle Bin')
+  await check(
+    22,
+    'Empty Recycle Bin uses the same counted wording',
+    `document.querySelector('[role="dialog"]').innerText.includes('Are you sure you want to delete these 2 items?')`,
+  )
+  await shot('empty-bin-confirmation')
+  await clickText(d, '[role="dialog"] button', 'No')
   console.log(`${results.length} fidelity assertions passed`)
 } finally {
+  writeFileSync(join(out, 'fidelity-runtime-errors.json'), `${JSON.stringify(d.diagnostics, null, 2)}\n`)
   writeFileSync(join(out, 'fidelity-assertions.json'), `${JSON.stringify(results, null, 2)}\n`)
   await d.close()
 }

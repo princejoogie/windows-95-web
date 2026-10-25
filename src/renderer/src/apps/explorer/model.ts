@@ -69,7 +69,7 @@ export function renamedName(
   return (
     name +
     (displayName(node, hideExtensions, registered) !== node.name && node.kind !== 'drive'
-      ? `.${extension(node.name)}`
+      ? node.name.slice(node.name.lastIndexOf('.'))
       : '')
   )
 }
@@ -97,12 +97,17 @@ export function cellValue(state: FsState, node: FsNode, column: Column): string 
   }
 }
 
-export function visibleNodes(state: FsState, location: Location, sort: Sort): FsNode[] {
+export function visibleNodes(
+  state: FsState,
+  location: Location,
+  sort: Sort,
+  includeSystem = false,
+): FsNode[] {
   const nodes =
     location.kind === 'computer'
       ? Object.values(state.nodes).filter((node) => node.kind === 'drive')
       : children(state, location.kind === 'recycle' ? RECYCLED_DIR : location.id).filter(
-          (node) => node.id !== RECYCLED_DIR,
+          (node) => includeSystem || node.id !== RECYCLED_DIR,
         )
   const rank = (node: FsNode) => (node.kind === 'folder' || node.kind === 'drive' ? 0 : 1)
   const value = (node: FsNode): number | string => {

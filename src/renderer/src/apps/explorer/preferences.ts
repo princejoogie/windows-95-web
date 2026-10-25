@@ -8,6 +8,7 @@ export interface FolderPreferences {
   readonly toolbar: boolean
   readonly status: boolean
   readonly autoArrange: boolean
+  readonly positions: Readonly<Record<string, Point>>
   readonly geometry?: { position: Point; size: Size }
 }
 export interface Options {
@@ -46,6 +47,7 @@ export function folderPreferences(key: string, exploring: boolean, recycled: boo
     toolbar: exploring,
     status: true,
     autoArrange: true,
+    positions: {},
   }
   try {
     const raw: unknown = JSON.parse(localStorage.getItem(`${KEY}.${key}`) ?? 'null')
@@ -62,6 +64,7 @@ export function folderPreferences(key: string, exploring: boolean, recycled: boo
       status: !('status' in raw) || raw.status !== false,
       autoArrange: !('autoArrange' in raw) || raw.autoArrange !== false,
       sort: readSort(raw),
+      positions: readPositions(raw),
       ...readGeometry(raw),
     }
   } catch {
@@ -77,6 +80,24 @@ function readSort(raw: object): Sort {
       return { column, direction: sort.direction }
   }
   return { column: 'name', direction: 'ascending' }
+}
+
+function readPositions(raw: object): Readonly<Record<string, Point>> {
+  if (!('positions' in raw) || !raw.positions || typeof raw.positions !== 'object') return {}
+  return Object.fromEntries(
+    Object.entries(raw.positions).flatMap(([id, point]) =>
+      point &&
+      typeof point === 'object' &&
+      'x' in point &&
+      'y' in point &&
+      typeof point.x === 'number' &&
+      typeof point.y === 'number' &&
+      Number.isFinite(point.x) &&
+      Number.isFinite(point.y)
+        ? [[id, { x: point.x, y: point.y }]]
+        : [],
+    ),
+  )
 }
 function readGeometry(raw: object): Pick<FolderPreferences, 'geometry'> {
   const geometry = 'geometry' in raw ? raw.geometry : null

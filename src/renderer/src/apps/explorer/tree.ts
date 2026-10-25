@@ -2,6 +2,8 @@ import { children } from '../../fs/fs'
 import { DESKTOP_DIR, type FsState, RECYCLED_DIR, ROOT } from '../../fs/types'
 import type { Location } from './model'
 
+export const TREE_DESKTOP = 'shell:desktop'
+
 export interface TreeEntry {
   readonly key: string
   readonly label: string
@@ -24,7 +26,7 @@ export function folderTree(state: FsState): TreeEntry {
       .map((node) => folder(node.id)),
   })
   return {
-    key: 'desktop',
+    key: TREE_DESKTOP,
     label: 'Desktop',
     location: { kind: 'folder', id: DESKTOP_DIR },
     children: [

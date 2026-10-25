@@ -276,6 +276,35 @@
   flex-direction: column;
   gap: 4px;
 }
+.explorer-rubber-band {
+  position: fixed;
+  z-index: 30000;
+  border: 1px dotted black;
+  pointer-events: none;
+}
+.explorer-drag-ghost {
+  position: fixed;
+  z-index: 30000;
+  pointer-events: none;
+}
+.explorer-drag-ghost > img {
+  width: 32px;
+  height: 32px;
+  mask-image: repeating-conic-gradient(#000 0 25%, transparent 0 50%);
+  mask-size: 2px 2px;
+}
+.explorer-drag-ghost > span {
+  position: absolute;
+  right: -4px;
+  bottom: 0;
+  background: white;
+  border: 1px solid black;
+  padding: 0 2px;
+}
+.explorer-item.drop-target .explorer-name {
+  color: white;
+  background: var(--color-select);
+}
 .explorer-toolbar > button > img {
   width: 16px;
   height: 16px;

@@ -24,6 +24,18 @@ describe('Windows 95 file lengths', () => {
     )
     expect(fileSize({ id: ROOT, name: 'folder', parent: ROOT, modified: 0, kind: 'folder' })).toBe(0)
   })
+  it('keeps the executable length after renaming or copying an installed program', () => {
+    expect(
+      fileSize({
+        id: ROOT,
+        name: 'Renamed.exe',
+        parent: ROOT,
+        modified: 0,
+        kind: 'program',
+        app: 'calculator',
+      }),
+    ).toBe(59392)
+  })
 })
 
 describe('Folder labels', () => {

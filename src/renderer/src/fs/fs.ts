@@ -46,7 +46,18 @@ export function fileSize(node: FsNode): number {
     'CONTROL.EXE': 11264,
     'WINHELP.EXE': 265728,
   }
-  return sizes[node.name.toUpperCase()] ?? 32768
+  const executables: Readonly<Record<string, string>> = {
+    calculator: 'CALC.EXE',
+    notepad: 'NOTEPAD.EXE',
+    minesweeper: 'WINMINE.EXE',
+    solitaire: 'SOL.EXE',
+    explorer: 'EXPLORER.EXE',
+    paint: 'MSPAINT.EXE',
+    dosprompt: 'COMMAND.COM',
+    controlpanel: 'CONTROL.EXE',
+    help: 'WINHELP.EXE',
+  }
+  return sizes[executables[node.app] ?? node.name.toUpperCase()] ?? 32768
 }
 
 export function extension(name: string): string {
