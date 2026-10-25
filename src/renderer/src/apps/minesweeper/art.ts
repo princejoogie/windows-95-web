@@ -8,6 +8,7 @@ const monochromePalette = {
   B: PALETTE.k,
   R: PALETTE.k,
   C: PALETTE.k,
+  g: PALETTE.k,
   y: PALETTE.w,
 }
 
@@ -311,7 +312,7 @@ function gameArt(color: boolean) {
             w: PALETTE.k,
           },
     ),
-    wrong: draw(wrong),
+    wrong: pixelArt(wrong, color ? PALETTE : { ...monochromePalette, k: PALETTE.w, w: PALETTE.k }),
     flag: draw(flagRows),
     question: draw(questionRows),
     faces: {
