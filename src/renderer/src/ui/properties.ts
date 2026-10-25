@@ -186,7 +186,7 @@ export function shortcutInfo(state: FsState, node: FsNode): ShortcutInfo | null 
     type: typeName(target),
     location: parent?.name ?? '',
     target: pathOf(state, target.id),
-    startIn: parent ? pathOf(state, parent.id) : '',
+    startIn: node.startIn ?? (parent ? pathOf(state, parent.id) : ''),
     folder: parent?.id ?? null,
   }
 }

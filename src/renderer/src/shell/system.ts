@@ -68,7 +68,10 @@ export function opener(node: FsNode): { appId: string; args: LaunchArgs } | null
 export function openNode(id: NodeId): boolean {
   const node = fsStore.get().nodes[id]
   const target = node && opener(node)
-  const opened = target ? launch(target.appId, target.args) !== null : false
+  const window = target ? launch(target.appId, target.args) : null
+  const opened = window !== null
   if (opened && target?.args.file) rememberDocument(target.args.file)
+  if (window !== null && node?.kind === 'shortcut' && node.run && node.run !== 'normal')
+    windowsStore.dispatch({ type: node.run === 'minimized' ? 'minimize' : 'toggleMaximize', id: window })
   return opened
 }

@@ -8,8 +8,12 @@ import {
   type ProgramSpec,
   RECYCLED_DIR,
   ROOT,
+  type ShortcutSettings,
   WINDOWS_DIR,
 } from './types'
+
+/** What a shortcut opens: an installed app, or a node. */
+export type ShortcutTarget = { readonly app: string } | { readonly node: NodeId }
 
 export type FsAction =
   | { type: 'create'; node: FsNode }
@@ -22,6 +26,8 @@ export type FsAction =
   | { type: 'emptyRecycleBin' }
   | { type: 'setAttributes'; id: NodeId; attributes: Attributes }
   | { type: 'setLabel'; id: NodeId; label: string }
+  /** Re-points a shortcut and sets its Shortcut tab fields. Empty fields go back to their defaults. */
+  | { type: 'setShortcut'; id: NodeId; target: ShortcutTarget; settings: ShortcutSettings }
   /** `shortcuts` also puts desktop shortcuts down. The shell passes it only on first boot. */
   | { type: 'installPrograms'; programs: readonly ProgramSpec[]; shortcuts: boolean; at: number }
 
@@ -289,6 +295,23 @@ export function fsReducer(state: FsState, action: FsAction): FsState {
       return children(state, RECYCLED_DIR).reduce((next, node) => remove(next, node.id), state)
     case 'installPrograms':
       return installPrograms(state, action.programs, action.shortcuts, action.at)
+    case 'setShortcut': {
+      const node = state.nodes[action.id]
+      if (node?.kind !== 'shortcut') return state
+      if ('node' in action.target && (!state.nodes[action.target.node] || action.target.node === node.id))
+        return state
+      const { app: _app, target: _target, startIn: _startIn, run: _run, icon: _icon, ...base } = node
+      const settings = Object.fromEntries(
+        Object.entries(action.settings).filter(
+          ([key, value]) => value && !(key === 'run' && value === 'normal'),
+        ),
+      ) as ShortcutSettings
+      const link: FsNode =
+        'node' in action.target
+          ? { ...base, ...settings, kind: 'shortcut', target: action.target.node }
+          : { ...base, ...settings, kind: 'shortcut', app: action.target.app }
+      return put(state, link)
+    }
     case 'setLabel': {
       const node = state.nodes[action.id]
       if (node?.kind !== 'drive' || volumeLabelError(action.label)) return state

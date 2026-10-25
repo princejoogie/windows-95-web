@@ -1,6 +1,6 @@
 import { createStore, useStore } from '../lib/store'
-import { emptyDrive, fsReducer, validateName } from './fs'
-import type { Attributes, FsNode, FsState, NodeId, ProgramSpec } from './types'
+import { emptyDrive, fsReducer, type ShortcutTarget, validateName } from './fs'
+import type { Attributes, FsNode, FsState, NodeId, ProgramSpec, ShortcutSettings } from './types'
 
 const KEY = 'w95.fs.v1'
 const SAVE_DELAY_MS = 250
@@ -73,6 +73,8 @@ export const fs = {
   restore: (id: NodeId) => fsStore.dispatch({ type: 'restore', id, at: Date.now() }),
   purge: (id: NodeId) => fsStore.dispatch({ type: 'purge', id }),
   emptyRecycleBin: () => fsStore.dispatch({ type: 'emptyRecycleBin' }),
+  setShortcut: (id: NodeId, target: ShortcutTarget, settings: ShortcutSettings) =>
+    fsStore.dispatch({ type: 'setShortcut', id, target, settings }),
   setLabel: (id: NodeId, label: string) => fsStore.dispatch({ type: 'setLabel', id, label }),
   setAttributes: (id: NodeId, attributes: Attributes) =>
     fsStore.dispatch({ type: 'setAttributes', id, attributes }),

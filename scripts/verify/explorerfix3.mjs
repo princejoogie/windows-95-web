@@ -785,7 +785,87 @@ async function icons() {
   await shot('27-windows-programs', await boxOf(win))
 }
 
-const phases = { panes, explorer, sizes, deletion, bin, shared, tree, drive, options, icons }
+async function shortcut() {
+  await fresh()
+  const openSheet = async () => {
+    await clickExpr(desktopItem('Minesweeper'), { button: 'right' })
+    await pickMenu('Properties')
+    await app.waitFor(`!!${dialog('Minesweeper Properties')}`)
+    await clickExpr(`[...${dialog('Minesweeper Properties')}.querySelectorAll('[role="tab"]')][1]`)
+  }
+  const sheet = dialog('Minesweeper Properties')
+  const field = (label) => `${sheet}.querySelector('input[aria-label=${q(label)}]')`
+  const setField = async (label, value) => {
+    await clickExpr(field(label))
+    await app.key('a', ['Control'])
+    await app.type(value)
+  }
+  await openSheet()
+  await setField('Target', 'C:\\nothere.exe')
+  await clickExpr(buttonIn(sheet, 'Apply'))
+  await app.waitFor(`!!${dialog('Problem with Shortcut')}`)
+  const invalid = await app.eval(`${dialog('Problem with Shortcut')}.innerText`)
+  check(
+    invalid.includes("The name 'C:\\nothere.exe' specified in the Target box is not valid."),
+    'S',
+    'an unknown Target is refused with the Windows 95 message',
+    invalid,
+  )
+  await app.key('Enter')
+  await setField('Target', 'C:\\WINDOWS\\NOTEPAD.EXE')
+  await setField('Start in', 'C:\\My Documents')
+  await clickExpr(`${sheet}.querySelector('[role="combobox"][aria-label="Run"]')`)
+  await clickExpr(
+    `[...document.querySelectorAll('[role="option"]')].find(o => o.textContent.trim() === 'Maximized')`,
+  )
+  await clickExpr(buttonIn(sheet, 'Change Icon...'))
+  await app.waitFor(`!!${dialog('Change Icon')}`)
+  await clickExpr(`${dialog('Change Icon')}.querySelector('[role="option"][aria-label="myComputer"]')`)
+  await shot('S-change-icon', await dialogBox('Change Icon'))
+  await clickExpr(buttonIn(dialog('Change Icon'), 'OK'))
+  await shot('S-shortcut-tab-edited', await dialogBox('Minesweeper Properties'))
+  await clickExpr(buttonIn(sheet, 'OK'))
+  await sleep(400)
+  const link = await app.eval(
+    `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n => n.name === 'Minesweeper' && n.parent === 'desktop')`,
+  )
+  check(
+    link.app === 'notepad' &&
+      link.startIn === 'C:\\My Documents' &&
+      link.run === 'maximized' &&
+      link.icon === 'myComputer',
+    'S',
+    'OK re-points the shortcut to NOTEPAD.EXE and saves Start in, Run, and the icon',
+    link,
+  )
+  const icon = await app.eval(`${desktopItem('Minesweeper')}.querySelector('img').src`)
+  const myComputer = await app.eval(`${desktopItem('My Computer')}.querySelector('img').src`)
+  check(icon === myComputer, 'S', 'the desktop draws the shortcut with the chosen icon')
+  await clickExpr(desktopItem('Minesweeper'), { count: 2 })
+  await app.waitFor(`!!${windowNamed('Untitled - Notepad')}`)
+  await sleep(500)
+  const state = await app.eval(
+    `(() => { const w = ${windowNamed('Untitled - Notepad')}; return { width: w.offsetWidth, screen: innerWidth } })()`,
+  )
+  check(state.width >= state.screen, 'S', 'the shortcut opens Notepad maximized', state)
+  await shot('S-opens-maximized')
+  await clickExpr(`${windowNamed('Untitled - Notepad')}.querySelector('button[aria-label="Close"]')`)
+  await openSheet()
+  const fields = await app.eval(
+    `({ target: ${field('Target')}.value, startIn: ${field('Start in')}.value, run: ${sheet}.querySelector('[role="combobox"][aria-label="Run"]').textContent })`,
+  )
+  check(
+    fields.target === 'C:\\WINDOWS\\NOTEPAD.EXE' &&
+      fields.startIn === 'C:\\My Documents' &&
+      fields.run === 'Maximized',
+    'S',
+    'reopening the sheet shows the saved target, Start in, and Run',
+    fields,
+  )
+  await app.key('Escape')
+}
+
+const phases = { panes, explorer, sizes, deletion, bin, shared, tree, drive, options, icons, shortcut }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {
