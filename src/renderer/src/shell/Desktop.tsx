@@ -1,7 +1,15 @@
 import { type PointerEvent as ReactPointerEvent, useCallback, useMemo, useRef, useState } from 'react'
 import { children, isInside, isProtected, uniqueName } from '../fs/fs'
 import { createNode, fs, fsStore, newNodeId, useFs } from '../fs/store'
-import { DESKTOP_DIR, DOCUMENTS_DIR, type FsNode, type NodeId, RECYCLED_DIR, ROOT } from '../fs/types'
+import {
+  DESKTOP_DIR,
+  DOCUMENTS_DIR,
+  type FsNode,
+  type FsState,
+  type NodeId,
+  RECYCLED_DIR,
+  ROOT,
+} from '../fs/types'
 import { useStore } from '../lib/store'
 import { ContextMenu } from '../ui/Menu'
 import { MessageBox } from '../ui/MessageBox'
@@ -92,13 +100,6 @@ interface Drag {
   started: boolean
 }
 
-interface Band {
-  from: Point
-  to: Point
-  base: ReadonlySet<string>
-  rects: Map<string, Rect[]>
-}
-
 function load<T>(key: string, fallback: T): T {
   try {
     return (JSON.parse(localStorage.getItem(key) ?? 'null') as T | null) ?? fallback
@@ -120,30 +121,28 @@ export function registerDesktopProperties(open: () => void): () => void {
   }
 }
 
-function useItems(labels: Readonly<Record<string, string>>): Item[] {
-  const state = useFs((s) => s)
-  return useMemo(() => {
-    const shell: Item[] = apps
-      .filter((app) => app.desktop)
-      .sort((a, b) => (a.desktop?.order ?? 0) - (b.desktop?.order ?? 0))
-      .map((app) => {
-        const key = `app:${app.id}`
-        return {
-          kind: 'shell',
-          key,
-          app,
-          label: labels[key] ?? app.desktop?.label ?? app.title,
-          icon: app.desktop?.icon?.(state) ?? app.icon,
-        }
-      })
-    const files: Item[] = children(state, DESKTOP_DIR)
-      .filter((node) => !isHidden(node))
-      .map((node) => {
-        const { icon, overlay } = nodeIcon(node)
-        return { kind: 'node', key: node.id, node, label: node.name, icon, overlay }
-      })
-    return [...shell, ...files]
-  }, [state, labels])
+/** Shell icons in their manifest order, then the Desktop folder's visible files. */
+function desktopItems(state: FsState, labels: Readonly<Record<string, string>>): Item[] {
+  const shell: Item[] = apps
+    .filter((app) => app.desktop)
+    .sort((a, b) => (a.desktop?.order ?? 0) - (b.desktop?.order ?? 0))
+    .map((app) => {
+      const key = `app:${app.id}`
+      return {
+        kind: 'shell',
+        key,
+        app,
+        label: labels[key] ?? app.desktop?.label ?? app.title,
+        icon: app.desktop?.icon?.(state) ?? app.icon,
+      }
+    })
+  const files: Item[] = children(state, DESKTOP_DIR)
+    .filter((node) => !isHidden(node))
+    .map((node) => {
+      const { icon, overlay } = nodeIcon(node)
+      return { kind: 'node', key: node.id, node, label: node.name, icon, overlay }
+    })
+  return [...shell, ...files]
 }
 
 /** Items in the order Arrange Icons puts them: shell icons first, then folders, then files. */
@@ -260,10 +259,10 @@ function DesktopIcon({
 
 export function Desktop({ size }: { size: Size }) {
   const [labels, setLabels] = useState<Readonly<Record<string, string>>>(() => load(LABELS_KEY, {}))
-  const items = useItems(labels)
+  const fsState = useFs((s) => s)
+  const items = useMemo(() => desktopItems(fsState, labels), [fsState, labels])
   const desktopFocused = useWindows((s) => s.focused === null)
   const clip = useStore(clipboard, (s) => s)
-  const fsState = useFs((s) => s)
   const binItems = useMemo(() => children(fsState, RECYCLED_DIR), [fsState])
   const [saved, setSaved] = useState<Positions>(() => load(POSITIONS_KEY, {}))
   const [arrangement, setArrangement] = useState<Arrangement>(() =>
@@ -275,7 +274,7 @@ export function Desktop({ size }: { size: Size }) {
   const [menu, setMenu] = useState<{ at: Point; key: string | null } | null>(null)
   const [prompt, setPrompt] = useState<Prompt | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
-  const [band, setBand] = useState<Band | null>(null)
+  const [band, setBand] = useState<Rect | null>(null)
   const dragRef = useRef<Drag | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const slowClick = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -600,13 +599,14 @@ export function Desktop({ size }: { size: Size }) {
     if (!event.ctrlKey) select([], null)
     root.setPointerCapture(event.pointerId)
     const from = local(event)
-    let current: Band | null = null
+    let started = false
     const move = (e: PointerEvent) => {
       const to = local(e)
-      if (!current && Math.abs(to.x - from.x) + Math.abs(to.y - from.y) < DRAG_THRESHOLD) return
-      current = { from, to, base, rects }
-      setBand(current)
-      setSelected(new Set([...base, ...touched(spanned(from, to), rects)]))
+      if (!started && Math.abs(to.x - from.x) + Math.abs(to.y - from.y) < DRAG_THRESHOLD) return
+      started = true
+      const rect = spanned(from, to)
+      setBand(rect)
+      setSelected(new Set([...base, ...touched(rect, rects)]))
     }
     const up = () => {
       root.removeEventListener('pointermove', move)
@@ -796,12 +796,12 @@ export function Desktop({ size }: { size: Size }) {
       })}
       {band && (
         <div
-          className="absolute pointer-events-none border border-dotted border-white mix-blend-difference"
-          style={(() => {
-            const rect = spanned(band.from, band.to)
-            return { left: rect.x, top: rect.y, width: rect.width, height: rect.height }
-          })()}
-        />
+          data-rubber-band
+          className="absolute pointer-events-none"
+          style={{ left: band.x, top: band.y, width: band.width, height: band.height }}
+        >
+          <span className="dotted-frame" />
+        </div>
       )}
       {menu && (
         <ContextMenu at={menu.at} items={menuItems(menu.key, menu.at)} onClose={() => setMenu(null)} />

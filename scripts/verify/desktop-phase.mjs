@@ -12,7 +12,6 @@ export async function desktopPhase(t) {
     )
   const iconAt = async (key) => app.center(`[data-desktop-item="${key}"] img`)
 
-  // 16: the Windows 95 default desktop.
   const keys = await app.eval(
     `[...document.querySelectorAll('[data-desktop-item]')].map(e => e.dataset.desktopItem)`,
   )
@@ -31,7 +30,6 @@ export async function desktopPhase(t) {
   )
   await shot('16-desktop')
 
-  // Missing 9: Network Neighborhood opens a folder showing an empty Entire Network.
   await app.click(...(await iconAt('app:network')), { count: 2 })
   await app.waitFor(`!!document.querySelector('[data-window][aria-label="Network Neighborhood"]')`)
   const hood = await app.eval(
@@ -53,7 +51,6 @@ export async function desktopPhase(t) {
   await shot('M9-entire-network')
   await closeWindows()
 
-  // 17: arrow keys, type-ahead, F2 on a shell icon, Shift+F10.
   await app.click(...(await iconAt('app:mycomputer')))
   await app.key('ArrowDown')
   check((await selectedKeys())[0] === 'app:network', '17', 'ArrowDown moves to Network Neighborhood')
@@ -101,7 +98,6 @@ export async function desktopPhase(t) {
   check(shiftF10[0] === 'Open', '17', 'Shift+F10 opens the icon menu', shiftF10)
   await closeMenus()
 
-  // 19: the full menus.
   await rightClick([700, 400])
   const background = await menuLabels()
   check(
@@ -183,7 +179,6 @@ export async function desktopPhase(t) {
   )
   await closeMenus()
 
-  // New > Text Document, then the file menu.
   await rightClick([700, 300])
   await pickMenu('New')
   await pickMenu('Text Document')
@@ -219,7 +214,6 @@ export async function desktopPhase(t) {
   await shot('19-file-menu')
   await closeMenus()
 
-  // 46: slow double-click renames.
   await app.click(...(await iconAt(letter)))
   await sleep(700)
   const labelAt = await app.center(`[data-desktop-item="${letter}"] [data-label]`)
@@ -250,7 +244,6 @@ export async function desktopPhase(t) {
   await closeWindows()
   await flushFs()
 
-  // Missing 6: copy, paste, cut, shortcuts, Send To.
   await app.click(...(await iconAt(letter)))
   await app.key('c', ['Control'])
   await app.key('v', ['Control'])
@@ -316,7 +309,6 @@ export async function desktopPhase(t) {
   await flushFs()
   check(await keyByLabel('Shortcut (2) to Letter.txt'), 'M6', 'Paste Shortcut numbers the second shortcut')
 
-  // Missing 7: the Properties sheet, by menu and by Alt+Enter.
   await rightClick(`[data-desktop-item="${letter}"] img`)
   await pickMenu('Properties')
   await app.waitFor(`!!document.querySelector('[role="dialog"][aria-label="Letter.txt Properties"]')`)
@@ -358,7 +350,6 @@ export async function desktopPhase(t) {
   await flushFs()
   check(!(await keyByLabel('Shortcut to Letter.txt')), 'M7', 'checking Hidden and OK hides the shortcut')
 
-  // Missing 8: Empty Recycle Bin.
   await app.click(...(await iconAt(letter)))
   await app.key('Delete')
   await app.waitFor(`!!document.querySelector('[role="dialog"][aria-label="Confirm File Delete"]')`)
@@ -389,12 +380,11 @@ export async function desktopPhase(t) {
     'Yes empties the bin and its icon turns empty',
   )
 
-  // 18: rubber-band selection.
   await clickDesktop()
   const band = await app.drag([150, 10], [5, 300])
   await sleep(100)
   const during = await app.eval(
-    `[!!document.querySelector('.border-dotted.mix-blend-difference'), [...document.querySelectorAll('[data-desktop-item][aria-selected="true"]')].map(e=>e.dataset.desktopItem)]`,
+    `[!!document.querySelector('[data-rubber-band] .dotted-frame'), [...document.querySelectorAll('[data-desktop-item][aria-selected="true"]')].map(e=>e.dataset.desktopItem)]`,
   )
   await shot('18-rubber-band', { x: 0, y: 0, width: 240, height: 340 })
   await band.release()
@@ -419,7 +409,6 @@ export async function desktopPhase(t) {
     extended,
   )
 
-  // New > Shortcut wizard.
   await clickDesktop()
   await rightClick([520, 400])
   await pickMenu('New')
@@ -433,7 +422,6 @@ export async function desktopPhase(t) {
   await flushFs()
   check(await keyByLabel('Calculator'), '19', 'New > Shortcut runs the Create Shortcut wizard')
 
-  // Auto Arrange keeps icons in order.
   await rightClick([700, 600])
   await hover('Arrange Icons')
   await pickMenu('Auto Arrange')

@@ -81,7 +81,6 @@ async function openStartItem(label) {
 }
 
 async function controls() {
-  // 7 and 24: the default ring follows focus, and selected text is navy.
   await openStartItem('Run...')
   await app.waitFor(`!!document.querySelector('#run-command')`)
   await app.type('notepad')
@@ -138,7 +137,6 @@ async function controls() {
   await shot('07-run-ring-on-cancel', runBox)
   await app.key('Escape')
 
-  // 10 and 31: message box width and accelerators.
   await openStartItem('Run...')
   await app.waitFor(`!!document.querySelector('#run-command')`)
   await app.type('notepad')
@@ -168,7 +166,6 @@ async function controls() {
   await sleep(200)
   check(!(await exists('[data-window]')), '31', 'pressing N answers No and Notepad closes without saving')
 
-  // 31: Esc does nothing in a Yes/No box; 10: a long message wraps at 5/8 of the screen, not the owner.
   await clickDesktop()
   await rightClick([600, 500])
   await pickMenu('New')
@@ -203,7 +200,6 @@ async function controls() {
     'pressing Y answers Yes and the file goes to the Recycle Bin',
   )
 
-  // 23: Windows 95 tooltips.
   const clock = await app.eval(
     `(()=>{const e=[...document.querySelectorAll('div')].find(d=>/^\\d{1,2}:\\d{2} [AP]M$/.test(d.textContent) && d.className.includes('bevel-shallow'));const b=e.getBoundingClientRect();return [b.x+b.width/2,b.y+b.height/2]})()`,
   )

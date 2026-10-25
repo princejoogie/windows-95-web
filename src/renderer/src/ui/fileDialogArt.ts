@@ -1,6 +1,6 @@
 import { pixelArtSet } from '../icons/pixel'
 
-/** The four toolbar glyphs of the Windows 95 Open and Save As dialogs. */
+/** The Open and Save As toolbar glyphs, plus the 16x16 Desktop icon its Look in list starts with. */
 export const toolbarGlyphs = pixelArtSet({
   desktop: [
     'kkkkkkkkkkkkkkkk',

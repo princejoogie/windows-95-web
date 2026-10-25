@@ -28,7 +28,6 @@ export async function dialogPhase(t) {
   await pickMenu('Save As...')
   await app.waitFor(`!!document.querySelector('${dialog}')`)
 
-  // 42: toolbar, labels.
   const toolbar = await app.eval(
     `[...document.querySelectorAll('${dialog} button[aria-label]')].filter(b=>b.getAttribute('aria-label')!=='Close').map(b=>{const r=b.getBoundingClientRect();return b.getAttribute('aria-label')+' '+r.width+'x'+r.height})`,
   )
@@ -49,7 +48,6 @@ export async function dialogPhase(t) {
   check(!(await exists(inDialog('select'))), '26', 'no native select is left in the dialog')
   await shot('42-save-as', await clipDialog())
 
-  // 26: the Look in combo box.
   await app.clickOn(inDialog('[role="combobox"]'))
   await app.waitFor(`!!document.querySelector('body > [role="listbox"]')`)
   const rows = await app.eval(
@@ -75,7 +73,6 @@ export async function dialogPhase(t) {
   await app.key('Enter')
   check((await lookIn()) === '(C:)', '26', 'Alt+Down, Up, Enter picks (C:) from the keyboard')
 
-  // 27: RECYCLED stays hidden.
   const root = await entries()
   check(
     !root.some((entry) => entry.includes('RECYCLED')) && root.includes('WINDOWS'),
@@ -85,7 +82,6 @@ export async function dialogPhase(t) {
   )
   await shot('27-root-no-recycled', await clipDialog())
 
-  // 28 and 41: keyboard in the file list, label-only highlight.
   await app.clickOn(`${dialog} [role="option"]`)
   await app.key('ArrowDown')
   const moved = await entries()
@@ -119,7 +115,6 @@ export async function dialogPhase(t) {
   await app.key('Backspace')
   check((await lookIn()) === '(C:)', '28', 'Backspace goes up one level')
 
-  // 42: List and Details, Create New Folder.
   await app.clickOn(`${dialog} button[aria-label="Details"]`)
   const header = await app.eval(
     `[...document.querySelectorAll('${dialog} .sticky > div')].map(d=>d.textContent)`,
@@ -154,7 +149,6 @@ export async function dialogPhase(t) {
   check((await entries()).includes('*Proofs'), '42', 'Create New Folder starts a rename and keeps the name')
   await shot('42-new-folder', await clipDialog())
 
-  // Save into the new folder through the keyboard.
   await app.key('Enter')
   check((await lookIn()) === 'Proofs', '28', 'Enter opens the new folder')
   await app.clickOn(`${dialog} input[id$="-name"]`)
