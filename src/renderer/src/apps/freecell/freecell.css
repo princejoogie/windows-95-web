@@ -66,6 +66,10 @@
   left: 0;
 }
 
+.freecell-preview {
+  z-index: 1;
+}
+
 .freecell-empty {
   position: absolute;
   inset: 0;
