@@ -98,6 +98,11 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
   const [outline, setOutline] = useState<Rect | null>(null)
   const [dialogHost, setDialogHost] = useState<HTMLDivElement | null>(null)
   const resizable = app.window.kind === 'resizable'
+  const closeHandler = useRef<(() => void) | null>(null)
+  const requestClose = () => {
+    if (closeHandler.current) closeHandler.current()
+    else windowsStore.dispatch({ type: 'close', id })
+  }
 
   const api = useMemo<WindowApi>(
     () => ({
@@ -105,6 +110,12 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
       focused,
       minimized,
       setTitle: (title) => windowsStore.dispatch({ type: 'setTitle', id, title }),
+      onCloseRequest: (handler) => {
+        closeHandler.current = handler
+        return () => {
+          if (closeHandler.current === handler) closeHandler.current = null
+        }
+      },
       close: () => windowsStore.dispatch({ type: 'close', id }),
     }),
     [id, focused, minimized],
@@ -241,11 +252,7 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
           onClick={toggleMaximize}
         />
         <span className="w-[2px]" />
-        <TitleButton
-          glyph="close"
-          label="Close"
-          onClick={() => windowsStore.dispatch({ type: 'close', id })}
-        />
+        <TitleButton glyph="close" label="Close" onClick={requestClose} />
       </TitleBar>
       <div
         ref={clientRef}

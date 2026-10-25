@@ -1,6 +1,6 @@
-import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
+import type { ComponentPropsWithRef, InputHTMLAttributes, ReactNode } from 'react'
 
-export function TextBox({ className = '', ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+export function TextBox({ className = '', ...rest }: ComponentPropsWithRef<'input'>) {
   return (
     <input
       className={`h-[21px] px-[3px] bg-white bevel-sunken outline-none select-text disabled:bg-face ${className}`}
@@ -10,7 +10,7 @@ export function TextBox({ className = '', ...rest }: InputHTMLAttributes<HTMLInp
   )
 }
 
-export function TextArea({ className = '', ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function TextArea({ className = '', ...rest }: ComponentPropsWithRef<'textarea'>) {
   return (
     <textarea
       className={`p-[3px] bg-white bevel-sunken outline-none resize-none select-text ${className}`}

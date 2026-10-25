@@ -83,7 +83,10 @@ export function MenuList({ items, onClose, style, className = '' }: MenuListProp
       role="menu"
       className={`absolute z-50 min-w-[120px] p-[3px] bg-face bevel-window ${className}`}
       style={{ ...style, marginTop: -lift }}
-      onPointerDown={(event) => event.stopPropagation()}
+      onPointerDown={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+      }}
     >
       {items.map((item, index) => {
         if (item === 'separator') {
@@ -183,6 +186,7 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
             type="button"
             className={`h-[19px] px-[6px] outline-none ${open === index ? 'bevel-shallow' : ''}`}
             onPointerDown={(event) => {
+              event.preventDefault()
               event.stopPropagation()
               setOpen(open === index ? null : index)
             }}
