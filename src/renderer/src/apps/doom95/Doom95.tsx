@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { AppProps } from '../../shell/types'
+import { menuIsActive } from '../../ui/Menu'
+import { shellOwnsKey } from './controls'
 import { SCREEN_H, SCREEN_W } from './render'
 import { DoomRuntime } from './runtime'
 
@@ -16,8 +18,8 @@ export function Doom95({ window: win }: AppProps) {
     const runtime = new DoomRuntime(canvas, () => close.current())
     runtimeRef.current = runtime
     const lock = () => runtime.pointerLockChanged()
-    const move = (event: MouseEvent) => runtime.mouseMove(event.movementX)
-    const up = (event: MouseEvent) => runtime.mouseUp(event.button)
+    const move = (event: MouseEvent) => runtime.mouseMove(event)
+    const up = (event: MouseEvent) => runtime.mouseUp(event.button, event.clientX, event.clientY)
     document.addEventListener('pointerlockchange', lock)
     document.addEventListener('mousemove', move)
     document.addEventListener('mouseup', up)
@@ -39,7 +41,7 @@ export function Doom95({ window: win }: AppProps) {
     }
     runtime.start()
     const down = (event: KeyboardEvent) => {
-      if (event.altKey || event.metaKey) return
+      if (shellOwnsKey(event) || menuIsActive()) return
       if (runtime.keyDown(event)) event.preventDefault()
     }
     const up = (event: KeyboardEvent) => runtime.keyUp(event)
@@ -59,7 +61,7 @@ export function Doom95({ window: win }: AppProps) {
         width={SCREEN_W}
         height={SCREEN_H}
         className="flex-1 min-h-0 w-full object-contain pixelated outline-none"
-        onMouseDown={(event) => runtimeRef.current?.mouseDown(event.button)}
+        onMouseDown={(event) => runtimeRef.current?.mouseDown(event.button, event.clientX, event.clientY)}
         onContextMenu={(event) => event.preventDefault()}
       />
     </div>

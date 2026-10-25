@@ -1,4 +1,4 @@
-import { slideMove } from './collision'
+import { bumps, slideMove } from './collision'
 import { applyHit, blast, damageActor, damagePlayer, spawnEffect, traceAttack, wake } from './combat'
 import { BARREL_BLAST_AT, MELEE_RANGE, MONSTER_DEFS, SKILLS } from './defs'
 import { doorAtCell, isSolid } from './grid'
@@ -60,10 +60,11 @@ export function noiseAlert(world: World, maxSteps = 24): void {
 function blockedFor(world: World, actor: Actor, r: number) {
   return (x: number, y: number): boolean => {
     const { player } = world
-    if (!player.dead && Math.hypot(player.x - x, player.y - y) < r + PLAYER_RADIUS) return true
+    const to = { x, y }
+    if (!player.dead && bumps(player.x, player.y, r + PLAYER_RADIUS, actor, to)) return true
     for (const other of world.actors) {
       if (other === actor || !isSolidActor(other)) continue
-      if (Math.hypot(other.x - x, other.y - y) < r + MONSTER_DEFS[other.kind].radius) return true
+      if (bumps(other.x, other.y, r + MONSTER_DEFS[other.kind].radius, actor, to)) return true
     }
     return false
   }

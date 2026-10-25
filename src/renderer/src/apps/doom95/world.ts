@@ -155,6 +155,8 @@ export interface World {
   readonly effects: Effect[]
   /** One flag per entry in `level.secrets`. */
   readonly secretFound: Uint8Array
+  /** One flag per cell the 3D view has drawn, which is what the automap shows. */
+  readonly seen: Uint8Array
   readonly stats: Stats
   readonly face: Face
   time: number
@@ -237,6 +239,7 @@ export function createWorld(
     projectiles: [],
     effects: [],
     secretFound: new Uint8Array(level.secrets.length),
+    seen: new Uint8Array(level.width * level.height),
     stats: {
       kills: 0,
       totalKills: actors.filter((actor) => MONSTER_DEFS[actor.kind].countsKill).length,

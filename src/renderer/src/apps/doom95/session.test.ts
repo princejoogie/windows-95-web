@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { damagePlayer } from './combat'
 import { IDLE, TICK } from './game'
 import { LEVELS } from './levels'
-import { command, createSession, type Session, TALLY_TIME, tickSession } from './session'
+import { command, createSession, type Session, TALLY_TIME, tickSession, togglePause } from './session'
 
 const playing = (skill = 2): Session => {
   const s = createSession(9)
@@ -24,7 +24,7 @@ describe('session', () => {
     const s = createSession(9)
     expect(s.screen.kind).toBe('title')
     expect(command(s, 'any')).toEqual(['menuSelect'])
-    expect(s.menu).toEqual({ page: 'main', cursor: 0 })
+    expect(s.menu).toMatchObject({ page: 'main', cursor: 0 })
     command(s, 'confirm')
     expect(s.menu?.page).toBe('skill')
     command(s, 'up')
@@ -85,6 +85,11 @@ describe('session', () => {
       command(s, 'confirm')
       command(s, 'confirm')
     }
+    expect(s.screen).toMatchObject({ kind: 'finale', page: 'text' })
+    for (let t = 0; t < 1.2; t += TICK) tickSession(s, IDLE, TICK)
+    command(s, 'confirm')
+    expect(s.screen).toMatchObject({ kind: 'finale', page: 'end' })
+    command(s, 'confirm')
     expect(s.screen.kind).toBe('finale')
     for (let t = 0; t < 1.2; t += TICK) tickSession(s, IDLE, TICK)
     command(s, 'confirm')
@@ -94,12 +99,39 @@ describe('session', () => {
   it('quits only on Y, and any other key backs out of the prompt', () => {
     const s = createSession(9)
     command(s, 'any')
-    command(s, 'down')
+    command(s, 'up')
     command(s, 'confirm')
     expect(s.menu?.page).toBe('quit')
     expect(command(s, 'any')).toEqual(['menuBack'])
     expect(s.menu?.page).toBe('main')
     command(s, 'confirm')
     expect(command(s, 'yes')).toEqual(['quit'])
+  })
+})
+
+describe('pause', () => {
+  it('freezes play on Pause and resumes on the same key, with the view still up', () => {
+    const s = playing()
+    const world = s.world
+    if (!world) throw new Error('no world')
+    expect(togglePause(s)).toBe(true)
+    const before = { time: world.time, x: world.player.x }
+    for (let i = 0; i < 30; i++) tickSession(s, { ...IDLE, forward: 1, fire: true }, TICK)
+    expect({ time: world.time, x: world.player.x }).toEqual(before)
+    expect(world.player.ammo.bullets).toBe(50)
+    expect(s.menu).toBeNull()
+    togglePause(s)
+    for (let i = 0; i < 30; i++) tickSession(s, { ...IDLE, forward: 1 }, TICK)
+    expect(world.player.x).toBeGreaterThan(before.x)
+  })
+
+  it('stays paused under the menu, and only works in play', () => {
+    const s = playing()
+    togglePause(s)
+    command(s, 'back')
+    expect(togglePause(s)).toBe(false)
+    command(s, 'back')
+    expect(s.paused).toBe(true)
+    expect(togglePause(createSession(1))).toBe(false)
   })
 })
