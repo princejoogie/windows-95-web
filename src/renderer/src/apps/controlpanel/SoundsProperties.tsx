@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { defaultSettings, type SoundEvent, soundEvents, soundNames } from '../../settings/model'
-import { previewSound, useSoundPlayerAvailable } from '../../settings/sounds'
-import { Button, GroupBox } from '../../ui'
+import { previewSound } from '../../settings/sounds'
+import { Button } from '../../ui/Button'
+import { GroupBox } from '../../ui/fields'
 import { appletIcons } from './icons'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
 
@@ -9,7 +10,6 @@ export function SoundsProperties({ onClose }: { onClose: () => void }) {
   const state = useSettingsDraft()
   const [event, setEvent] = useState<SoundEvent>('Asterisk')
   const [error, setError] = useState('')
-  const available = useSoundPlayerAvailable()
   const sounds = state.draft.soundScheme
   return (
     <PropertySheet
@@ -65,10 +65,16 @@ export function SoundsProperties({ onClose }: { onClose: () => void }) {
                   <Button
                     aria-label="Preview sound"
                     className="min-w-[28px]! px-1!"
-                    disabled={!available || sounds[event] === '(None)'}
+                    disabled={sounds[event] === '(None)'}
                     onClick={() => {
                       setError('')
-                      void previewSound(sounds[event]).catch(() => setError('The sound could not be played.'))
+                      void previewSound(sounds[event]).then((result) =>
+                        setError(
+                          result
+                            ? `Playing ${sounds[event]}.`
+                            : 'The sound is unavailable or the audio device is not ready.',
+                        ),
+                      )
                     }}
                   >
                     ▶
@@ -105,7 +111,7 @@ export function SoundsProperties({ onClose }: { onClose: () => void }) {
                 </select>
               </label>
               <p role="status" className="mt-2">
-                {error || (!available ? 'Sound playback is not installed.' : '')}
+                {error}
               </p>
             </>
           ),

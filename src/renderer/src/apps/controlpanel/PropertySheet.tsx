@@ -1,7 +1,8 @@
 import { type ReactNode, useId, useState } from 'react'
 import { changedSettings, type Settings } from '../../settings/model'
 import { settingsStore } from '../../settings/store'
-import { Button, Dialog } from '../../ui'
+import { Button } from '../../ui/Button'
+import { Dialog } from '../../ui/Dialog'
 
 export function useSettingsDraft() {
   const [baseline, setBaseline] = useState(settingsStore.get)

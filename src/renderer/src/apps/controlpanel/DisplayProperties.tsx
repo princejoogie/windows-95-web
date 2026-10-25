@@ -10,7 +10,9 @@ import {
   standardColors,
   type ThemeColor,
 } from '../../settings/schemes'
-import { Button, Dialog, GroupBox, Radio, TextBox } from '../../ui'
+import { Button } from '../../ui/Button'
+import { Dialog } from '../../ui/Dialog'
+import { GroupBox, Radio, TextBox } from '../../ui/fields'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
 
 function Monitor({ children }: { children: ReactNode }) {

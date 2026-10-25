@@ -1,7 +1,9 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { locales } from '../../settings/model'
-import { apps } from '../../shell/registry'
-import { Button, Checkbox, Dialog, GroupBox, TextBox } from '../../ui'
+import type { AppManifest } from '../../shell/types'
+import { Button } from '../../ui/Button'
+import { Dialog } from '../../ui/Dialog'
+import { Checkbox, GroupBox, TextBox } from '../../ui/fields'
 import { appletIcons } from './icons'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
 
@@ -450,7 +452,19 @@ export function SystemProperties({ onClose }: { onClose: () => void }) {
 
 export function AddRemovePrograms({ onClose }: { onClose: () => void }) {
   const state = useSettingsDraft()
-  const [selected, setSelected] = useState(apps[0]?.id ?? '')
+  const [apps, setApps] = useState<readonly AppManifest[]>([])
+  const [selected, setSelected] = useState('')
+  useEffect(() => {
+    let active = true
+    void import('../../shell/registry').then((registry) => {
+      if (!active) return
+      setApps(registry.apps)
+      setSelected(registry.apps[0]?.id ?? '')
+    })
+    return () => {
+      active = false
+    }
+  }, [])
   const selectedApp = apps.find((app) => app.id === selected)
   return (
     <PropertySheet

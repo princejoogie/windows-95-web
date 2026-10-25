@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Checkbox, GroupBox, Radio } from '../../ui'
+import { Checkbox, GroupBox, Radio } from '../../ui/fields'
 import { appletIcons } from './icons'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
 

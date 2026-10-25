@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { clockOffsetForParts, clockParts } from '../../settings/clock'
 import { timeZones } from '../../settings/model'
-import { GroupBox, TextBox } from '../../ui'
+import { GroupBox, TextBox } from '../../ui/fields'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
 
 const months = [

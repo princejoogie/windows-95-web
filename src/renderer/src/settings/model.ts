@@ -1,3 +1,4 @@
+import type { SoundName as SystemSoundName } from '../system/sound'
 import { type BackgroundSettings, patternNames, wallpaperNames } from './backgrounds'
 import { type AppearanceSettings, schemeNames, themeColorNames } from './schemes'
 
@@ -11,8 +12,16 @@ export const saverNames = [
   'Blank Screen',
 ] as const
 export type SaverName = (typeof saverNames)[number]
-export const soundNames = ['(None)', 'ding', 'chord', 'tada', 'chimes', 'recycle', 'start', 'exit'] as const
-export type SoundName = (typeof soundNames)[number]
+export const soundNames = [
+  '(None)',
+  'ding',
+  'chord',
+  'tada',
+  'chimes',
+  'notify',
+  'recycle',
+] as const satisfies readonly (SystemSoundName | '(None)')[]
+export type SoundName = SystemSoundName | '(None)'
 export const soundEvents = [
   'Asterisk',
   'Critical Stop',
@@ -90,16 +99,16 @@ export const defaultSettings: Settings = {
     'Critical Stop': 'chord',
     'Default Sound': 'ding',
     Exclamation: 'chord',
-    'Exit Windows': 'exit',
+    'Exit Windows': 'chimes',
     Maximize: '(None)',
     'Menu Command': '(None)',
     'Menu Popup': '(None)',
     Minimize: '(None)',
-    'New Mail Notification': 'chimes',
+    'New Mail Notification': 'notify',
     Question: 'chord',
     'Restore Down': '(None)',
     'Restore Up': '(None)',
-    'Start Windows': 'start',
+    'Start Windows': 'tada',
     'Empty Recycle Bin': 'recycle',
   },
   clockOffset: 0,
