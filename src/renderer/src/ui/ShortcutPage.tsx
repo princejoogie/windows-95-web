@@ -1,5 +1,6 @@
 import { type ReactNode, useId, useMemo, useState } from 'react'
 import { resolvePath, type ShortcutTarget } from '../fs/fs'
+import { shortcutKey } from '../fs/shortcutKey'
 import { fs } from '../fs/store'
 import type { FsNode, FsState, RunAs } from '../fs/types'
 import { iconChoice, nodeIcon } from '../shell/nodeIcon'
@@ -18,12 +19,19 @@ export interface ShortcutDraft {
   readonly startIn: string
   readonly run: RunAs
   readonly icon: string | null
+  readonly shortcutKey: string
 }
 
 export function shortcutDraft(state: FsState, node: FsNode): ShortcutDraft | null {
   const info = shortcutInfo(state, node)
   if (!info || node.kind !== 'shortcut') return null
-  return { target: info.target, startIn: info.startIn, run: node.run ?? 'normal', icon: node.icon ?? null }
+  return {
+    target: info.target,
+    startIn: info.startIn,
+    run: node.run ?? 'normal',
+    icon: node.icon ?? null,
+    shortcutKey: node.shortcutKey ?? '',
+  }
 }
 
 /**
@@ -45,6 +53,7 @@ export function applyShortcut(state: FsState, node: FsNode, draft: ShortcutDraft
     ...(startIn ? { startIn } : {}),
     run: draft.run,
     ...(draft.icon ? { icon: draft.icon } : {}),
+    ...(draft.shortcutKey ? { shortcutKey: draft.shortcutKey } : {}),
   })
   return null
 }
@@ -207,7 +216,21 @@ export function ShortcutPage({
         )}
         {field(
           'Shortcut &key:',
-          <TextBox aria-label="Shortcut key" className="w-full" value="None" readOnly />,
+          <TextBox
+            aria-label="Shortcut key"
+            data-shortcut-key
+            className="w-full"
+            value={draft.shortcutKey ? `Ctrl + Alt + ${draft.shortcutKey}` : 'None'}
+            readOnly
+            onKeyDown={(event) => {
+              const letter = shortcutKey(event.key)
+              if (letter || event.key === 'Backspace' || event.key === 'Delete') {
+                event.preventDefault()
+                event.stopPropagation()
+                onChange({ ...draft, shortcutKey: letter ?? '' })
+              }
+            }}
+          />,
         )}
         {field(
           '&Run:',

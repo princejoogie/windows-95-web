@@ -17,10 +17,12 @@ import { Desktop } from './Desktop'
 import { shellEvents } from './events'
 import { PowerScreens } from './PowerScreens'
 import { RunDialog } from './RunDialog'
+import { connectRecycleLimit } from './recycleLimit'
 import { apps, findAppByExe, getApp, programSpecs } from './registry'
 import { type ShutDownChoice, ShutDownDialog } from './ShutDownDialog'
 import { StartMenu } from './StartMenu'
 import { openSystemMenu, SystemMenu } from './SystemMenu'
+import { shortcutForKey } from './shortcutKeys'
 import { installStartMenu, startMenuFolder } from './startup'
 import { launch, openNode, useWindows, windowsStore } from './system'
 import { Taskbar } from './Taskbar'
@@ -38,6 +40,7 @@ type Switch = { order: readonly WindowId[]; selected: WindowId }
 
 export function Shell() {
   useEffect(connectSystemSounds, [])
+  useEffect(connectRecycleLimit, [])
   const [power, setPower] = useState<Power>('booting')
   useEffect(() => (power === 'running' ? undefined : beginSystemCursor('wait')), [power])
   const [startOpen, setStartOpen] = useState(false)
@@ -145,6 +148,16 @@ export function Shell() {
       setStartOpen(false)
     }
     const key = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey && !event.repeat) {
+        if (event.target instanceof Element && event.target.closest('[data-shortcut-key]')) return
+        const shortcut = shortcutForKey(fs.get(), event.key)
+        if (shortcut) {
+          event.preventDefault()
+          event.stopImmediatePropagation()
+          openNode(shortcut)
+          return
+        }
+      }
       if (event.altKey && (event.key === 'Tab' || event.key === '`')) {
         event.preventDefault()
         event.stopImmediatePropagation()

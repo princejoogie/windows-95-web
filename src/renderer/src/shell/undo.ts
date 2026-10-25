@@ -1,10 +1,11 @@
 import { type FsAction, fsReducer, isInside, validateName } from '../fs/fs'
-import { type FsNode, type FsState, RECYCLED_DIR } from '../fs/types'
+import { type FsNode, type FsState, RECYCLED_DIR, type Recycled } from '../fs/types'
 import { createStore } from '../lib/store'
 
 interface Change {
   readonly before: FsNode
   readonly after: FsNode
+  readonly recycled: Recycled | undefined
 }
 export interface UndoEntry {
   readonly label: string
@@ -19,7 +20,7 @@ export function undoEntry(before: FsState, after: FsState, label: string): UndoE
   for (const node of Object.values(before.nodes)) {
     const next = after.nodes[node.id]
     if (next && (node.name !== next.name || node.parent !== next.parent))
-      changes.push({ before: node, after: next })
+      changes.push({ before: node, after: next, recycled: before.recycled[node.id] })
   }
   const created = Object.values(after.nodes).filter(
     (node) =>
@@ -46,19 +47,23 @@ export function planUndo(
       return { ok: false, message: 'The item has changed since the last operation and cannot be undone.' }
     add({ type: 'purge', id: node.id })
   }
-  for (const { before, after } of [...entry.changes].reverse()) {
+  for (const { before, after, recycled } of [...entry.changes].reverse()) {
     const current = working.nodes[before.id]
     if (!current || current.name !== after.name || current.parent !== after.parent || !before.parent) {
       return { ok: false, message: 'The item has changed since the last operation and cannot be undone.' }
     }
     const parent = working.nodes[before.parent]
     const error = validateName(working, before.parent, before.name, before.id)
-    if (!parent || isInside(working, parent.id, RECYCLED_DIR) || error) {
+    const returningToBin = before.parent === RECYCLED_DIR && recycled !== undefined
+    if (!parent || (isInside(working, parent.id, RECYCLED_DIR) && !returningToBin) || error) {
       return { ok: false, message: error ?? 'The original folder is no longer available.' }
     }
-    if (working.recycled[before.id]) add({ type: 'restore', id: before.id, at })
-    if (working.nodes[before.id]?.parent !== before.parent)
-      add({ type: 'move', id: before.id, parent: before.parent, at })
+    if (returningToBin) add({ type: 'recycle', id: before.id, at: recycled.at, from: recycled.from })
+    else {
+      if (working.recycled[before.id]) add({ type: 'restore', id: before.id, at })
+      if (working.nodes[before.id]?.parent !== before.parent)
+        add({ type: 'move', id: before.id, parent: before.parent, at })
+    }
     if (working.nodes[before.id]?.name !== before.name)
       add({ type: 'rename', id: before.id, name: before.name, at })
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { children, emptyDrive, fsReducer } from '../fs/fs'
-import { DOCUMENTS_DIR, type FsState, type NodeId, ROOT } from '../fs/types'
+import { DESKTOP_DIR, DOCUMENTS_DIR, type FsState, type NodeId, RECYCLED_DIR, ROOT } from '../fs/types'
 import { planPaste } from './clipboard'
 import { planUndo, undoEntry } from './undo'
 
@@ -60,5 +60,19 @@ describe('Explorer undo', () => {
   })
   it('does not record a failed or unchanged operation', () => {
     expect(undoEntry(before, before, 'Move')).toBeNull()
+  })
+
+  it('undoes a move out of the bin with the original deletion time and restore folder', () => {
+    const deleted = fsReducer(before, { type: 'recycle', id: readme.id, at: 2 })
+    const moved = fsReducer(deleted, { type: 'move', id: readme.id, parent: DESKTOP_DIR, at: 3 })
+    const entry = undoEntry(deleted, moved, 'Move')
+    if (!entry) throw new Error('Move was not recorded')
+    const plan = planUndo(moved, entry, 4)
+    if (!plan.ok) throw new Error(plan.message)
+    const undone = plan.actions.reduce(fsReducer, moved)
+    expect(undone.nodes[readme.id]?.parent).toBe(RECYCLED_DIR)
+    expect(undone.recycled[readme.id]).toEqual({ from: DOCUMENTS_DIR, at: 2 })
+    const restored = fsReducer(undone, { type: 'restore', id: readme.id, at: 5 })
+    expect(restored.nodes[readme.id]?.parent).toBe(DOCUMENTS_DIR)
   })
 })

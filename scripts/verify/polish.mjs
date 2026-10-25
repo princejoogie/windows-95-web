@@ -21,18 +21,26 @@ async function click(expression, options) {
   )
   await c.click(...xy, options)
 }
+async function reload() {
+  await c.eval("document.documentElement.dataset.polishReload = 'pending'")
+  await c.send('Page.reload')
+  await c.waitFor(
+    `!document.documentElement.dataset.polishReload && !!document.querySelector('[data-desktop-item]')`,
+    10000,
+  )
+  await sleep(200)
+}
 async function fresh() {
   await c.eval(
     "addEventListener('beforeunload', () => localStorage.clear(), {once:true}); localStorage.clear()",
   )
-  await c.send('Page.reload')
-  await c.waitFor(`!!document.querySelector('[data-desktop-item]')`, 10000)
-  await sleep(500)
+  await reload()
 }
 async function run(command) {
   await click(`document.querySelector('[data-start-button]')`)
   await click(menuItem('Run...'))
   await c.waitFor(`!!document.querySelector('#run-command')`)
+  await c.key('a', ['Control'])
   await c.type(command)
   await c.key('Enter')
   await sleep(350)
@@ -44,6 +52,11 @@ async function check(expression, name) {
   console.log(`PASS ${name}`)
 }
 const shot = (name) => c.shot(`${proof}/${name}.png`)
+const option = (label, scope = top) =>
+  `[...(${scope}).querySelectorAll('[role="option"]')].find(e => e.getAttribute('aria-label') === ${q(label)} || e.textContent.trim() === ${q(label)})`
+const desktopItem = (label) =>
+  `[...document.querySelectorAll('[data-desktop-item]')].find(e => e.getAttribute('aria-label') === ${q(label)})`
+const saved = `JSON.parse(localStorage.getItem('w95.fs.v1'))`
 const systemMenu = async () => {
   await c.key(' ', ['Alt'])
   await c.waitFor(`!!document.querySelector('[role="menu"]')`)
@@ -139,9 +152,187 @@ async function help() {
   await check(`!document.querySelector('[data-window]')`, 'Help Topics closes from the caption')
 }
 
+async function desktopUndo() {
+  await fresh()
+  await click(desktopItem('Minesweeper'))
+  await c.key('c', ['Control'])
+  await c.click(900, 600)
+  await c.key('v', ['Control'])
+  await sleep(350)
+  await check(
+    `Object.values((${saved}).nodes).some(n => n.name === 'Copy of Minesweeper')`,
+    'Desktop Paste creates the copy',
+  )
+  await c.click(900, 600, { button: 'right' })
+  await check(`!!(${menuItem('Undo Copy')})`, 'Desktop offers Undo Copy')
+  await shot('04-desktop-undo-copy')
+  await c.key('Escape')
+  await c.key('z', ['Control'])
+  await sleep(350)
+  await check(
+    `!Object.values((${saved}).nodes).some(n => n.name === 'Copy of Minesweeper')`,
+    'Desktop Ctrl+Z removes the pasted copy',
+  )
+
+  await run('C:\\My Documents')
+  await click(option('Readme.txt'))
+  await c.key('x', ['Control'])
+  await click(button('Close', top))
+  await c.click(900, 600)
+  await c.key('v', ['Control'])
+  await sleep(350)
+  await check(`(${saved}).nodes.readme.parent === 'desktop'`, 'Desktop Paste moves a cut file')
+  await c.click(900, 600, { button: 'right' })
+  await check(`!!(${menuItem('Undo Move')})`, 'Desktop offers Undo Move')
+  await shot('04-desktop-undo-move')
+  await c.key('Escape')
+  await c.key('z', ['Control'])
+  await sleep(350)
+  await check(`(${saved}).nodes.readme.parent === 'documents'`, 'Desktop Ctrl+Z returns the moved file')
+
+  await run('C:\\My Documents')
+  await click(option('Readme.txt'))
+  await c.key('Delete')
+  await c.key('y')
+  await sleep(350)
+  const record = await c.eval(`(${saved}).recycled.readme`)
+  assert.ok(record)
+  await click(button('Close', top))
+  await run('recycle')
+  await click(option('Readme.txt'))
+  await c.key('x', ['Control'])
+  await click(button('Close', top))
+  await c.click(900, 600)
+  await c.key('v', ['Control'])
+  await sleep(350)
+  await check(
+    `(${saved}).nodes.readme.parent === 'desktop' && !(${saved}).recycled.readme`,
+    'Cut out of the bin clears the active recycle record',
+  )
+  await c.key('z', ['Control'])
+  await sleep(350)
+  await check(
+    `(${saved}).nodes.readme.parent === 'recycled' && JSON.stringify((${saved}).recycled.readme) === ${q(JSON.stringify(record))}`,
+    'Undo Move restores the original recycle record',
+  )
+  await run('recycle')
+  await click(option('Readme.txt'))
+  await c.key('Enter', ['Alt'])
+  await shot('04-bin-undo-record')
+  await c.key('Escape')
+  await click(option('Readme.txt'), { button: 'right' })
+  await click(menuItem('Restore'))
+  await sleep(350)
+  await check(
+    `(${saved}).nodes.readme.parent === 'documents' && !(${saved}).recycled.readme`,
+    'Restore after Undo returns to My Documents',
+  )
+}
+
+async function shortcut() {
+  await fresh()
+  const openSheet = async () => {
+    await click(desktopItem('Minesweeper'), { button: 'right' })
+    await click(menuItem('Properties'))
+    await click(
+      `document.querySelector('[role="tab"][id$="-Shortcut"]') ?? [...document.querySelectorAll('[role="tab"]')].find(e => e.textContent === 'Shortcut')`,
+    )
+    await click(`document.querySelector('[aria-label="Shortcut key"]')`)
+  }
+  await openSheet()
+  await c.key('k', ['Control', 'Alt'])
+  await check(
+    `document.querySelector('[aria-label="Shortcut key"]').value === 'Ctrl + Alt + K'`,
+    'Shortcut key captures Ctrl+Alt+K',
+  )
+  await shot('04-shortcut-key')
+  await click(button('OK'))
+  await sleep(350)
+  await check(
+    `Object.values((${saved}).nodes).some(n=>n.name === 'Minesweeper' && n.parent === 'desktop' && n.shortcutKey === 'K')`,
+    'Shortcut key is saved on the shortcut',
+  )
+  await run('notepad')
+  await c.type('The global shortcut works while Notepad owns focus.')
+  await c.key('k', ['Control', 'Alt'])
+  await check(
+    `(${top}).getAttribute('aria-label') === 'Minesweeper'`,
+    'Ctrl+Alt+K launches Minesweeper from another app',
+  )
+  await shot('04-global-shortcut-launch')
+  await reload()
+  await c.key('k', ['Control', 'Alt'])
+  await c.waitFor(`!!document.querySelector('[data-window][aria-label="Minesweeper"]')`)
+  await check(
+    `(${top}).getAttribute('aria-label') === 'Minesweeper'`,
+    'Shortcut key still launches after a reload',
+  )
+  await click(button('Close', top))
+  await openSheet()
+  await c.key('Delete')
+  await click(button('OK'))
+  await c.key('k', ['Control', 'Alt'])
+  await check(`!document.querySelector('[data-window]')`, 'Clearing Shortcut key disables the global launch')
+}
+
+async function capacity() {
+  await fresh()
+  await sleep(350)
+  await c.eval(`addEventListener('beforeunload',()=>{
+    const state=${saved};
+    for(const [index,name] of ['Oldest','Newest'].entries()) {
+      const id='capacity-'+index;
+      state.nodes[id]={id,name,parent:'desktop',kind:'folder',modified:index};
+      for(let n=0;n<10;n++) {
+        const child=id+'-'+n;
+        state.nodes[child]={id:child,name:'PAINT'+n+'.EXE',parent:id,kind:'program',app:'paint',modified:0};
+      }
+    }
+    localStorage.setItem('w95.fs.v1',JSON.stringify(state));
+  },{once:true})`)
+  await reload()
+  await c.waitFor(`!!(${desktopItem('Oldest')})`, 10000)
+  await click(desktopItem('Recycle Bin'), { button: 'right' })
+  await click(menuItem('Properties'))
+  await click(`document.querySelector('[role="slider"]')`)
+  await c.key('Home')
+  await c.key('ArrowRight')
+  await shot('04-bin-one-percent')
+  await click(button('OK'))
+  for (const name of ['Oldest', 'Newest']) {
+    await click(desktopItem(name))
+    await c.key('Delete')
+    await c.key('y')
+    await sleep(350)
+    if (name === 'Oldest')
+      await check(`!!(${saved}).nodes['capacity-0']`, 'The first 3MB deletion fits within the 1% limit')
+  }
+  await check(
+    `!(${saved}).nodes['capacity-0'] && !(${saved}).nodes['capacity-0-0'] && !!(${saved}).nodes['capacity-1'] && !!(${saved}).recycled['capacity-1']`,
+    'Overflow evicts the oldest folder and its files, retaining the newer deletion',
+  )
+  await run('recycle')
+  await shot('04-bin-oldest-evicted')
+  await click(button('Close', top))
+  await click(desktopItem('Recycle Bin'), { button: 'right' })
+  await click(menuItem('Properties'))
+  await click(`document.querySelector('[role="slider"]')`)
+  await c.key('Home')
+  await click(button('OK'))
+  await sleep(350)
+  await check(
+    `!(${saved}).nodes['capacity-1'] && Object.keys((${saved}).recycled).length === 0`,
+    'Applying a smaller limit immediately evicts excess contents',
+  )
+  await shot('04-bin-limit-reduced')
+}
+
 try {
   if (phase === 'menu') await menu()
   else if (phase === 'help') await help()
+  else if (phase === 'undo') await desktopUndo()
+  else if (phase === 'shortcut') await shortcut()
+  else if (phase === 'capacity') await capacity()
   else throw new Error(`Unknown phase ${phase}`)
 } finally {
   c.close()

@@ -421,10 +421,12 @@ export function Desktop({ size }: { size: Size }) {
   }
 
   const paste = (clipNow: Clip, dest: NodeId, at: Point | null) => {
+    const before = fs.get()
     const created = carry(
       planPaste(fs.get(), clipNow, dest, Date.now(), newNodeId),
       dest === DESKTOP_DIR ? at : null,
     )
+    remember(before, fs.get(), clipNow?.op === 'cut' ? 'Move' : 'Copy')
     if (clipNow?.op === 'cut' && created.length) clipboard.dispatch(null)
   }
 

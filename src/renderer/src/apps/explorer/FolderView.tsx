@@ -1382,7 +1382,10 @@ export function FolderView({
             if (after && after.name !== prompt.node.name)
               history.dispatch([
                 ...history.get(),
-                { label: 'Rename', changes: [{ before: prompt.node, after }] },
+                {
+                  label: 'Rename',
+                  changes: [{ before: prompt.node, after, recycled: fs.get().recycled[prompt.node.id] }],
+                },
               ])
             setPrompt(null)
           }}
