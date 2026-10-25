@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { defaultSettings, type SoundEvent, soundEvents, soundNames } from '../../settings/model'
 import { previewSound } from '../../settings/sounds'
 import { Button } from '../../ui/Button'
+import { ComboBox } from '../../ui/ComboBox'
 import { GroupBox } from '../../ui/fields'
 import { appletIcons } from './icons'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
@@ -25,43 +26,34 @@ export function SoundsProperties({ onClose }: { onClose: () => void }) {
                 <img src={appletIcons.sounds} width={32} height={32} alt="" />
                 <p>Select an event, then choose the sound to play.</p>
               </div>
-              <label className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1">
                 Events:
-                <select
+                <ComboBox
                   aria-label="Sound events"
-                  size={7}
                   value={event}
-                  onChange={(change) =>
-                    setEvent(soundEvents.find((name) => name === change.target.value) ?? 'Asterisk')
-                  }
-                >
-                  {soundEvents.map((name) => (
-                    <option key={name}>{name}</option>
-                  ))}
-                </select>
-              </label>
+                  onChange={(value) => setEvent(soundEvents.find((name) => name === value) ?? 'Asterisk')}
+                  options={soundEvents.map((name) => ({ key: name, label: name }))}
+                />
+              </div>
               <GroupBox label="Sound" className="mt-3">
                 <div className="flex items-center gap-2">
-                  <label className="flex gap-2 items-center flex-1">
+                  <div className="flex gap-2 items-center flex-1">
                     Name:
-                    <select
+                    <ComboBox
                       aria-label="Sound name"
                       className="flex-1"
                       value={sounds[event]}
-                      onChange={(change) =>
+                      onChange={(value) =>
                         state.change({
                           soundScheme: {
                             ...sounds,
-                            [event]: soundNames.find((name) => name === change.target.value) ?? '(None)',
+                            [event]: soundNames.find((name) => name === value) ?? '(None)',
                           },
                         })
                       }
-                    >
-                      {soundNames.map((name) => (
-                        <option key={name}>{name}</option>
-                      ))}
-                    </select>
-                  </label>
+                      options={soundNames.map((name) => ({ key: name, label: name }))}
+                    />
+                  </div>
                   <Button
                     aria-label="Preview sound"
                     className="min-w-[28px]! px-1!"
@@ -81,9 +73,9 @@ export function SoundsProperties({ onClose }: { onClose: () => void }) {
                   </Button>
                 </div>
               </GroupBox>
-              <label className="flex items-center gap-2 mt-3">
+              <div className="flex items-center gap-2 mt-3">
                 Schemes:
-                <select
+                <ComboBox
                   aria-label="Sound scheme"
                   className="flex-1"
                   value={
@@ -93,10 +85,10 @@ export function SoundsProperties({ onClose }: { onClose: () => void }) {
                         ? 'Windows Default'
                         : '(Modified)'
                   }
-                  onChange={(change) => {
-                    if (change.target.value === 'Windows Default')
+                  onChange={(value) => {
+                    if (value === 'Windows Default')
                       state.change({ soundScheme: defaultSettings.soundScheme })
-                    if (change.target.value === 'No Sounds')
+                    if (value === 'No Sounds')
                       state.change({
                         soundScheme: {
                           ...sounds,
@@ -104,12 +96,12 @@ export function SoundsProperties({ onClose }: { onClose: () => void }) {
                         },
                       })
                   }}
-                >
-                  <option>Windows Default</option>
-                  <option>No Sounds</option>
-                  <option disabled>(Modified)</option>
-                </select>
-              </label>
+                  options={['Windows Default', 'No Sounds', '(Modified)'].map((name) => ({
+                    key: name,
+                    label: name,
+                  }))}
+                />
+              </div>
               <p role="status" className="mt-2">
                 {error}
               </p>

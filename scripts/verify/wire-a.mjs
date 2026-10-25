@@ -39,6 +39,23 @@ async function run(command) {
   await sleep(200)
 }
 
+async function combo(label, option) {
+  await c.clickOn(`[role="combobox"][aria-label="${label}"]`)
+  if (option) {
+    await c.eval(
+      `(() => {const el=[...document.querySelectorAll('[role="option"]')].find(el=>el.textContent.trim()===${JSON.stringify(option)});if(!el)throw new Error('Missing option');el.scrollIntoView({block:'nearest'})})()`,
+    )
+    await clickText(option, '[role="option"]')
+  } else {
+    await c.key('End')
+    await c.key('Enter')
+  }
+  await check(
+    `${label} uses the shared ComboBox and accepts a choice`,
+    `!!document.querySelector('[role="combobox"][aria-label="${label}"][aria-expanded="false"]')`,
+  )
+}
+
 async function shutdown() {
   await c.clickOn('[data-start-button]')
   await clickText('Shut Down...')
@@ -89,7 +106,8 @@ async function hear(name, label) {
 try {
   await c.send('Page.enable')
   if (item === 'sounds') await c.send('Page.addScriptToEvaluateOnNewDocument', { source: audioProbe })
-  if (item === 'cursors') await c.send('Page.addScriptToEvaluateOnNewDocument', { source: cursorProbe })
+  if (item === 'cursors' || item === 'wallpaper')
+    await c.send('Page.addScriptToEvaluateOnNewDocument', { source: cursorProbe })
   await c.send('Page.reload')
   await sleep(100)
   await c.waitFor('!!document.querySelector("[data-start-button]")')
@@ -273,6 +291,100 @@ try {
     )
     await c.eval(
       '(() => {const s=JSON.parse(localStorage.getItem("win95.settings.v1"));s.screenSaver.name="(None)";s.clockOffset=0;localStorage.setItem("win95.settings.v1",JSON.stringify(s))})()',
+    )
+  }
+  if (item === 'controlpanel') {
+    await run('control')
+    for (const [applet, tabs] of [
+      [
+        'display',
+        [
+          ['Background', ['Pattern', 'Wallpaper']],
+          ['Screen Saver', ['Screen saver']],
+          ['Appearance', ['Scheme', 'Appearance item']],
+        ],
+      ],
+      [
+        'datetime',
+        [
+          ['Date & Time', ['Month']],
+          ['Time Zone', ['Time zone']],
+        ],
+      ],
+      [
+        'regional',
+        [
+          ['Regional Settings', ['Regional language']],
+          ['Time', ['Time style']],
+          ['Date', ['Short date style']],
+        ],
+      ],
+      ['sounds', [['Sounds', ['Sound events', 'Sound name', 'Sound scheme']]]],
+      ['programs', [['Install/Uninstall', ['Installed programs']]]],
+    ]) {
+      await c.clickOn(`[data-applet="${applet}"]`, { count: 2 })
+      for (const [tab, labels] of tabs) {
+        await clickText(tab, '[role="tab"]')
+        await check(`${applet} ${tab} has no native select`, '!document.querySelector("select")')
+        for (const label of labels) await combo(label)
+        await c.shot(join(proof, `combobox-${applet}-${tab.replaceAll(' ', '-').replaceAll('/', '-')}.png`))
+      }
+      await clickText('Cancel')
+    }
+    await c.clickOn('[data-applet="regional"]', { count: 2 })
+    await clickText('Time', '[role="tab"]')
+    await combo('Time style', 'HH:mm:ss')
+    await clickText('OK')
+    await check(
+      'Taskbar clock honors the selected 24-hour format',
+      '(() => {const s=JSON.parse(localStorage.getItem("win95.settings.v1"));return s.regional.time24 && document.querySelector("[data-clock]").textContent===new Date(Date.now()+s.clockOffset).toLocaleTimeString("en-US",{timeZone:s.timeZone,hour:"numeric",minute:"2-digit",hour12:false})})()',
+      'clock-24-hour',
+    )
+    await c.key('F4', ['Alt'])
+  }
+  if (item === 'wallpaper') {
+    await run('mspaint')
+    const [cx, cy] = await c.center('[aria-label="Paint canvas"]')
+    const stroke = await c.drag([cx - 60, cy - 40], [cx + 60, cy + 40])
+    await stroke.release()
+    await c.eval('window.__cursors = []')
+    await clickText('File', '[role="menubar"] button')
+    await clickText('Set As Wallpaper (Tiled)')
+    await c.waitFor(
+      'getComputedStyle(document.querySelector(".bg-desktop")).backgroundRepeat === "repeat, repeat"',
+    )
+    await c.waitFor(
+      '!!JSON.parse(localStorage.getItem("w95.fs.v1")).nodes[JSON.parse(localStorage.getItem("win95.settings.v1")).wallpaper]',
+    )
+    await check(
+      'Unsaved Paint picture tiles as a file wallpaper',
+      '(() => {const s=JSON.parse(localStorage.getItem("win95.settings.v1"));const f=JSON.parse(localStorage.getItem("w95.fs.v1")).nodes[s.wallpaper];return f?.kind==="file" && f.content.startsWith("data:image/png;base64,") && s.wallpaperMode==="tile" && getComputedStyle(document.querySelector(".bg-desktop")).backgroundSize==="440px 280px, 8px 8px"})()',
+      'paint-wallpaper-tiled',
+    )
+    await check(
+      'Decoding the wallpaper uses the hourglass and releases it',
+      'window.__cursors.some(entry => entry.kind === "wait" && entry.cursor.includes("wait_r")) && !document.documentElement.dataset.systemCursor',
+    )
+    await clickText('File', '[role="menubar"] button')
+    await clickText('Set As Wallpaper (Centered)')
+    await c.waitFor(
+      'getComputedStyle(document.querySelector(".bg-desktop")).backgroundRepeat === "no-repeat, repeat"',
+    )
+    await check(
+      'Paint picture centers at native size',
+      'JSON.parse(localStorage.getItem("win95.settings.v1")).wallpaperMode==="center"',
+      'paint-wallpaper-centered',
+    )
+    await c.key('F4', ['Alt'])
+    await clickText('No')
+    await sleep(300)
+    await c.send('Page.reload')
+    await sleep(100)
+    await c.waitFor('!!document.querySelector("[data-start-button]")')
+    await check(
+      'File wallpaper survives a renderer restart',
+      'getComputedStyle(document.querySelector(".bg-desktop")).backgroundSize==="440px 280px, 8px 8px" && getComputedStyle(document.querySelector(".bg-desktop")).backgroundImage.includes("data:image/png;base64,")',
+      'wallpaper-restart',
     )
   }
   writeFileSync(join(proof, `${item}.json`), `${JSON.stringify({ port, item, checks }, null, 2)}\n`)

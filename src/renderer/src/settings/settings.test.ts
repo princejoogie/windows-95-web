@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { DOCUMENTS_DIR, type FsNode, WINDOWS_DIR } from '../fs/types'
 import { applySettings } from './apply'
 import { desktopBackground, patternImage, patternNames, patterns } from './backgrounds'
 import { changedSettings, defaultSettings, parseSettings, settingsReducer } from './model'
@@ -49,6 +50,34 @@ describe('persistent settings', () => {
 })
 
 describe('Windows desktop backgrounds', () => {
+  const wallpaper: FsNode = {
+    id: DOCUMENTS_DIR,
+    kind: 'file',
+    name: 'Wallpaper.bmp',
+    parent: WINDOWS_DIR,
+    modified: 0,
+    content:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jF1sAAAAASUVORK5CYII=',
+  }
+
+  it('loads a file wallpaper at its native size and keeps it through unrelated settings edits', () => {
+    const settings = parseSettings({ wallpaper: wallpaper.id, wallpaperMode: 'tile' }, [wallpaper])
+    expect(settings.wallpaper).toBe(wallpaper.id)
+    expect(desktopBackground(settings, [wallpaper])['--desktop-size']).toBe('1px 1px, 8px 8px')
+    expect(desktopBackground(settings, [wallpaper])['--desktop-repeat']).toBe('repeat, repeat')
+    expect(settingsReducer(settings, { type: 'apply', patch: { clockOffset: 1000 } }).wallpaper).toBe(
+      wallpaper.id,
+    )
+    expect(parseSettings({ wallpaper: wallpaper.id }).wallpaper).toBeNull()
+    expect(desktopBackground(settings)['--desktop-image']).toBe('none')
+  })
+
+  it('falls back to the pattern for corrupt image contents', () => {
+    const corrupt = { ...wallpaper, content: 'data:image/png;base64,broken' }
+    expect(
+      desktopBackground({ ...defaultSettings, wallpaper: wallpaper.id }, [corrupt])['--desktop-image'],
+    ).toBe('none')
+  })
   it('supplies twenty distinct eight by eight monochrome bitmaps', () => {
     expect(patternNames).toHaveLength(20)
     const images = new Set<string>()

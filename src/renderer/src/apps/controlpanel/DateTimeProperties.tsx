@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { clockOffsetForParts, clockParts } from '../../settings/clock'
 import { timeZones } from '../../settings/model'
+import { ComboBox } from '../../ui/ComboBox'
 import { GroupBox, TextBox } from '../../ui/fields'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
 
@@ -98,24 +99,19 @@ export function DateTimeProperties({ onClose }: { onClose: () => void }) {
               <div className="flex gap-3 mt-2">
                 <GroupBox label="Date" className="w-[192px]">
                   <div className="flex gap-2">
-                    <select
+                    <ComboBox
                       aria-label="Month"
                       className="w-[105px]"
-                      value={parts.month}
-                      onChange={(event) => {
-                        const month = Number(event.target.value)
+                      value={String(parts.month)}
+                      onChange={(value) => {
+                        const month = Number(value)
                         update({
                           month,
                           day: Math.min(parts.day, new Date(Date.UTC(parts.year, month, 0)).getUTCDate()),
                         })
                       }}
-                    >
-                      {months.map((month, index) => (
-                        <option key={month} value={index + 1}>
-                          {month}
-                        </option>
-                      ))}
-                    </select>
+                      options={months.map((label, index) => ({ key: String(index + 1), label }))}
+                    />
                     <TextBox
                       aria-label="Year"
                       type="number"
@@ -183,20 +179,17 @@ export function DateTimeProperties({ onClose }: { onClose: () => void }) {
           label: 'Time Zone',
           content: (
             <>
-              <label className="flex flex-col gap-2 mt-2">
+              <div className="flex flex-col gap-2 mt-2">
                 Time zone:
-                <select
+                <ComboBox
                   aria-label="Time zone"
                   value={draft.timeZone}
-                  onChange={(event) =>
-                    change({ timeZone: timeZones.find((zone) => zone === event.target.value) ?? 'UTC' })
+                  onChange={(value) =>
+                    change({ timeZone: timeZones.find((zone) => zone === value) ?? 'UTC' })
                   }
-                >
-                  {timeZones.map((zone) => (
-                    <option key={zone}>{zone}</option>
-                  ))}
-                </select>
-              </label>
+                  options={timeZones.map((name) => ({ key: name, label: name }))}
+                />
+              </div>
               <div className="mt-5 h-[150px] bg-[#008080] border border-shadow relative overflow-hidden">
                 <svg role="img" aria-label="Time zone map" viewBox="0 0 330 150" className="w-full h-full">
                   <title>Time zone map</title>

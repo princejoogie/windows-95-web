@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from 'react'
 import { locales } from '../../settings/model'
 import type { AppManifest } from '../../shell/types'
 import { Button } from '../../ui/Button'
+import { ComboBox } from '../../ui/ComboBox'
 import { Dialog } from '../../ui/Dialog'
 import { Checkbox, GroupBox, TextBox } from '../../ui/fields'
 import { appletIcons } from './icons'
@@ -125,23 +126,20 @@ export function RegionalProperties({ onClose }: { onClose: () => void }) {
                 <img src={appletIcons.regional} width={48} height={48} alt="" />
                 <p>Select the language and country whose conventions you want to use.</p>
               </div>
-              <select
+              <ComboBox
                 aria-label="Regional language"
                 className="w-full"
                 value={regional.locale}
-                onChange={(event) =>
+                onChange={(value) =>
                   state.change({
                     regional: {
                       ...regional,
-                      locale: locales.find((name) => name === event.target.value) ?? locales[0],
+                      locale: locales.find((name) => name === value) ?? locales[0],
                     },
                   })
                 }
-              >
-                {locales.map((name) => (
-                  <option key={name}>{name}</option>
-                ))}
-              </select>
+                options={locales.map((name) => ({ key: name, label: name }))}
+              />
               <GroupBox label="Sample" className="mt-6">
                 <p>{regional.locale}</p>
                 <p className="mt-2">Currency: {regional.currency}1,234.56</p>
@@ -180,19 +178,18 @@ export function RegionalProperties({ onClose }: { onClose: () => void }) {
           label: 'Time',
           content: (
             <>
-              <label className="flex flex-col gap-2 mt-3">
+              <div className="flex flex-col gap-2 mt-3">
                 Time style:
-                <select
+                <ComboBox
                   aria-label="Time style"
                   value={regional.time24 ? '24' : '12'}
-                  onChange={(event) =>
-                    state.change({ regional: { ...regional, time24: event.target.value === '24' } })
-                  }
-                >
-                  <option value="12">h:mm:ss tt</option>
-                  <option value="24">HH:mm:ss</option>
-                </select>
-              </label>
+                  onChange={(value) => state.change({ regional: { ...regional, time24: value === '24' } })}
+                  options={[
+                    { key: '12', label: 'h:mm:ss tt' },
+                    { key: '24', label: 'HH:mm:ss' },
+                  ]}
+                />
+              </div>
               <GroupBox label="Sample" className="mt-5">
                 {regional.time24 ? '13:05:00' : '1:05:00 PM'}
               </GroupBox>
@@ -203,30 +200,30 @@ export function RegionalProperties({ onClose }: { onClose: () => void }) {
           label: 'Date',
           content: (
             <>
-              <label className="flex flex-col gap-2 mt-3">
+              <div className="flex flex-col gap-2 mt-3">
                 Short date style:
-                <select
+                <ComboBox
                   aria-label="Short date style"
                   value={regional.dateFormat}
-                  onChange={(event) =>
+                  onChange={(value) =>
                     state.change({
                       regional: {
                         ...regional,
                         dateFormat:
-                          event.target.value === 'dd/MM/yyyy'
+                          value === 'dd/MM/yyyy'
                             ? 'dd/MM/yyyy'
-                            : event.target.value === 'yyyy-MM-dd'
+                            : value === 'yyyy-MM-dd'
                               ? 'yyyy-MM-dd'
                               : 'M/d/yyyy',
                       },
                     })
                   }
-                >
-                  <option>M/d/yyyy</option>
-                  <option>dd/MM/yyyy</option>
-                  <option>yyyy-MM-dd</option>
-                </select>
-              </label>
+                  options={['M/d/yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd'].map((name) => ({
+                    key: name,
+                    label: name,
+                  }))}
+                />
+              </div>
               <GroupBox label="Sample" className="mt-5">
                 {regional.dateFormat === 'dd/MM/yyyy'
                   ? '24/08/1995'
@@ -478,19 +475,13 @@ export function AddRemovePrograms({ onClose }: { onClose: () => void }) {
           content: (
             <>
               <p className="mb-3 mt-2">The following software is installed on your computer.</p>
-              <select
+              <ComboBox
                 aria-label="Installed programs"
-                size={10}
                 className="w-full"
                 value={selected}
-                onChange={(event) => setSelected(event.target.value)}
-              >
-                {apps.map((app) => (
-                  <option key={app.id} value={app.id}>
-                    {app.title}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => setSelected(value)}
+                options={apps.map((app) => ({ key: app.id, label: app.title }))}
+              />
               <GroupBox label="Program information" className="mt-3">
                 <p>{selectedApp?.title}</p>
                 <p className="mt-2">{selectedApp?.exe}</p>
