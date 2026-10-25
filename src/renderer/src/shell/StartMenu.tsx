@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
-import { children } from '../fs/fs'
+import { children, isInside } from '../fs/fs'
 import { useFs } from '../fs/store'
-import type { FsState, NodeId } from '../fs/types'
+import { type FsState, type NodeId, RECYCLED_DIR } from '../fs/types'
 import { icons } from '../icons'
 import { type MenuEntry, MenuList } from '../ui/Menu'
 import { isHidden } from '../ui/properties'
@@ -58,7 +58,7 @@ export function StartMenu({
       recent
         .flatMap((id) => {
           const node = state.nodes[id]
-          return node?.kind === 'file' ? [node] : []
+          return node?.kind === 'file' && !isInside(state, node.id, RECYCLED_DIR) ? [node] : []
         })
         .sort((a, b) => a.name.localeCompare(b.name)),
     [state, recent],

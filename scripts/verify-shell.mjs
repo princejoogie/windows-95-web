@@ -72,7 +72,12 @@ function drag(from, to) {
 }
 
 const phase = process.argv[2] ?? 'smoke'
-if (process.env.W95_CDP_PORT) browser('connect', process.env.W95_CDP_PORT)
+if (process.env.W95_CDP_PORT) {
+  execFileSync(executable, ['--session', session, 'connect', process.env.W95_CDP_PORT], {
+    stdio: 'ignore',
+    timeout: 35000,
+  })
+}
 browser('wait', '[data-start-button]')
 
 if (phase === 'smoke') {
@@ -292,6 +297,15 @@ if (phase === 'smoke') {
 } else if (phase === 'desktop') {
   browser('reload')
   browser('wait', '[data-start-button]')
+  for (const name of ['Shell Readme.txt', 'Readme.txt']) {
+    const selector = `[data-desktop-item][aria-label=${JSON.stringify(name)}]`
+    if (!evaluate(`document.querySelector(${JSON.stringify(selector)}) !== null`)) continue
+    browser('click', selector)
+    browser('press', 'Delete')
+    browser('wait', '[role="dialog"][aria-label="Confirm File Delete"]')
+    button('Yes')
+    wait(`document.querySelector(${JSON.stringify(selector)}) === null`)
+  }
   browser('mouse', 'move', '400', '300')
   browser('mouse', 'down', 'right')
   browser('mouse', 'up', 'right')
