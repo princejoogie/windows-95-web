@@ -115,10 +115,13 @@ export function FolderView({
   initial,
   window,
   exploring = false,
+  select,
 }: {
   initial: Location
   window: WindowApi
   exploring?: boolean
+  /** Selected and scrolled into view when the window opens. */
+  select?: NodeId | undefined
 }) {
   const state = useFs((s) => s)
   const clip = useStore(clipboard, (s) => s)
@@ -137,7 +140,15 @@ export function FolderView({
   )
   const [view, setView] = useState<View>(initialPrefs.view)
   const [sort, setSort] = useState<Sort>(initialPrefs.sort)
-  const [selection, setSelection] = useState<Selection>(emptySelection)
+  const [selection, setSelection] = useState<Selection>(() =>
+    select ? { ids: new Set([select]), anchor: select, focus: select } : emptySelection,
+  )
+  useEffect(() => {
+    if (select)
+      list.current
+        ?.querySelector(`[data-node-id="${CSS.escape(select)}"]`)
+        ?.scrollIntoView({ block: 'nearest' })
+  }, [select])
   const [renaming, setRenaming] = useState<NodeId | null>(null)
   const [status, setStatus] = useState(initialPrefs.status)
   const [toolbar, setToolbar] = useState(initialPrefs.toolbar)

@@ -15,6 +15,8 @@ export interface Size {
 export interface LaunchArgs {
   readonly file?: NodeId
   readonly folder?: NodeId
+  /** A node inside the folder that the window opens with selected, as Find's Open Containing Folder asks. */
+  readonly select?: NodeId
   /** A help book id, for Windows Help. */
   readonly book?: string
 }

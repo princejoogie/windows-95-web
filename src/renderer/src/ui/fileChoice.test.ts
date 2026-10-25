@@ -30,6 +30,23 @@ describe('common file dialog', () => {
       name: 'Readme.txt',
     })
   })
+  it('finds a file by the name the list shows with its extension hidden', () => {
+    const hidden = (node: { name: string }) => node.name.replace(/\.[^.]+$/, '')
+    expect(chooseFile(state, ROOT, 'autoexec', 'open', '', ['file'], hidden)).toMatchObject({
+      kind: 'existing',
+      name: 'AUTOEXEC.BAT',
+    })
+    expect(chooseFile(state, DOCUMENTS_DIR, 'Readme', 'save', 'bmp', ['file'], hidden)).toMatchObject({
+      kind: 'new',
+      name: 'Readme.bmp',
+    })
+  })
+  it('says File not found under the name when Open gets a missing file', () => {
+    expect(chooseFile(state, DOCUMENTS_DIR, 'nothere', 'open', 'txt')).toEqual({
+      kind: 'error',
+      message: 'nothere.txt\nFile not found.\nPlease verify the correct file name was given.',
+    })
+  })
   it('rejects missing folders, missing open targets, and invalid names', () => {
     for (const name of ['C:\\Missing\\note.txt', 'missing.txt', 'bad?.txt']) {
       expect(chooseFile(state, ROOT, name, 'open').kind).toBe('error')

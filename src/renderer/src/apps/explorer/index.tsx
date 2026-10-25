@@ -10,6 +10,7 @@ function Explorer({ args, window }: AppProps) {
         args.folder === RECYCLED_DIR ? { kind: 'recycle' } : { kind: 'folder', id: args.folder ?? ROOT }
       }
       window={window}
+      select={args.select}
       exploring
     />
   )

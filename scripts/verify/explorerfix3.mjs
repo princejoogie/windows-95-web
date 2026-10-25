@@ -520,7 +520,87 @@ async function bin() {
   )
 }
 
-const phases = { panes, explorer, sizes, deletion, bin }
+async function shared() {
+  await fresh()
+  await openStartItem('Find')
+  await pickMenu('Files or Folders...')
+  await app.waitFor(`!!document.activeElement && document.activeElement.name === 'named'`)
+  await app.type('*.txt')
+  await app.key('Enter')
+  const findWindow = `[...document.querySelectorAll('[data-window]')].find(w => w.getAttribute('aria-label').startsWith('Find'))`
+  const result = `[...${findWindow}.querySelectorAll('tr, [role="option"], [role="row"]')].find(r => r.textContent.includes('Readme') && r.textContent.includes('My Documents'))`
+  await app.waitFor(`!!(${result})`)
+  await clickExpr(result, { button: 'right' })
+  await pickMenu('Open Containing Folder')
+  await app.waitFor(`!!${windowNamed('My Documents')}`)
+  await sleep(300)
+  const docs = windowNamed('My Documents')
+  const selected = await app.eval(
+    `[...${docs}.querySelectorAll('[role="option"][aria-selected="true"]')].map(o => o.getAttribute('aria-label'))`,
+  )
+  check(
+    selected.join() === 'Readme.txt',
+    '37',
+    "Find's Open Containing Folder opens My Documents with the file selected",
+    selected,
+  )
+  await shot('37-containing-folder-selected', await boxOf(docs))
+
+  await run('notepad')
+  await app.waitFor(`!!${windowNamed('Untitled - Notepad')}`)
+  const pad = windowNamed('Untitled - Notepad')
+  await openMenu('File', 'Open...', windowNamed('Untitled - Notepad'))
+  await app.waitFor(`!!${dialog('Open')}`)
+  await clickExpr(`${dialog('Open')}.querySelector('input')`)
+  await app.key('a', ['Control'])
+  await app.type('nothere')
+  await app.key('Enter')
+  await app.waitFor(`[...document.querySelectorAll('[role="dialog"]')].length > 1`)
+  const missing = await app.eval(`${anyDialog}.innerText`)
+  check(
+    missing.includes('nothere.txt\nFile not found.\nPlease verify the correct file name was given.'),
+    '30',
+    'Open on a missing name gives the common dialog File not found wording',
+    missing,
+  )
+  await shot('30-open-missing', await boxOf(anyDialog))
+  await app.key('Enter')
+  await app.key('Escape')
+  await clickExpr(`${pad}.querySelector('textarea')`)
+  await app.type('hello')
+  await openMenu('File', 'Save As...', pad)
+  await app.waitFor(`!!${dialog('Save As')}`)
+  const listed = await app.eval(
+    `[...${dialog('Save As')}.querySelectorAll('[role="option"]')].map(o => o.textContent.trim())`,
+  )
+  check(
+    listed.includes('Readme') && !listed.includes('Readme.txt'),
+    '30',
+    'Save As lists Readme with its registered extension hidden',
+    listed,
+  )
+  await clickExpr(
+    `[...${dialog('Save As')}.querySelectorAll('[role="option"]')].find(o => o.textContent.trim() === 'Readme')`,
+  )
+  const field = await app.eval(`${dialog('Save As')}.querySelector('input').value`)
+  await shot('30-save-as-hidden-extension', await dialogBox('Save As'))
+  await clickExpr(buttonIn(dialog('Save As'), 'Save'))
+  await app.waitFor(`[...document.querySelectorAll('[role="dialog"]')].length > 1`)
+  const box = await app.eval(`${anyDialog}.innerText`)
+  check(
+    field === 'Readme' &&
+      box.includes('C:\\My Documents\\Readme.txt\nThis file already exists.') &&
+      box.includes('Replace existing file?'),
+    '30',
+    'saving over Readme asks with the full path, This file already exists, and Replace existing file?',
+    { field, box },
+  )
+  await shot('30-overwrite-prompt', await boxOf(anyDialog))
+  await clickExpr(buttonIn(anyDialog, 'No'))
+  await app.key('Escape')
+}
+
+const phases = { panes, explorer, sizes, deletion, bin, shared }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {

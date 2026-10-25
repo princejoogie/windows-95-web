@@ -1,4 +1,4 @@
-import { extension, findChild, pathOf, resolvePath, validateName } from '../fs/fs'
+import { children, extension, findChild, pathOf, resolvePath, validateName } from '../fs/fs'
 import type { FsNode, FsState, NodeId } from '../fs/types'
 
 export interface FileTypeFilter {
@@ -34,6 +34,8 @@ export function chooseFile(
   mode: 'open' | 'save',
   defaultExtension = '',
   pickable: readonly Pickable[] = DOCUMENTS,
+  /** The name the list shows, so a name typed or picked with its extension hidden still finds the file. */
+  label: (node: FsNode) => string = (node) => node.name,
 ): FileChoice {
   const typed = input
     .trim()
@@ -50,7 +52,15 @@ export function chooseFile(
   }
   let name = path.slice(split + 1)
   if (defaultExtension && !extension(name)) name += `.${defaultExtension}`
-  const existing = findChild(state, parent.id, name)
+  const typedName = path.slice(split + 1).toLowerCase()
+  const existing =
+    findChild(state, parent.id, name) ??
+    children(state, parent.id).find(
+      (child) =>
+        isPickable(child, pickable) &&
+        (!defaultExtension || extension(child.name) === defaultExtension) &&
+        label(child).toLowerCase() === typedName,
+    )
   if (existing && isPickable(existing, pickable)) {
     return { kind: 'existing', id: existing.id, parent: parent.id, name: existing.name }
   }
@@ -58,6 +68,9 @@ export function chooseFile(
   const error = validateName(state, parent.id, name)
   if (error) return { kind: 'error', message: error }
   if (mode === 'open')
-    return { kind: 'error', message: `Cannot find the file '${name}'. Check the filename and try again.` }
+    return {
+      kind: 'error',
+      message: `${name}\nFile not found.\nPlease verify the correct file name was given.`,
+    }
   return { kind: 'new', parent: parent.id, name }
 }
