@@ -3,7 +3,7 @@ import { icons } from '../../icons'
 import { useKeyDown } from '../../shell/context'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { Button, MenuBar, TextBox } from '../../ui'
+import { Button, Dialog, MenuBar, TextBox } from '../../ui'
 import { artwork, largeMineIcon, mineIcon } from './art'
 import {
   advanceTime,
@@ -21,7 +21,6 @@ import {
   reveal,
   seconds,
 } from './game'
-import { MineDialog as Dialog } from './MineDialog'
 import { emptyRecords, loadPreferences, savePreferences } from './preferences'
 import './minesweeper.css'
 

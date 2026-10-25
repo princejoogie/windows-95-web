@@ -1,5 +1,7 @@
 import {
   type CSSProperties,
+  type ReactNode,
+  type RefObject,
   useCallback,
   useContext,
   useEffect,
@@ -139,6 +141,7 @@ function MenuTree({
   style,
   className = '',
   label,
+  dropsBelow = false,
 }: {
   items: readonly MenuEntry[]
   controller: Controller
@@ -147,6 +150,8 @@ function MenuTree({
   style?: CSSProperties | undefined
   className?: string | undefined
   label?: string | undefined
+  /** Hangs below its parent, like a menu bar title, so it opens upward when the screen runs out. */
+  dropsBelow?: boolean
 }) {
   const { state, setState, pick } = controller
   const path = state.kind === 'open' || state.kind === 'tracking' ? state.path : []
@@ -158,15 +163,20 @@ function MenuTree({
   useLayoutEffect(() => {
     const box = ref.current?.getBoundingClientRect()
     if (!box) return
-    const parentWidth = ref.current?.parentElement?.getBoundingClientRect().width ?? 0
+    const parent = ref.current?.parentElement?.getBoundingClientRect()
+    const parentWidth = parent?.width ?? 0
+    const above = box.top - (parent?.height ?? 0) - box.height
     setShift({
       x:
         box.right > innerWidth && prefix.length > 0
           ? Math.max(-box.left, -box.width - parentWidth + 3)
           : Math.min(0, innerWidth - box.right),
-      y: Math.min(0, innerHeight - box.bottom),
+      y:
+        dropsBelow && box.bottom > innerHeight && above >= 0
+          ? above - box.top
+          : Math.min(0, innerHeight - box.bottom),
     })
-  }, [prefix.length])
+  }, [prefix.length, dropsBelow])
   return (
     <div
       ref={ref}
@@ -298,12 +308,42 @@ export function MenuList({
   )
 }
 
+/**
+ * Lifts a menu bar's drop-down out of the window, as Windows 95 menus are popups of their own: a window's client
+ * area clips its content, so a tall menu or one that opens upward would otherwise be cut off.
+ */
+function BarPopup({
+  anchor,
+  popup,
+  children,
+}: {
+  anchor: HTMLElement | null
+  popup: RefObject<HTMLDivElement | null>
+  children: ReactNode
+}) {
+  const [rect, setRect] = useState<DOMRect | null>(null)
+  useLayoutEffect(() => setRect(anchor?.getBoundingClientRect() ?? null), [anchor])
+  if (!rect) return null
+  return createPortal(
+    <div
+      ref={popup}
+      className="fixed z-[10050] pointer-events-none"
+      style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
+    >
+      {children}
+    </div>,
+    document.body,
+  )
+}
+
 export interface MenuBarMenu {
   readonly label: string
   readonly items: readonly MenuEntry[]
 }
 export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
   const root = useRef<HTMLDivElement>(null)
+  const popup = useRef<HTMLDivElement>(null)
+  const titleRefs = useRef<(HTMLDivElement | null)[]>([])
   const owner = useContext(WindowContext)
   const focused = owner?.api.focused ?? true
   const controller = useMenu(
@@ -360,7 +400,12 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
   useEffect(() => {
     if (state.kind === 'closed') return
     const outside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !root.current?.contains(event.target)) close()
+      if (
+        event.target instanceof Node &&
+        !root.current?.contains(event.target) &&
+        !popup.current?.contains(event.target)
+      )
+        close()
     }
     document.addEventListener('pointerdown', outside, true)
     return () => document.removeEventListener('pointerdown', outside, true)
@@ -368,7 +413,13 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
   return (
     <div ref={root} role="menubar" className="relative flex h-[19px] shrink-0 bg-face">
       {menus.map((menu, title) => (
-        <div key={menu.label} className="relative">
+        <div
+          key={menu.label}
+          ref={(element) => {
+            titleRefs.current[title] = element
+          }}
+          className="relative"
+        >
           <button
             type="button"
             tabIndex={-1}
@@ -391,7 +442,15 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
             <Accel label={menu.label} />
           </button>
           {(state.kind === 'open' || state.kind === 'tracking') && state.title === title && (
-            <MenuTree items={menu.items} controller={controller} style={{ left: 0, top: '100%' }} />
+            <BarPopup anchor={titleRefs.current[title] ?? null} popup={popup}>
+              <MenuTree
+                items={menu.items}
+                controller={controller}
+                style={{ left: 0, top: '100%' }}
+                className="pointer-events-auto"
+                dropsBelow
+              />
+            </BarPopup>
           )}
         </div>
       ))}
