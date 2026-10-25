@@ -1,0 +1,124 @@
+.dos-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+}
+
+.dos-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  flex-shrink: 0;
+  padding: 2px 4px;
+  background: #c0c0c0;
+  border-bottom: 1px solid #808080;
+}
+
+.dos-toolbar select {
+  width: 77px;
+  height: 21px;
+  margin-right: 5px;
+  background: white;
+  color: black;
+}
+
+.dos-tool {
+  width: 24px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  outline-offset: -4px;
+}
+
+.dos-tool img {
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+}
+.dos-tool:active img {
+  transform: translate(1px, 1px);
+}
+.dos-tool:disabled img {
+  opacity: 0.45;
+}
+
+.dos-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: #000;
+}
+
+.dos-screen {
+  position: relative;
+  width: calc(var(--dos-cell) * 80);
+  height: calc(var(--dos-row) * 25);
+  color: #c0c0c0;
+  background: #000;
+  font-family: var(--font-mono);
+  font-size: var(--dos-font-size);
+  line-height: var(--dos-row);
+  letter-spacing: calc(var(--dos-cell) - 1ch);
+  font-variant-ligatures: none;
+  font-weight: normal;
+  cursor: text;
+  overflow: hidden;
+  user-select: none;
+}
+
+.dos-screen pre {
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  white-space: pre;
+}
+.dos-screen input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  color: transparent;
+  caret-color: transparent;
+}
+
+.dos-caret {
+  position: absolute;
+  width: var(--dos-cell);
+  height: 2px;
+  background: #c0c0c0;
+  pointer-events: none;
+}
+
+.dos-caret-blink {
+  animation: dos-blink 1s steps(1, end) infinite;
+}
+@keyframes dos-blink {
+  50% {
+    visibility: hidden;
+  }
+}
+.dos-mark {
+  color: #000;
+  background: #c0c0c0;
+}
+.dos-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: black;
+  overflow: hidden;
+}
+.dos-fullscreen .dos-screen {
+  transform-origin: top left;
+}
+.dos-menu {
+  position: fixed;
+  z-index: 100001;
+  width: 204px;
+}
