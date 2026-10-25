@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { connect, sleep } from './cdp.mjs'
@@ -105,7 +106,7 @@ async function hear(name, label) {
 
 try {
   await c.send('Page.enable')
-  if (item === 'sounds') {
+  if (item === 'sounds' || item === 'blocked') {
     await c.send('Page.addScriptToEvaluateOnNewDocument', { source: audioProbe })
     await c.eval(
       '(() => {const s=JSON.parse(localStorage.getItem("win95.settings.v1") ?? "{}");delete s.soundScheme;localStorage.setItem("win95.settings.v1",JSON.stringify(s))})()',
@@ -518,7 +519,30 @@ try {
     )
     await check('Open Help book has blue covers and white pages', `(${blueBook})()`, 'help-book-open')
   }
-  writeFileSync(join(proof, `${item}.json`), `${JSON.stringify({ port, item, checks }, null, 2)}\n`)
+  if (item === 'blocked') {
+    await hear('tada', 'Default sound scheme is enabled for the warning check')
+    await run('notepad')
+    await c.type('Warning sound verification')
+    await c.key('s', ['Control'])
+    await c.clickOn('[role="dialog"] input[id$="-name"]')
+    await c.key('a', ['Control'])
+    await c.type('bad?.txt')
+    await c.eval('window.__audio = []')
+    await clickText('Save')
+    await c.waitFor('document.querySelectorAll("[role=dialog]").length > 1')
+    await sleep(250)
+    await check(
+      'KNOWN BLOCKER: a shared warning box has no sound event',
+      'JSON.parse(localStorage.getItem("win95.settings.v1")).soundScheme.Exclamation === "chord" && window.__audio.length === 0',
+      'blocked-warning-sound',
+    )
+  }
+  assert.ok(checks.length > 0, `Unknown verification item ${item}`)
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  writeFileSync(
+    join(proof, `${item}.json`),
+    `${JSON.stringify({ head, verifiedAt: new Date().toISOString(), port, item, checks }, null, 2)}\n`,
+  )
 } catch (error) {
   console.log(await c.eval('document.body.innerText'))
   await c.shot(join(proof, `${item}-failure.png`))
