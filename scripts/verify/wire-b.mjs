@@ -538,7 +538,9 @@ async function sounds() {
 
   await played('chord', 'S1', 'an error box (Run, missing program) plays Critical Stop once', async () => {
     await run('nosuchprogram')
-    await app.waitFor(`[...document.querySelectorAll('[role="dialog"]')].some(d => d.textContent.includes('Cannot find'))`)
+    await app.waitFor(
+      `[...document.querySelectorAll('[role="dialog"]')].some(d => d.textContent.includes('Cannot find'))`,
+    )
   })
   await shot('s1-error-box')
   await app.key('Enter')
@@ -565,10 +567,17 @@ async function sounds() {
     await openMenu('File', 'New')
     await app.waitFor(`!!document.querySelector('[role="dialog"]')`)
   })
-  await played('chimes', 'S1', 'clicking the owner window under the modal box plays Default Sound once', async () => {
-    const box = await app.eval(`document.querySelector('[data-window] textarea').getBoundingClientRect().toJSON()`)
-    await app.click(box.x + 12, box.y + 12)
-  })
+  await played(
+    'chimes',
+    'S1',
+    'clicking the owner window under the modal box plays Default Sound once',
+    async () => {
+      const box = await app.eval(
+        `document.querySelector('[data-window] textarea').getBoundingClientRect().toJSON()`,
+      )
+      await app.click(box.x + 12, box.y + 12)
+    },
+  )
   const [nx, ny] = await centerOf(buttonIn('Notepad', 'No'))
   await app.click(nx, ny)
   await closeWindows()
@@ -592,11 +601,16 @@ async function sounds() {
     for (const a of columns) for (const b of columns)
       if (a !== b && !(rank(b) === rank(a) + 1 && red(a) !== red(b))) return [a.getAttribute('aria-label'), b.getAttribute('aria-label')]
   })()`)
-  await played('notify', 'S1', 'FreeCell illegal move box plays Exclamation once, with no extra chord', async () => {
-    await clickExpr(`document.querySelector('[aria-label=${JSON.stringify(pair[0])}]')`)
-    await clickExpr(`document.querySelector('[aria-label=${JSON.stringify(pair[1])}]')`)
-    await app.waitFor(`!!document.querySelector('[role="dialog"]')`)
-  })
+  await played(
+    'notify',
+    'S1',
+    'FreeCell illegal move box plays Exclamation once, with no extra chord',
+    async () => {
+      await clickExpr(`document.querySelector('[aria-label=${JSON.stringify(pair[0])}]')`)
+      await clickExpr(`document.querySelector('[aria-label=${JSON.stringify(pair[1])}]')`)
+      await app.waitFor(`!!document.querySelector('[role="dialog"]')`)
+    },
+  )
   await shot('s1-freecell-illegal')
   await app.key('Enter')
   await closeWindows()
@@ -611,7 +625,9 @@ async function sounds() {
   await clickExpr(`${topWindow}.querySelector('button[aria-label="Minimize"]')`)
   await sleep(600)
   await played('tada', 'S2', 'restoring from the taskbar plays Restore Up', async () => {
-    await clickExpr(`[...document.querySelectorAll('[data-taskbar] button')].find(b => b.textContent.includes('Notepad'))`)
+    await clickExpr(
+      `[...document.querySelectorAll('[data-taskbar] button')].find(b => b.textContent.includes('Notepad'))`,
+    )
   })
   await closeWindows()
 }
