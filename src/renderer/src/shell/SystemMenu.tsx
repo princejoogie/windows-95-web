@@ -2,6 +2,7 @@ import { createStore, useStore } from '../lib/store'
 import { ContextMenu, type MenuEntry } from '../ui/Menu'
 import { requestWindowClose } from './closeRequests'
 import { useWindows, windowsStore } from './system'
+import { systemMenuItems } from './systemMenuItems'
 import { animateWindow } from './transitions'
 import type { Point, WindowId } from './types'
 
@@ -18,6 +19,7 @@ export function registerWindowControls(id: WindowId, handler: (mode: 'move' | 's
 export function SystemMenu() {
   const menu = useStore(store, (state) => state)
   const windows = useWindows((state) => state.windows)
+  const appItems = useStore(systemMenuItems, (state) => (menu ? state.get(menu.id) : undefined))
   const window = windows.find((window) => window.id === menu?.id)
   if (!menu || !window) return null
   const id = window.id
@@ -58,5 +60,6 @@ export function SystemMenu() {
       },
     },
   ]
+  if (appItems?.length) items.push('separator', ...appItems)
   return <ContextMenu at={menu.at} items={items} onClose={() => store.dispatch(null)} />
 }

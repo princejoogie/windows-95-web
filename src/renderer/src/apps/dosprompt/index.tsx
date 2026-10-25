@@ -2,7 +2,7 @@ import { type CSSProperties, type PointerEvent, useEffect, useRef, useState } fr
 import { createPortal } from 'react-dom'
 import { fsStore, useFs } from '../../fs/store'
 import { WINDOWS_DIR } from '../../fs/types'
-import { useKeyDown } from '../../shell/context'
+import { useKeyDown, useSystemMenu } from '../../shell/context'
 import { launch, openNode, windowsStore } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
 import { AboutDialog, ComboBox, MessageBox } from '../../ui'
@@ -24,7 +24,9 @@ function DosPrompt({ window: api, args }: AppProps) {
   const [settings, setSettings] = useState<Settings>({ font: 1, blink: true, toolbar: true })
   const [full, setFull] = useState(false)
   const [viewport, setViewport] = useState({ width: innerWidth, height: innerHeight })
-  const [mark, setMark] = useState<(Mark & { kind: 'mark' | 'select' }) | null>(null)
+  const [mode, setMode] = useState<(Mark & { kind: 'mark' | 'select' }) | { kind: 'scroll' } | null>(null)
+  const mark = mode?.kind === 'scroll' ? null : mode
+  const scrolling = mode?.kind === 'scroll'
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [dialog, setDialog] = useState<'none' | 'properties' | 'help' | 'about'>('none')
   const [propertyTab, setPropertyTab] = useState<'Program' | 'Font'>('Program')
@@ -68,8 +70,9 @@ function DosPrompt({ window: api, args }: AppProps) {
     if (!api.focused) setMenu(null)
   }, [api.focused])
   useEffect(() => {
-    api.setTitle(mark ? `${mark.kind === 'mark' ? 'Mark' : 'Select'} - MS-DOS Prompt` : 'MS-DOS Prompt')
-  }, [api, mark])
+    const prefix = mode ? { mark: 'Mark', select: 'Select', scroll: 'Scroll' }[mode.kind] : null
+    api.setTitle(prefix ? `${prefix} - MS-DOS Prompt` : 'MS-DOS Prompt')
+  }, [api, mode])
 
   const editLine = (value: string) => {
     setInput(value.slice(0, 127))
@@ -111,7 +114,7 @@ function DosPrompt({ window: api, args }: AppProps) {
     })
     editLine('')
     historyPosition.current = null
-    setMark(null)
+    setMode(null)
   }
   const copy = async () => {
     if (!mark) return
@@ -119,7 +122,7 @@ function DosPrompt({ window: api, args }: AppProps) {
     clipboard.current = text
     try {
       await navigator.clipboard.writeText(text)
-      setMark(null)
+      setMode(null)
       commandInput.current?.focus()
     } catch {
       setError('The Clipboard is not available. Try copying the selection again.')
@@ -136,7 +139,7 @@ function DosPrompt({ window: api, args }: AppProps) {
       else setError('The Clipboard is not available. You can paste text with Shift+Insert or Ctrl+V.')
     }
   }
-  const markText = () => setMark({ kind: 'mark', anchor: { row: 0, column: 0 }, end: { row: 0, column: 0 } })
+  const markText = () => setMode({ kind: 'mark', anchor: { row: 0, column: 0 }, end: { row: 0, column: 0 } })
   const properties = () => {
     setFull(false)
     setPropertyTab('Program')
@@ -200,6 +203,28 @@ function DosPrompt({ window: api, args }: AppProps) {
     },
   ]
 
+  useSystemMenu([
+    {
+      label: '&Toolbar',
+      checked: settings.toolbar,
+      onSelect: () => setSettings({ ...settings, toolbar: !settings.toolbar }),
+    },
+    {
+      label: '&Edit',
+      items: [
+        { label: '&Mark', onSelect: markText },
+        { label: '&Copy', onSelect: () => void copy(), disabled: !mark },
+        {
+          label: '&Paste',
+          onSelect: () => void paste(),
+          disabled: waiting || session.pending.kind !== 'ready',
+        },
+        { label: '&Scroll', onSelect: () => setMode({ kind: 'scroll' }) },
+      ],
+    },
+    { label: '&Properties', onSelect: properties },
+  ])
+
   useKeyDown((event) => {
     if (api.minimized || dialog !== 'none' || error || menu) return
     if (event.altKey && event.key === 'Enter') {
@@ -225,10 +250,30 @@ function DosPrompt({ window: api, args }: AppProps) {
       else cancel()
       return
     }
+    if (scrolling) {
+      event.preventDefault()
+      if (event.key === 'Escape' || event.key === 'Enter') setMode(null)
+      else {
+        const viewport = consoleRef.current?.parentElement
+        const amount = event.key.startsWith('Page') ? ROWS * font.height : font.height
+        if (event.key === 'Home') viewport?.scrollTo(0, 0)
+        else if (event.key === 'End') viewport?.scrollTo(0, viewport.scrollHeight)
+        else
+          viewport?.scrollBy(
+            event.key === 'ArrowLeft' ? -font.width : event.key === 'ArrowRight' ? font.width : 0,
+            event.key === 'ArrowUp' || event.key === 'PageUp'
+              ? -amount
+              : event.key === 'ArrowDown' || event.key === 'PageDown'
+                ? amount
+                : 0,
+          )
+      }
+      return
+    }
     if (mark) {
       if (event.key === 'Escape') {
         event.preventDefault()
-        setMark(null)
+        setMode(null)
       }
       if (event.key === 'Enter') {
         event.preventDefault()
@@ -252,7 +297,7 @@ function DosPrompt({ window: api, args }: AppProps) {
             ),
           ),
         }
-        setMark({ kind: event.shiftKey ? 'select' : 'mark', anchor: event.shiftKey ? mark.anchor : end, end })
+        setMode({ kind: event.shiftKey ? 'select' : 'mark', anchor: event.shiftKey ? mark.anchor : end, end })
       }
       return
     }
@@ -325,12 +370,12 @@ function DosPrompt({ window: api, args }: AppProps) {
         if (!mark) return
         event.preventDefault()
         const cell = cellAt(event)
-        setMark({ kind: 'select', anchor: cell, end: cell })
+        setMode({ kind: 'select', anchor: cell, end: cell })
         dragging.current = true
         event.currentTarget.setPointerCapture(event.pointerId)
       }}
       onPointerMove={(event) => {
-        if (dragging.current && mark) setMark({ ...mark, end: cellAt(event) })
+        if (dragging.current && mark) setMode({ ...mark, end: cellAt(event) })
       }}
       onPointerUp={() => {
         dragging.current = false
@@ -373,7 +418,7 @@ function DosPrompt({ window: api, args }: AppProps) {
         spellCheck={false}
         value={input}
         maxLength={127}
-        readOnly={waiting || Boolean(mark)}
+        readOnly={waiting || Boolean(mode)}
         style={{ left: cursorColumn * font.width, top: cursorRow * font.height }}
         onChange={(event) => {
           setInput(event.target.value)
@@ -390,7 +435,7 @@ function DosPrompt({ window: api, args }: AppProps) {
             )
         }}
       />
-      {api.focused && !api.minimized && !mark && !waiting && (
+      {api.focused && !api.minimized && !mode && !waiting && (
         <span
           aria-hidden="true"
           className={`dos-caret ${settings.blink ? 'dos-caret-blink' : ''}`}
