@@ -161,7 +161,7 @@ export function drawAutomap(frame: Bitmap, world: World, view: AutomapView, view
       )
     }
   }
-  const size = Math.max(4, zoom * 0.45)
+  const size = Math.max(6, zoom * 0.75)
   const cos = Math.cos(player.angle)
   const sin = Math.sin(player.angle)
   const px = sx(player.x)

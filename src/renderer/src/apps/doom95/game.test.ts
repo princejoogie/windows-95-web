@@ -210,3 +210,32 @@ describe('pickups and level flow', () => {
     expect(w.outcome).toBe('exited')
   })
 })
+
+describe('bumping into things', () => {
+  const barrels = () =>
+    world(['########', '#......#', '#......#', '#.oo...#', '#......#', '#..^...#', '########'])
+
+  it('lets the player walk between two barrels a cell apart', () => {
+    const w = barrels()
+    Object.assign(w.player, { x: 3.05, y: 5.5, angle: -Math.PI / 2 })
+    run(w, 1.2, { forward: 1 })
+    expect(w.player.y).toBeLessThan(2.5)
+  })
+
+  it('never pins a player who ended up overlapping a barrel', () => {
+    const w = barrels()
+    Object.assign(w.player, { x: 2.7, y: 3.55, angle: Math.PI / 2 })
+    run(w, 0.5, { forward: 1 })
+    expect(w.player.y).toBeGreaterThan(4.3)
+    Object.assign(w.player, { x: 2.7, y: 3.55, angle: 0, vx: 0, vy: 0 })
+    run(w, 0.3, { forward: 1 })
+    expect(w.player.x).toBeGreaterThan(2.95)
+  })
+
+  it('still stops the player at a barrel it walks straight into', () => {
+    const w = barrels()
+    Object.assign(w.player, { x: 2.5, y: 5.5, angle: -Math.PI / 2 })
+    run(w, 1, { forward: 1 })
+    expect(w.player.y).toBeGreaterThan(3.5 + 0.25)
+  })
+})
