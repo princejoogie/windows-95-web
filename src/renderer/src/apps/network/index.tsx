@@ -1,112 +1,51 @@
-import { useEffect, useState } from 'react'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { MenuBar, MessageBox, StatusBar, StatusPane } from '../../ui'
-import '../explorer/explorer.css'
+import { MessageBox } from '../../ui'
+import { FolderView } from '../explorer/FolderView'
+import { registerShellFolder } from '../explorer/shellFolders'
 import { entireNetworkIcon, networkIcon, networkSmallIcon } from './art'
 
-type Place = 'neighborhood' | 'entire'
-
-const TITLES: Record<Place, string> = { neighborhood: 'Network Neighborhood', entire: 'Entire Network' }
-
-/**
- * Network Neighborhood. This computer has no network, so the only thing in it is Entire Network, and that
- * folder is empty.
- */
-function NetworkNeighborhood({ window }: AppProps) {
-  const [place, setPlace] = useState<Place>('neighborhood')
-  const [selected, setSelected] = useState(false)
-  const [status, setStatus] = useState(true)
-  const [about, setAbout] = useState(false)
-  const items = place === 'neighborhood' ? [{ label: 'Entire Network', icon: entireNetworkIcon }] : []
-
-  useEffect(() => window.setTitle(TITLES[place]), [place, window])
-
-  const open = () => {
-    setPlace('entire')
-    setSelected(false)
-  }
-
+function NetworkDialog({ id, onClose }: { id: string; onClose: () => void }) {
   return (
-    <div className="explorer h-full w-full flex flex-col">
-      <MenuBar
-        menus={[
-          {
-            label: '&File',
-            items: [
-              { label: '&Open', bold: true, disabled: !selected, onSelect: open },
-              'separator',
-              { label: '&Close', onSelect: window.close },
-            ],
-          },
-          {
-            label: '&Edit',
-            items: [
-              { label: 'Select &All', shortcut: 'Ctrl+A', onSelect: () => setSelected(items.length > 0) },
-            ],
-          },
-          {
-            label: '&View',
-            items: [
-              {
-                label: '&Up One Level',
-                disabled: place === 'neighborhood',
-                onSelect: () => setPlace('neighborhood'),
-              },
-              'separator',
-              { label: 'Status &Bar', checked: status, onSelect: () => setStatus(!status) },
-            ],
-          },
-          { label: '&Help', items: [{ label: '&About Windows 95', onSelect: () => setAbout(true) }] },
-        ]}
-      />
-      <div className="explorer-files explorer-large bevel-sunken">
-        <div
-          role="listbox"
-          aria-label={`${TITLES[place]} contents`}
-          tabIndex={0}
-          className="explorer-items"
-          onPointerDown={(event) => event.target === event.currentTarget && setSelected(false)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && selected) open()
-            if (event.key === 'Backspace') setPlace('neighborhood')
-            if (event.key.startsWith('Arrow') && items.length) setSelected(true)
-          }}
-        >
-          {items.map((item) => (
-            <div
-              key={item.label}
-              role="option"
-              aria-label={item.label}
-              aria-selected={selected}
-              tabIndex={-1}
-              className={`explorer-item ${selected ? 'selected' : ''}`}
-              onPointerDown={() => setSelected(true)}
-              onDoubleClick={open}
-            >
-              <span className="explorer-icon">
-                <img src={item.icon} alt="" draggable={false} />
-              </span>
-              <span className="explorer-name">{item.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      {status && (
-        <StatusBar className="shrink-0">
-          <StatusPane className="flex-1">{items.length} object(s)</StatusPane>
-        </StatusBar>
-      )}
-      {about && (
-        <MessageBox
-          title="About Windows 95"
-          icon="info"
-          message={'Microsoft Windows 95\nNetwork Neighborhood'}
-          buttons={['OK']}
-          onClose={() => setAbout(false)}
-        />
-      )}
-    </div>
+    <MessageBox
+      title="Network Neighborhood"
+      icon="error"
+      message={
+        id === 'browse'
+          ? "Unable to browse the network.\n\nThe network is not accessible. For more information, look in the Help Index at the topic 'Network Troubleshooter'."
+          : 'The network is not accessible.'
+      }
+      buttons={['OK']}
+      onClose={onClose}
+    />
   )
+}
+
+registerShellFolder({
+  id: 'network',
+  title: 'Network Neighborhood',
+  parent: { kind: 'computer' },
+  Dialog: NetworkDialog,
+  properties: { kind: 'dialog', id: 'properties' },
+  fileCommands: [
+    { label: '&Explore', action: { kind: 'dialog', id: 'browse' } },
+    { label: '&Find Computer...', action: { kind: 'dialog', id: 'find' } },
+    'separator',
+    { label: '&Map Network Drive...', action: { kind: 'dialog', id: 'map' } },
+    { label: '&Disconnect Network Drive...', action: { kind: 'dialog', id: 'disconnect' } },
+  ],
+  items: [
+    {
+      key: 'entire-network',
+      label: 'Entire Network',
+      icon: entireNetworkIcon,
+      help: 'Displays the entire network.',
+      action: { kind: 'dialog', id: 'browse' },
+    },
+  ],
+})
+
+function NetworkNeighborhood({ window }: AppProps) {
+  return <FolderView initial={{ kind: 'shell', id: 'network' }} window={window} />
 }
 
 export const app: AppManifest = {

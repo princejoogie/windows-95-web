@@ -1,8 +1,13 @@
 import { children, extension, fileSize, pathOf } from '../../fs/fs'
 import { type FsNode, type FsState, type NodeId, RECYCLED_DIR } from '../../fs/types'
+import type { ShellFolderId } from './shellFolders'
 
 export type View = 'large' | 'small' | 'list' | 'details'
-export type Location = { kind: 'folder'; id: NodeId } | { kind: 'computer' } | { kind: 'recycle' }
+export type Location =
+  | { kind: 'folder'; id: NodeId }
+  | { kind: 'computer' }
+  | { kind: 'recycle' }
+  | { kind: 'shell'; id: ShellFolderId }
 export type Column = 'name' | 'size' | 'type' | 'modified' | 'original' | 'deleted'
 export interface Sort {
   column: Column
@@ -103,6 +108,7 @@ export function visibleNodes(
   sort: Sort,
   includeSystem = false,
 ): FsNode[] {
+  if (location.kind === 'shell') return []
   const nodes =
     location.kind === 'computer'
       ? Object.values(state.nodes).filter((node) => node.kind === 'drive')

@@ -43,7 +43,13 @@ export function FolderTree({
 }) {
   const root = useMemo(() => folderTree(state), [state])
   const active =
-    location.kind === 'folder' ? (location.id === DESKTOP_DIR ? TREE_DESKTOP : location.id) : location.kind
+    location.kind === 'folder'
+      ? location.id === DESKTOP_DIR
+        ? TREE_DESKTOP
+        : location.id
+      : location.kind === 'shell'
+        ? location.id
+        : location.kind
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set([TREE_DESKTOP, 'computer', ROOT]))
   useEffect(() => setExpanded((old) => expandTo(root, active, old)), [root, active])
   const rows = treeRows(root, expanded)
