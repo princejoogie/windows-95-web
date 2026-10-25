@@ -368,6 +368,7 @@ export function writeTtf(face, family = face.face) {
   const post = Buffer.concat([u32(0x30000, 0), u16(-SCALE, SCALE), u32(fixed ? 1 : 0), Buffer.alloc(16)])
   const tables = Object.entries({
     cmap: cmapTable(face.glyphs),
+    gasp: u16(0, 1, 0xffff, 1),
     glyf: Buffer.concat(glyf),
     head,
     hhea,

@@ -1,13 +1,10 @@
 @import "tailwindcss";
 
-@font-face {
-  font-family: "MS Sans Serif";
-  src: url("./assets/fonts/micross.ttf") format("truetype");
-}
+@import "./system/fonts.css";
 
 @theme {
-  --font-sans: "MS Sans Serif", "Microsoft Sans Serif", Tahoma, sans-serif;
-  --font-mono: "Fixedsys", "Courier New", monospace;
+  --font-sans: "MS Sans Serif Bitmap", "MS Sans Serif Fallback", "Microsoft Sans Serif", Tahoma, sans-serif;
+  --font-mono: "Fixedsys Bitmap", "Fixedsys", "Courier New", monospace;
   --color-desktop: #008080;
   --color-face: #c0c0c0;
   --color-shadow: #808080;

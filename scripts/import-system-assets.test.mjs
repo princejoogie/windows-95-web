@@ -110,7 +110,7 @@ function checkPixels(face) {
   const font = writeTtf(face)
   const t = tables(font)
   expect(Object.keys(t).sort()).toEqual(
-    ['OS/2', 'cmap', 'glyf', 'head', 'hhea', 'hmtx', 'loca', 'maxp', 'name', 'post'].sort(),
+    ['OS/2', 'cmap', 'gasp', 'glyf', 'head', 'hhea', 'hmtx', 'loca', 'maxp', 'name', 'post'].sort(),
   )
   expect(t.head.readUInt16BE(18)).toBe((face.height - face.internalLeading) * 64)
   expect(t.hhea.readInt16BE(4)).toBe(face.ascent * 64)
