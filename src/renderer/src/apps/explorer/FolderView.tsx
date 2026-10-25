@@ -574,6 +574,13 @@ export function FolderView({
         { label: 'P&roperties', onSelect: act.properties },
       ]
     if (node) return nodeMenu(node, facts, act)
+    const background = backgroundMenu(facts, act)
+      .filter((entry) => writable || entry === 'separator' || entry.label !== 'Ne&w')
+      .map((entry) =>
+        entry !== 'separator' && entry.label === 'P&roperties' && !folder && !recycled
+          ? { ...entry, disabled: true }
+          : entry,
+      )
     return [
       {
         label: '&View',
@@ -583,13 +590,13 @@ export function FolderView({
           onSelect: () => setView(item.id),
         })),
       },
-      ...backgroundMenu(facts, act).slice(0, 6),
+      ...background.slice(0, 6),
       {
         label: `&Undo${undoStack.at(-1) ? ` ${undoStack.at(-1)?.label}` : ''}`,
         disabled: !undoStack.length,
         onSelect: undo,
       },
-      ...backgroundMenu(facts, act).slice(6),
+      ...background.slice(6),
     ]
   }
   const fileItems: MenuEntry[] = recycled

@@ -25,6 +25,14 @@ try {
     'Selected drive reports free space and capacity',
     `document.querySelector('[data-location="My Computer"]').innerText.includes('Free Space:') && document.querySelector('[data-location="My Computer"]').innerText.includes('Capacity: 512MB')`,
   )
+  await d.clickSel('[data-location="My Computer"] .explorer-items', { button: 'right' })
+  await check(
+    2,
+    'My Computer background does not offer file creation',
+    `!Array.from(document.querySelectorAll('[role="menuitem"]')).some(e=>e.textContent==='New')`,
+  )
+  await shot('mycomputer-background')
+  await d.key('Escape')
   await d.clickSel('[data-node-id="c"]', { clickCount: 2 })
   const root = '[data-location="(C:)"]'
   await d.clickSel('[data-window][aria-label="My Computer"] button[aria-label="Close"]')
