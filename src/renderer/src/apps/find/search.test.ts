@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { emptyDrive, fsReducer } from '../../fs/fs'
+import { emptyDrive, fileSize, fsReducer } from '../../fs/fs'
 import { DOCUMENTS_DIR, type FsState, ROOT, WINDOWS_DIR } from '../../fs/types'
-import { defaultCriteria, fileSize, type SearchCriteria, searchFiles, validateCriteria } from './search'
+import { defaultCriteria, resultOf, type SearchCriteria, searchFiles, validateCriteria } from './search'
 
 const now = new Date(2026, 9, 25, 12).getTime()
 const state = emptyDrive(now)
@@ -11,6 +11,27 @@ const names = (criteria: Partial<SearchCriteria> = {}, drive: FsState = state, a
   )
 
 describe('Find files', () => {
+  it('uses shared executable and shortcut lengths in search results', () => {
+    const installed = fsReducer(state, {
+      type: 'installPrograms',
+      programs: [
+        {
+          app: 'notepad',
+          title: 'Notepad',
+          exe: 'NOTEPAD.EXE',
+          installDir: 'C:\\WINDOWS',
+          desktopShortcut: true,
+        },
+      ],
+      shortcuts: true,
+      at: now,
+    })
+    const results = [...searchFiles(installed, defaultCriteria)].flatMap((node) =>
+      node ? [resultOf(installed, node)] : [],
+    )
+    expect(results.find((result) => result.node.kind === 'program')?.bytes).toBe(34304)
+    expect(results.find((result) => result.node.kind === 'shortcut')?.bytes).toBe(352)
+  })
   it('matches partial names, wildcards, literal regex characters, and multiple patterns', () => {
     expect(names({ name: 'readme' })).toEqual(['Readme.txt'])
     expect(names({ name: 'READ?E.*' })).toHaveLength(1)

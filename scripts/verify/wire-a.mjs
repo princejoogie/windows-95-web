@@ -446,6 +446,39 @@ try {
       'freecell-undo',
     )
   }
+  if (item === 'find-help') {
+    await run('find')
+    await c.clickOn('input[name="named"]')
+    await c.type('Readme.txt')
+    await clickText('Find Now')
+    await c.waitFor('document.querySelectorAll("tbody tr").length === 1')
+    await check(
+      'Find displays the shared byte length for the real Readme file',
+      `(() => {const f=Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.name==='Readme.txt');return document.querySelector('tbody tr td:nth-child(3)').textContent===Math.ceil(new TextEncoder().encode(f.content).length/1024)+' KB'})()`,
+      'find-size',
+    )
+    await c.key('F4', ['Alt'])
+    await run('winhlp32')
+    const book = '[role="treeitem"][aria-expanded="false"]'
+    const blueBook = `async () => {
+      const img = document.querySelector('[role="treeitem"][aria-expanded] img')
+      await img.decode()
+      const canvas = document.createElement('canvas');canvas.width=16;canvas.height=16
+      const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0)
+      const pixels=ctx.getImageData(0,0,16,16).data
+      let blue=0,green=0
+      for(let i=0;i<pixels.length;i+=4) {if(pixels[i]===0&&pixels[i+1]===0&&pixels[i+2]>=128&&pixels[i+3])blue++;if(pixels[i]===0&&pixels[i+1]===128&&pixels[i+2]===0&&pixels[i+3])green++}
+      return img.naturalWidth===16&&img.naturalHeight===16&&blue>10&&green===0
+    }`
+    await check('Closed Help book is a crisp 16-pixel blue book', `(${blueBook})()`, 'help-book-closed')
+    const closed = await c.eval(`document.querySelector('${book} img').src`)
+    await c.clickOn(book, { count: 2 })
+    await check(
+      'Opening a Help book changes its icon',
+      `document.querySelector('[role="treeitem"][aria-expanded="true"] img')?.src !== ${JSON.stringify(closed)}`,
+    )
+    await check('Open Help book has blue covers and white pages', `(${blueBook})()`, 'help-book-open')
+  }
   writeFileSync(join(proof, `${item}.json`), `${JSON.stringify({ port, item, checks }, null, 2)}\n`)
 } catch (error) {
   console.log(await c.eval('document.body.innerText'))
