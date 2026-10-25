@@ -275,6 +275,15 @@ describe('Standard scoring and undo', () => {
 })
 
 describe('Vegas, no scoring, and winning', () => {
+  it('carries the Vegas balance only when Keep score is enabled', () => {
+    const options = { ...DEFAULT_OPTIONS, scoring: 'vegas', keepScore: true } as const
+    const first = newGame(options, seededRandom(95))
+    const second = newGame(options, seededRandom(96), first.score)
+    expect([first.score, second.score]).toEqual([-52, -104])
+    expect(newGame(options, seededRandom(97), second.score + 5).score).toBe(-151)
+    expect(newGame({ ...options, keepScore: false }, seededRandom(98), -151).score).toBe(-52)
+    expect(newGame(DEFAULT_OPTIONS, seededRandom(99), -151).score).toBe(0)
+  })
   it('charges 52, pays 5 per foundation card, charges 5 on return, and undo restores earnings', () => {
     const game = position(
       { waste: [up(1, 'hearts')], tableau: [[up(2, 'clubs')], [], [], [], [], [], []] },

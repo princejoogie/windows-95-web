@@ -18,6 +18,7 @@ export interface Options {
   readonly timed: boolean
   readonly statusBar: boolean
   readonly outline: boolean
+  readonly keepScore: boolean
 }
 export const DEFAULT_OPTIONS: Options = {
   draw: 3,
@@ -25,6 +26,7 @@ export const DEFAULT_OPTIONS: Options = {
   timed: true,
   statusBar: true,
   outline: false,
+  keepScore: false,
 }
 export interface Position {
   readonly stock: readonly Card[]
@@ -68,7 +70,11 @@ export function deck(): Card[] {
   return SUITS.flatMap((suit) => RANKS.map((rank) => ({ suit, rank })))
 }
 
-export function newGame(options: Options = DEFAULT_OPTIONS, random: () => number = Math.random): Game {
+export function newGame(
+  options: Options = DEFAULT_OPTIONS,
+  random: () => number = Math.random,
+  vegasBalance = 0,
+): Game {
   const cards = deck()
   for (let index = cards.length - 1; index > 0; index--) {
     const other = Math.floor(random() * (index + 1))
@@ -94,7 +100,7 @@ export function newGame(options: Options = DEFAULT_OPTIONS, random: () => number
     tableau,
     foundations: [[], [], [], []],
     recycles: 0,
-    score: options.scoring === 'vegas' ? -52 : 0,
+    score: options.scoring === 'vegas' ? (options.keepScore ? vegasBalance : 0) - 52 : 0,
     elapsed: 0,
     started: false,
     previous: null,

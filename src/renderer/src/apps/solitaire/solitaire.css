@@ -29,3 +29,17 @@
   outline: 1px dotted #000;
   outline-offset: -4px;
 }
+
+.solitaire-back {
+  position: relative;
+}
+.solitaire-back input {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  cursor: default;
+}
+.solitaire-back:has(input:focus-visible) {
+  outline: 1px dotted #000;
+  outline-offset: -3px;
+}
