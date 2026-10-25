@@ -1,6 +1,7 @@
 import { fsStore } from '../fs/store'
 import type { FsNode, NodeId } from '../fs/types'
 import { createStore, useStore } from '../lib/store'
+import { beginSystemCursor } from '../system/cursors'
 import { resolveShortcut } from './clipboard'
 import { shellEvents } from './events'
 import { rememberDocument } from './recent'
@@ -33,6 +34,8 @@ export function useWindows<T>(select: (state: WindowsState) => T): T {
 export function launch(appId: string, args: LaunchArgs = {}): WindowId | null {
   const app = getApp(appId)
   if (!app) return null
+  const painted = beginSystemCursor('busy')
+  requestAnimationFrame(() => requestAnimationFrame(painted))
   const spec = app.window
   const size = spec.kind === 'resizable' ? { width: spec.width, height: spec.height } : null
   windowsStore.dispatch({ type: 'open', appId, title: app.title, args, size })

@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { HostEvent } from '../../../shared/ipc'
 import { DateTimeProperties } from '../apps/controlpanel/DateTimeProperties'
+import { DesktopDisplayProperties } from '../apps/controlpanel/DisplayProperties'
 import { children } from '../fs/fs'
 import { fs, installPrograms } from '../fs/store'
+import { ScreenSaverHost } from '../settings/ScreenSaverHost'
+import { connectSystemSounds } from '../settings/sounds'
+import { beginSystemCursor } from '../system/cursors'
 import { Button, Dialog, MessageBox, TextBox } from '../ui'
 import { requestActiveDialogClose } from '../ui/Dialog'
 import { menuIsActive } from '../ui/Menu'
@@ -33,7 +37,9 @@ type ShellDialog = 'run' | 'shutdown' | 'taskbar' | 'datetime' | 'logon' | null
 type Switch = { order: readonly WindowId[]; selected: WindowId }
 
 export function Shell() {
+  useEffect(connectSystemSounds, [])
   const [power, setPower] = useState<Power>('booting')
+  useEffect(() => (power === 'running' ? undefined : beginSystemCursor('wait')), [power])
   const [startOpen, setStartOpen] = useState(false)
   const [dialog, setDialog] = useState<ShellDialog>(null)
   const [missing, setMissing] = useState<string | null>(null)
@@ -331,6 +337,8 @@ export function Shell() {
           />
         )}
         <SystemMenu />
+        <DesktopDisplayProperties />
+        <ScreenSaverHost />
         <TooltipLayer />
         <CaptionZoom />
         {switcher && (

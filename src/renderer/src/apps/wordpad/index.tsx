@@ -172,6 +172,7 @@ export function WordPad({ window: windowApi, args }: AppProps) {
   })
   const [recent, setRecent] = useState<NodeId[]>(readRecent)
   const [locks, setLocks] = useState({ caps: false, num: true, scroll: false })
+  const closeResult = useRef<((closed: boolean) => void) | null>(null)
   const node = useFs((state) => (file ? state.nodes[file] : undefined))
   const fsState = useFs((state) => state)
   const view = options.types[docType]
@@ -257,6 +258,8 @@ export function WordPad({ window: windowApi, args }: AppProps) {
   /** Closes any dialog and hands focus and the selection back to the document. */
   const closeDialog = () => {
     setDialog(null)
+    closeResult.current?.(false)
+    closeResult.current = null
     requestAnimationFrame(() => keeper.restore())
   }
 
@@ -278,6 +281,8 @@ export function WordPad({ window: windowApi, args }: AppProps) {
         openFile(command.id)
         break
       case 'exit':
+        closeResult.current?.(true)
+        closeResult.current = null
         windowApi.close()
         break
     }
@@ -285,7 +290,15 @@ export function WordPad({ window: windowApi, args }: AppProps) {
 
   const request = (command: Command) => (dirty ? setDialog({ kind: 'confirm', next: command }) : run(command))
 
-  useEffect(() => windowApi.onCloseRequest(() => request({ kind: 'exit' })))
+  useEffect(() =>
+    windowApi.onCloseRequest(
+      () =>
+        new Promise<boolean>((resolve) => {
+          closeResult.current = resolve
+          request({ kind: 'exit' })
+        }),
+    ),
+  )
 
   const writeTo = (target: SaveTarget, type: DocumentType, next: Command | null) => {
     const content = serialize(currentDocument(), type)
@@ -720,7 +733,7 @@ export function WordPad({ window: windowApi, args }: AppProps) {
           filters={dialog.mode === 'open' ? OPEN_FILTERS : SAVE_FILTERS}
           defaultExtension={extensionFor(docType)}
           onSelect={acceptFile}
-          onCancel={() => setDialog(null)}
+          onCancel={closeDialog}
         />
       )}
       {dialog?.kind === 'printFile' && (

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
+import type { FsNode } from '../fs/types'
 import { createStore, useStore } from '../lib/store'
 import { parseSettings, type Settings, settingsReducer } from './model'
 
 export const SETTINGS_KEY = 'win95.settings.v1'
 
-function loadSettings(): Settings {
+export function loadSettings(nodes: readonly FsNode[] = []): Settings {
   try {
-    return parseSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null'))
+    return parseSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null'), nodes)
   } catch {
     return parseSettings(null)
   }

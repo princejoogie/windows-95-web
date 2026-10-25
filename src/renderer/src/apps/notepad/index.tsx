@@ -322,7 +322,7 @@ export function Notepad({ window: windowApi, args }: AppProps) {
         <MessageBox
           title="Notepad"
           icon="question"
-          message={`The text in the ${name} file has changed.\nDo you want to save the changes?`}
+          message={`The text in the ${name} file has changed.\n\nDo you want to save the changes?`}
           buttons={['Yes', 'No', 'Cancel']}
           onClose={(answer) => {
             if (answer === 'Yes') save(prompt.next)

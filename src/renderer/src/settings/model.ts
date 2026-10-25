@@ -1,5 +1,6 @@
+import type { FsNode } from '../fs/types'
 import type { SoundName as SystemSoundName } from '../system/sound'
-import { type BackgroundSettings, patternNames, wallpaperNames } from './backgrounds'
+import { type BackgroundSettings, patternNames, wallpaperNames, wallpaperNode } from './backgrounds'
 import { type AppearanceSettings, schemeNames, themeColorNames } from './schemes'
 
 export const saverNames = [
@@ -129,7 +130,10 @@ export type SettingsAction = { type: 'apply'; patch: Partial<Settings> } | { typ
 
 export function settingsReducer(state: Settings, action: SettingsAction): Settings {
   if (action.type === 'reset') return defaultSettings
-  return parseSettings({ ...state, ...action.patch })
+  return {
+    ...parseSettings({ ...state, ...action.patch }),
+    wallpaper: action.patch.wallpaper === undefined ? state.wallpaper : action.patch.wallpaper,
+  }
 }
 
 function object(value: unknown): Record<string, unknown> {
@@ -158,7 +162,7 @@ export function hexColor(value: unknown, fallback: string): string {
   return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : fallback
 }
 
-export function parseSettings(value: unknown): Settings {
+export function parseSettings(value: unknown, nodes: readonly FsNode[] = []): Settings {
   const source = object(value)
   const appearance = object(source.appearance)
   const colors = object(appearance.colors)
@@ -175,7 +179,10 @@ export function parseSettings(value: unknown): Settings {
   return {
     desktopColor: hexColor(source.desktopColor, defaults.desktopColor),
     pattern: patternNames.find((name) => name === source.pattern) ?? null,
-    wallpaper: wallpaperNames.find((name) => name === source.wallpaper) ?? null,
+    wallpaper:
+      wallpaperNames.find((name) => name === source.wallpaper) ??
+      wallpaperNode(source.wallpaper, nodes)?.id ??
+      null,
     wallpaperMode: source.wallpaperMode === 'tile' ? 'tile' : 'center',
     appearance: {
       scheme: choice(appearance.scheme, schemeNames, defaults.appearance.scheme),

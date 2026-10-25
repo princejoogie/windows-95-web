@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useId, useState } from 'react'
+import { useFs } from '../../fs/store'
 import { PALETTE } from '../../icons/pixel'
-import { desktopBackground, patternNames, wallpaperNames } from '../../settings/backgrounds'
+import { desktopBackground, patternNames, wallpaperNames, wallpaperNode } from '../../settings/backgrounds'
 import { type Settings, saverNames } from '../../settings/model'
 import { SaverCanvas, ScreenSaverPreview } from '../../settings/ScreenSaverHost'
 import {
@@ -10,7 +11,9 @@ import {
   standardColors,
   type ThemeColor,
 } from '../../settings/schemes'
+import { registerDesktopProperties } from '../../shell/Desktop'
 import { Button } from '../../ui/Button'
+import { ComboBox } from '../../ui/ComboBox'
 import { Dialog } from '../../ui/Dialog'
 import { GroupBox, Radio, TextBox } from '../../ui/fields'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
@@ -25,6 +28,12 @@ function Monitor({ children }: { children: ReactNode }) {
       <div className="cp-monitor-foot" />
     </div>
   )
+}
+
+export function DesktopDisplayProperties() {
+  const [open, setOpen] = useState(false)
+  useEffect(() => registerDesktopProperties(() => setOpen(true)), [])
+  return open ? <DisplayProperties onClose={() => setOpen(false)} /> : null
 }
 
 export function ColorPicker({
@@ -107,7 +116,8 @@ export function ColorPicker({
 }
 
 function DesktopPreview({ settings }: { settings: Settings }) {
-  const bg = desktopBackground(settings)
+  const state = useFs((state) => state)
+  const bg = desktopBackground(settings, Object.values(state.nodes))
   return (
     <div
       className="absolute left-0 top-0 origin-top-left"
@@ -213,6 +223,7 @@ const appearanceItems: readonly { label: string; color: ThemeColor }[] = [
 ]
 
 export function DisplayProperties({ onClose, initialTab = 0 }: { onClose: () => void; initialTab?: number }) {
+  const nodes = useFs((state) => state.nodes)
   const state = useSettingsDraft()
   const { draft, change } = state
   const [preview, setPreview] = useState(false)
@@ -237,40 +248,41 @@ export function DisplayProperties({ onClose, initialTab = 0 }: { onClose: () => 
                   <DesktopPreview settings={draft} />
                 </Monitor>
                 <div className="grid grid-cols-2 gap-[10px]">
-                  <label className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1">
                     Pattern:
-                    <select
+                    <ComboBox
                       aria-label="Pattern"
-                      size={5}
                       value={draft.pattern ?? '(None)'}
-                      onChange={(event) =>
-                        change({ pattern: patternNames.find((name) => name === event.target.value) ?? null })
+                      onChange={(value) =>
+                        change({ pattern: patternNames.find((name) => name === value) ?? null })
                       }
-                    >
-                      <option>(None)</option>
-                      {patternNames.map((name) => (
-                        <option key={name}>{name}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-1">
+                      options={['(None)', ...patternNames].map((name) => ({ key: name, label: name }))}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
                     Wallpaper:
-                    <select
+                    <ComboBox
                       aria-label="Wallpaper"
-                      size={5}
                       value={draft.wallpaper ?? '(None)'}
-                      onChange={(event) =>
+                      onChange={(value) =>
                         change({
-                          wallpaper: wallpaperNames.find((name) => name === event.target.value) ?? null,
+                          wallpaper:
+                            wallpaperNames.find((name) => name === value) ??
+                            wallpaperNode(value, Object.values(nodes))?.id ??
+                            null,
                         })
                       }
-                    >
-                      <option>(None)</option>
-                      {wallpaperNames.map((name) => (
-                        <option key={name}>{name}</option>
-                      ))}
-                    </select>
-                  </label>
+                      options={[
+                        ...['(None)', ...wallpaperNames].map((name) => ({ key: name, label: name })),
+                        ...Object.values(nodes)
+                          .filter(
+                            (node) =>
+                              node.kind === 'file' && node.content.startsWith('data:image/png;base64,'),
+                          )
+                          .map((node) => ({ key: node.id, label: node.name })),
+                      ]}
+                    />
+                  </div>
                 </div>
                 <div className="mt-[10px] flex items-center justify-between">
                   <span>
@@ -311,23 +323,20 @@ export function DisplayProperties({ onClose, initialTab = 0 }: { onClose: () => 
                   )}
                 </Monitor>
                 <GroupBox label="Screen Saver" className="mt-3">
-                  <select
+                  <ComboBox
                     aria-label="Screen saver"
                     className="w-full"
                     value={draft.screenSaver.name}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       change({
                         screenSaver: {
                           ...draft.screenSaver,
-                          name: saverNames.find((name) => name === event.target.value) ?? '(None)',
+                          name: saverNames.find((name) => name === value) ?? '(None)',
                         },
                       })
                     }
-                  >
-                    {saverNames.map((name) => (
-                      <option key={name}>{name}</option>
-                    ))}
-                  </select>
+                    options={saverNames.map((name) => ({ key: name, label: name }))}
+                  />
                   <div className="mt-3 flex justify-end gap-2">
                     <Button
                       disabled={
@@ -377,42 +386,30 @@ export function DisplayProperties({ onClose, initialTab = 0 }: { onClose: () => 
             content: (
               <>
                 <AppearanceSample settings={draft} />
-                <label className="flex flex-col mt-3 gap-1">
+                <div className="flex flex-col mt-3 gap-1">
                   Scheme:
-                  <select
+                  <ComboBox
                     aria-label="Scheme"
                     value={draft.appearance.scheme}
-                    onChange={(event) => {
-                      const scheme =
-                        schemeNames.find((name) => name === event.target.value) ?? 'Windows Standard'
+                    onChange={(value) => {
+                      const scheme = schemeNames.find((name) => name === value) ?? 'Windows Standard'
                       change({ appearance: { scheme, colors: {} }, desktopColor: schemes[scheme].desktop })
                     }}
-                  >
-                    {schemeNames.map((name) => (
-                      <option key={name}>{name}</option>
-                    ))}
-                  </select>
-                </label>
+                    options={schemeNames.map((name) => ({ key: name, label: name }))}
+                  />
+                </div>
                 <div className="flex items-end gap-3 mt-3">
-                  <label className="flex flex-col gap-1 flex-1">
+                  <div className="flex flex-col gap-1 flex-1">
                     Item:
-                    <select
+                    <ComboBox
                       aria-label="Appearance item"
                       value={item}
-                      onChange={(event) =>
-                        setItem(
-                          appearanceItems.find((option) => option.color === event.target.value)?.color ??
-                            'face',
-                        )
+                      onChange={(value) =>
+                        setItem(appearanceItems.find((option) => option.color === value)?.color ?? 'face')
                       }
-                    >
-                      {appearanceItems.map((option) => (
-                        <option key={option.label} value={option.color}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      options={appearanceItems.map((option) => ({ key: option.color, label: option.label }))}
+                    />
+                  </div>
                   <div className="flex flex-col gap-1">
                     Color:
                     <ColorPicker
