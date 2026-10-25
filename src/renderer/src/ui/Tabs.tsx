@@ -29,7 +29,7 @@ export function Tabs<T extends string>({
     event.preventDefault()
     event.stopPropagation()
     onChange(next)
-    if (focusTab)
+    if (focusTab || document.activeElement?.getAttribute('role') === 'tab')
       event.currentTarget
         .closest('[data-tabs]')
         ?.querySelectorAll<HTMLElement>('[role="tab"]')

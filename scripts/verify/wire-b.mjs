@@ -946,6 +946,27 @@ async function fixedWindows() {
   }
 }
 
+async function displayProperties() {
+  await closeWindows()
+  await app.click(700, 400, { button: 'right' })
+  await pickMenu('Properties')
+  await app.waitFor(`!!${dialog('Display Properties')}`)
+  const tabs = await app.eval(
+    `[...${dialog('Display Properties')}.querySelectorAll('[role="tab"]')].map(t => t.textContent.trim())`,
+  )
+  await clickExpr(`${dialog('Display Properties')}.querySelector('[role="tab"][aria-selected="true"]')`)
+  await app.key('Tab', ['Control'])
+  const second = await selectedTab('Display Properties')
+  await shot('3b-display-properties-tabs', await dialogBox('Display Properties'))
+  await app.key('Escape')
+  check(
+    tabs.join('|') === 'Background|Screen Saver|Appearance|Settings' && second === 'Screen Saver',
+    '3b',
+    'Display Properties uses the shared tabs, and Ctrl+Tab turns the page',
+    { tabs, second },
+  )
+}
+
 const phases = {
   fileDialog,
   dialogs,
@@ -958,6 +979,7 @@ const phases = {
   deletion,
   labels,
   fixedWindows,
+  displayProperties,
 }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
