@@ -1,3 +1,108 @@
+.explorer-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.explorer-content-pane,
+.explorer-tree-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.explorer-content-pane {
+  flex: 1;
+}
+.explorer-tree-pane {
+  flex-shrink: 0;
+}
+.explorer-pane-heading {
+  height: 20px;
+  padding: 2px 4px;
+  flex-shrink: 0;
+}
+.explorer-splitter {
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+}
+.explorer-tree {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: white;
+  padding: 2px;
+}
+.explorer-tree-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 18px;
+  width: max-content;
+  min-width: 100%;
+  outline: none;
+}
+.explorer-tree-row > img {
+  width: 16px;
+  height: 16px;
+  margin-right: 3px;
+}
+.explorer-tree-row > span:last-child {
+  padding: 1px 2px;
+}
+.explorer-tree-row .selected {
+  color: white;
+  background: var(--color-select);
+  outline: 1px dotted black;
+}
+.explorer-tree-indent {
+  width: 16px;
+  align-self: stretch;
+  flex-shrink: 0;
+}
+.explorer-tree-indent.line {
+  background:
+    repeating-linear-gradient(to bottom, #808080 0 1px, transparent 1px 2px) 8px 0 / 1px 100% no-repeat;
+}
+.explorer-tree-joint {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 18px;
+  border-left: 1px dotted #808080;
+  background:
+    repeating-linear-gradient(to right, #808080 0 1px, transparent 1px 2px) 0 9px / 8px 1px no-repeat;
+}
+.explorer-tree-joint.last {
+  height: 10px;
+}
+.explorer-tree-expander {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 1px solid #808080;
+  background: white;
+  line-height: 6px;
+  text-align: center;
+}
+.explorer-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 3px;
+  border-top: 1px solid white;
+  border-bottom: 1px solid #808080;
+}
+.explorer-toolbar > button {
+  width: 23px;
+  height: 22px;
+  font-size: 16px;
+}
+.explorer-toolbar > button:disabled {
+  color: #808080;
+}
 .explorer-files {
   flex: 1;
   min-height: 0;
@@ -9,6 +114,38 @@
   min-height: 100%;
   outline: none;
   align-content: start;
+}
+.explorer-details .explorer-items {
+  min-height: calc(100% - 20px);
+}
+.explorer-tabs {
+  display: flex;
+  align-items: end;
+  height: 22px;
+  padding-left: 2px;
+}
+.explorer-tabs > button {
+  height: 19px;
+  padding: 2px 8px;
+  box-shadow:
+    inset 1px 1px #fff,
+    inset -1px 0 #000,
+    inset -2px 0 #808080;
+}
+.explorer-tabs > button[aria-selected="true"] {
+  height: 22px;
+  position: relative;
+  z-index: 1;
+  background: var(--color-face);
+}
+.explorer-icon-dither {
+  position: absolute;
+  inset: 0;
+  background: var(--color-select);
+  pointer-events: none;
+}
+.explorer-size {
+  text-align: right;
 }
 .explorer-item {
   display: flex;
@@ -54,7 +191,7 @@
 .explorer-large .explorer-item {
   flex-direction: column;
   width: 75px;
-  min-height: 68px;
+  min-height: 70px;
   padding-top: 5px;
   text-align: center;
   gap: 4px;
@@ -121,7 +258,7 @@
   align-items: center;
   gap: 3px;
 }
-.explorer-details .selected {
+.explorer-details .selected .explorer-name {
   background: var(--color-select);
   color: white;
 }
@@ -135,13 +272,44 @@
   outline: none;
   user-select: text;
 }
-.explorer-properties {
-  display: grid;
-  grid-template-columns: 65px minmax(160px, 280px);
-  gap: 10px;
-  padding: 15px;
-  user-select: text;
+.explorer-large [data-shell-item] > .explorer-label {
+  flex-direction: column;
+  gap: 4px;
 }
-.explorer-properties dd {
-  overflow-wrap: anywhere;
+.explorer-rubber-band {
+  position: fixed;
+  z-index: 30000;
+  border: 1px dotted black;
+  pointer-events: none;
+}
+.explorer-drag-ghost {
+  position: fixed;
+  z-index: 30000;
+  pointer-events: none;
+}
+.explorer-drag-ghost > img {
+  width: 32px;
+  height: 32px;
+  mask-image: repeating-conic-gradient(#000 0 25%, transparent 0 50%);
+  mask-size: 2px 2px;
+}
+.explorer-drag-ghost > span {
+  position: absolute;
+  right: -4px;
+  bottom: 0;
+  background: white;
+  border: 1px solid black;
+  padding: 0 2px;
+}
+.explorer-item.drop-target .explorer-name {
+  color: white;
+  background: var(--color-select);
+}
+.explorer-toolbar > button > img {
+  width: 16px;
+  height: 16px;
+  margin: auto;
+}
+.explorer-toolbar > button:disabled > img {
+  opacity: 0.4;
 }

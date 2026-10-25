@@ -1,4 +1,4 @@
-import { children, extension, pathOf } from '../../fs/fs'
+import { children, extension, fileSize, pathOf } from '../../fs/fs'
 import { type FsNode, type FsState, type NodeId, RECYCLED_DIR } from '../../fs/types'
 
 export type View = 'large' | 'small' | 'list' | 'details'
@@ -9,19 +9,23 @@ export interface Sort {
   direction: 'ascending' | 'descending'
 }
 export interface Selection {
-  ids: ReadonlySet<NodeId>
-  anchor: NodeId | null
-  focus: NodeId | null
+  ids: ReadonlySet<string>
+  anchor: string | null
+  focus: string | null
 }
 export const emptySelection: Selection = { ids: new Set(), anchor: null, focus: null }
 export const columns: readonly { id: Column; label: string; width: number }[] = [
   { id: 'name', label: 'Name', width: 170 },
-  { id: 'size', label: 'Size', width: 65 },
+  { id: 'size', label: 'Size', width: 60 },
   { id: 'type', label: 'Type', width: 120 },
-  { id: 'modified', label: 'Modified', width: 140 },
-  { id: 'original', label: 'Original Location', width: 180 },
-  { id: 'deleted', label: 'Date Deleted', width: 140 },
+  { id: 'modified', label: 'Modified', width: 125 },
+  { id: 'original', label: 'Original Location', width: 150 },
+  { id: 'deleted', label: 'Date Deleted', width: 125 },
 ]
+
+export const recycleColumns = ['name', 'original', 'deleted', 'type', 'size'].flatMap((id) =>
+  columns.filter((column) => column.id === id),
+)
 
 export function typeOf(node: FsNode): string {
   switch (node.kind) {
@@ -42,16 +46,42 @@ export function typeOf(node: FsNode): string {
   }
 }
 
-export const sizeOf = (node: FsNode): number =>
-  node.kind === 'file' ? new TextEncoder().encode(node.content).length : 0
-export const formatDate = (at: number): string => new Date(at).toLocaleString('en-US')
+export const sizeOf = fileSize
+export const formatDate = (at: number): string => {
+  const date = new Date(at)
+  return `${date.getMonth() + 1}/${date.getDate()}/${String(date.getFullYear() % 100).padStart(2, '0')} ${date.getHours() % 12 || 12}:${String(date.getMinutes()).padStart(2, '0')} ${date.getHours() < 12 ? 'AM' : 'PM'}`
+}
+
+export function displayName(node: FsNode, hideExtensions: boolean, registered: ReadonlySet<string>): string {
+  if (node.kind === 'drive') return '(C:)'
+  const ext = extension(node.name)
+  return hideExtensions && node.kind !== 'folder' && node.kind !== 'shortcut' && registered.has(ext)
+    ? node.name.slice(0, -(ext.length + 1))
+    : node.name
+}
+
+export function renamedName(
+  node: FsNode,
+  name: string,
+  hideExtensions: boolean,
+  registered: ReadonlySet<string>,
+): string {
+  return (
+    name +
+    (displayName(node, hideExtensions, registered) !== node.name && node.kind !== 'drive'
+      ? node.name.slice(node.name.lastIndexOf('.'))
+      : '')
+  )
+}
 
 export function cellValue(state: FsState, node: FsNode, column: Column): string {
   switch (column) {
     case 'name':
       return node.name
     case 'size':
-      return node.kind === 'file' ? `${Math.ceil(sizeOf(node) / 1024)} KB` : ''
+      return node.kind === 'file' || node.kind === 'program' || node.kind === 'shortcut'
+        ? `${Math.ceil(sizeOf(node) / 1024)} KB`
+        : ''
     case 'type':
       return typeOf(node)
     case 'modified':
@@ -67,12 +97,17 @@ export function cellValue(state: FsState, node: FsNode, column: Column): string 
   }
 }
 
-export function visibleNodes(state: FsState, location: Location, sort: Sort): FsNode[] {
+export function visibleNodes(
+  state: FsState,
+  location: Location,
+  sort: Sort,
+  includeSystem = false,
+): FsNode[] {
   const nodes =
     location.kind === 'computer'
       ? Object.values(state.nodes).filter((node) => node.kind === 'drive')
       : children(state, location.kind === 'recycle' ? RECYCLED_DIR : location.id).filter(
-          (node) => node.id !== RECYCLED_DIR,
+          (node) => includeSystem || node.id !== RECYCLED_DIR,
         )
   const rank = (node: FsNode) => (node.kind === 'folder' || node.kind === 'drive' ? 0 : 1)
   const value = (node: FsNode): number | string => {
@@ -112,8 +147,8 @@ export function selectNode({
   shift,
 }: {
   selection: Selection
-  order: readonly NodeId[]
-  id: NodeId
+  order: readonly string[]
+  id: string
   ctrl: boolean
   shift: boolean
 }): Selection {
