@@ -1,4 +1,4 @@
-import { type BoardSize, customSize, type Level } from './game'
+import { type BoardSize, customSize, LEVELS, type Level } from './game'
 
 export interface BestTime {
   readonly seconds: number
@@ -43,7 +43,7 @@ function readRecord(value: unknown): BestTime {
 export function parsePreferences(value: unknown): Preferences {
   const defaults: Preferences = {
     level: 'beginner',
-    custom: { width: 9, height: 9, mines: 10 },
+    custom: LEVELS.beginner,
     marks: true,
     color: true,
     records: emptyRecords(),
