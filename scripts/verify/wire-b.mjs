@@ -783,7 +783,96 @@ async function captions() {
   await closeWindows()
 }
 
-const phases = { fileDialog, dialogs, about, kit, systemMenu, sounds, properties, captions }
+const confirmation = () =>
+  app.eval(
+    `(() => { const d = [...document.querySelectorAll('[role="dialog"]')].find(d => d.querySelector('[role="img"]')); return d && { caption: d.querySelector('[data-dialog-caption]').className.includes('bg-title-inactive') ? 'inactive' : 'active', dialogs: document.querySelectorAll('[role=dialog]').length, title: d.getAttribute('aria-label'), picture: d.querySelector('[role="img"]').getAttribute('aria-label'), message: d.querySelector('p').textContent } })()`,
+  )
+const onDesktop = (name) =>
+  app.eval(
+    `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).some(n => n.parent === 'desktop' && n.name === ${q(name)})`,
+  )
+
+async function deletion() {
+  await closeWindows()
+  await app.click(700, 400, { button: 'right' })
+  await pickMenu('New')
+  await pickMenu('Text Document')
+  await app.waitFor(`!!document.querySelector('[data-desktop-item] input')`)
+  await app.key('a', ['Control'])
+  await app.type('Notes')
+  await app.key('Enter')
+  await sleep(700)
+  await clickExpr(desktopItem('Notes'))
+  await app.key('Delete')
+  await app.waitFor(`!!document.querySelector('[role="dialog"] [role="img"]')`)
+  await sleep(200)
+  const desktop = await confirmation()
+  await shot('5-desktop-delete-confirmation')
+  check(
+    desktop.title === 'Confirm File Delete' &&
+      desktop.picture === 'Send file to Recycle Bin' &&
+      desktop.message === "Are you sure you want to send 'Notes' to the Recycle Bin?",
+    '5',
+    'the desktop asks with the shared confirmation picture and wording, by display name',
+    desktop,
+  )
+  await app.key('y')
+  await sleep(400)
+  const gone = !(await onDesktop('Notes.txt'))
+  await app.click(700, 400, { button: 'right' })
+  const undoItem = await app.eval(
+    `[...document.querySelectorAll('[role="menuitem"]')].find(m => m.textContent.startsWith('Undo'))?.textContent`,
+  )
+  await app.key('Escape')
+  await app.click(700, 400)
+  await app.key('z', ['Control'])
+  await sleep(400)
+  check(
+    gone && undoItem === 'Undo Delete' && (await onDesktop('Notes.txt')),
+    '5',
+    'the desktop menu offers Undo Delete, and Ctrl+Z brings the file back',
+    { gone, undoItem },
+  )
+
+  await run('C:\\My Documents')
+  await app.waitFor(
+    `[...document.querySelectorAll('[data-window]')].some(w => w.getAttribute('aria-label').endsWith('My Documents'))`,
+  )
+  await sleep(400)
+  const readme = `[...${topWindow}.querySelectorAll('*')].find(e => e.children.length === 0 && e.textContent.trim() === 'Readme')`
+  await clickExpr(readme)
+  await app.key('Delete')
+  await app.waitFor(`!!document.querySelector('[role="dialog"] [role="img"]')`)
+  const explorer = await confirmation()
+  check(
+    explorer.title === 'Confirm File Delete' &&
+      explorer.picture === 'Send file to Recycle Bin' &&
+      explorer.message === "Are you sure you want to send 'Readme' to the Recycle Bin?",
+    '5',
+    'Explorer asks with the same promoted confirmation',
+    explorer,
+  )
+  await app.key('y')
+  await sleep(300)
+  await clickExpr(desktopItem('Notes'))
+  await app.key('Delete')
+  await app.waitFor(`!!document.querySelector('[role="dialog"] [role="img"]')`)
+  await app.key('y')
+  await sleep(300)
+  await clickExpr(
+    `[...document.querySelectorAll('[data-window]')].find(w => w.getAttribute('aria-label').endsWith('My Documents'))`,
+  )
+  await openMenu('Edit', 'Undo Delete')
+  await sleep(300)
+  check(
+    await onDesktop('Notes.txt'),
+    '5',
+    "Explorer's Undo reverses the desktop's delete, so both share one history",
+  )
+  await closeWindows()
+}
+
+const phases = { fileDialog, dialogs, about, kit, systemMenu, sounds, properties, captions, deletion }
 try {
   for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
 } finally {

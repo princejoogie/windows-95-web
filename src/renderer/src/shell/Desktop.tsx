@@ -26,6 +26,7 @@ import {
   type ShortcutTarget,
 } from './clipboard'
 import { useKeyDown } from './context'
+import { DeleteConfirmation } from './DeleteConfirmation'
 import {
   type ArrangeBy,
   backgroundMenu,
@@ -49,11 +50,12 @@ import {
   touched,
   typeAhead,
 } from './desktopModel'
-import { useNaming } from './folderOptions'
+import { folderOptions, useNaming } from './folderOptions'
 import { nodeIcon } from './nodeIcon'
 import { apps, getApp } from './registry'
 import { launch, openNode, useWindows, windowsStore } from './system'
 import type { AppManifest, Point, Size } from './types'
+import { history, remember, undoLabel, undoLast } from './undo'
 
 const POSITIONS_KEY = 'w95.desktop.v1'
 const LABELS_KEY = 'w95.desktop.labels.v1'
@@ -265,6 +267,7 @@ export function Desktop({ size }: { size: Size }) {
   const [labels, setLabels] = useState<Readonly<Record<string, string>>>(() => load(LABELS_KEY, {}))
   const fsState = useFs((s) => s)
   const naming = useNaming()
+  const undoStack = useStore(history, (entries) => entries)
   const items = useMemo(() => desktopItems(fsState, labels, naming.label), [fsState, labels, naming])
   const desktopFocused = useWindows((s) => s.focused === null)
   const clip = useStore(clipboard, (s) => s)
@@ -363,8 +366,10 @@ export function Desktop({ size }: { size: Size }) {
       localStorage.setItem(LABELS_KEY, JSON.stringify(next))
       return
     }
+    const before = fs.get()
     const error = fs.rename(item.node.id, naming.rename(item.node, name))
     if (error) showError('Error Renaming File', error)
+    else remember(before, fs.get(), 'Rename')
   }
 
   const createOnDesktop = (kind: 'folder' | 'file', at: Point | null) => {
@@ -385,7 +390,9 @@ export function Desktop({ size }: { size: Size }) {
 
   const askDelete = (keyList: Iterable<string>, permanent: boolean) => {
     const nodes = nodesOf(keyList).filter((node) => !isProtected(node.id))
-    if (nodes.length) setPrompt({ kind: permanent ? 'purge' : 'recycle', nodes })
+    if (!nodes.length) return
+    if (folderOptions.get().confirmDelete) setPrompt({ kind: permanent ? 'purge' : 'recycle', nodes })
+    else answerDelete(nodes, permanent)
   }
 
   const openProperties = (key: string | null) => {
@@ -441,6 +448,7 @@ export function Desktop({ size }: { size: Size }) {
       createShortcut: () =>
         carry(planShortcuts(fs.get(), targetsOf(scope), DESKTOP_DIR, Date.now(), newNodeId), null),
       remove: () => askDelete(scope, false),
+      undo,
       rename: () => key && startRename(key),
       properties: () => openProperties(key),
       sendToDocuments: () =>
@@ -476,6 +484,7 @@ export function Desktop({ size }: { size: Size }) {
       single: scope.length <= 1,
       mutable: item?.kind === 'node' && !isProtected(item.node.id),
       hasProperties: item?.kind === 'node',
+      undo: undoStack.length ? undoLabel(undoStack) : null,
     }
   }
 
@@ -698,7 +707,10 @@ export function Desktop({ size }: { size: Size }) {
     }
     if (event.ctrlKey && !event.altKey) {
       const key = event.key.toLowerCase()
-      if (key === 'a') {
+      if (key === 'z') {
+        handled()
+        undo()
+      } else if (key === 'a') {
         handled()
         select(keys, focus)
       } else if (key === 'c' || key === 'x') {
@@ -723,42 +735,21 @@ export function Desktop({ size }: { size: Size }) {
     }
   })
 
-  const answerDelete = (nodes: readonly FsNode[], permanent: boolean) => {
+  function answerDelete(nodes: readonly FsNode[], permanent: boolean) {
+    const before = fs.get()
     for (const node of nodes) {
       if (permanent) fs.purge(node.id)
       else fs.recycle(node.id)
     }
+    if (permanent) history.dispatch([])
+    else remember(before, fs.get(), 'Delete')
     select([], null)
   }
 
-  const deletePrompt = (nodes: readonly FsNode[], permanent: boolean) => {
-    const [first] = nodes
-    if (!first) return null
-    const many = nodes.length > 1
-    const folder = !many && first.kind === 'folder'
-    const title = many
-      ? 'Confirm Multiple File Delete'
-      : folder
-        ? 'Confirm Folder Delete'
-        : 'Confirm File Delete'
-    const message = permanent
-      ? many
-        ? `Are you sure you want to delete these ${nodes.length} items?`
-        : `Are you sure you want to delete '${first.name}'?`
-      : many
-        ? `Are you sure you want to send these ${nodes.length} items to the Recycle Bin?`
-        : folder
-          ? `Are you sure you want to remove the folder '${first.name}' and move all its contents to the Recycle Bin?`
-          : `Are you sure you want to send '${first.name}' to the Recycle Bin?`
-    return { title, message, icon: folder ? ('warning' as const) : ('question' as const) }
+  function undo() {
+    const problem = undoLast(fs.get(), fsStore.dispatch)
+    if (problem) showError('Undo', problem)
   }
-
-  const confirm =
-    prompt?.kind === 'recycle' || prompt?.kind === 'purge'
-      ? deletePrompt(prompt.nodes, prompt.kind === 'purge')
-      : prompt?.kind === 'empty'
-        ? deletePrompt(binItems, true)
-        : null
 
   return (
     <div
@@ -811,15 +802,13 @@ export function Desktop({ size }: { size: Size }) {
       {menu && (
         <ContextMenu at={menu.at} items={menuItems(menu.key, menu.at)} onClose={() => setMenu(null)} />
       )}
-      {confirm && (prompt?.kind === 'recycle' || prompt?.kind === 'purge' || prompt?.kind === 'empty') && (
-        <MessageBox
-          title={confirm.title}
-          icon={confirm.icon}
-          message={confirm.message}
-          buttons={['Yes', 'No']}
-          onClose={(answer) => {
+      {(prompt?.kind === 'recycle' || prompt?.kind === 'purge' || prompt?.kind === 'empty') && (
+        <DeleteConfirmation
+          nodes={prompt.kind === 'empty' ? binItems : prompt.nodes}
+          permanent={prompt.kind !== 'recycle'}
+          onAnswer={(yes) => {
             setPrompt(null)
-            if (answer !== 'Yes') return
+            if (!yes) return
             if (prompt.kind === 'empty') fs.emptyRecycleBin()
             else answerDelete(prompt.nodes, prompt.kind === 'purge')
           }}

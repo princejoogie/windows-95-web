@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import type { FsNode } from '../../fs/types'
 import { icons } from '../../icons'
 import { type FolderOptions as Options, folderOptions as options } from '../../shell/folderOptions'
 import { Button, Checkbox, Dialog, GroupBox, Radio, Tabs } from '../../ui'
@@ -116,81 +115,6 @@ export function RecycleProperties({ onClose }: { onClose: () => void }) {
             onClick={() => options.dispatch(draft)}
           >
             Apply
-          </Button>
-        </div>
-      </form>
-    </Dialog>
-  )
-}
-
-export function DeleteConfirmation({
-  nodes,
-  permanent,
-  onAnswer,
-}: {
-  nodes: readonly FsNode[]
-  permanent: boolean
-  onAnswer: (yes: boolean) => void
-}) {
-  const first = nodes[0]
-  if (!first) return null
-  const many = nodes.length > 1
-  const message = permanent
-    ? many
-      ? `Are you sure you want to delete these ${nodes.length} items?`
-      : `Are you sure you want to delete '${first.name}'?`
-    : `Are you sure you want to send ${many ? `these ${nodes.length} items` : `'${first.name}'`} to the Recycle Bin?`
-  const title = many
-    ? 'Confirm Multiple File Delete'
-    : first.kind === 'folder'
-      ? 'Confirm Folder Delete'
-      : 'Confirm File Delete'
-  return (
-    <Dialog title={title}>
-      <form
-        className="p-3 flex flex-col gap-3"
-        onSubmit={(event) => {
-          event.preventDefault()
-          onAnswer(true)
-        }}
-        onKeyDown={(event) => {
-          if (event.altKey || event.ctrlKey) return
-          if (event.key.toLowerCase() === 'y' || event.key.toLowerCase() === 'n') {
-            event.preventDefault()
-            onAnswer(event.key.toLowerCase() === 'y')
-          }
-        }}
-      >
-        <div className="flex items-center gap-4">
-          <div
-            role="img"
-            className="relative size-8 shrink-0"
-            aria-label={permanent ? 'Delete file' : 'Send file to Recycle Bin'}
-          >
-            <img src={icons.document} alt="" className="absolute left-0 top-0 size-4" />
-            <svg
-              aria-hidden="true"
-              className="absolute left-[13px] top-[1px]"
-              width="8"
-              height="8"
-              shapeRendering="crispEdges"
-            >
-              <path d="M0 1h2v2h2V1h2v5H1V4h2L0 1z" />
-            </svg>
-            <img
-              src={permanent ? icons.binFull : icons.binEmpty}
-              alt=""
-              className="absolute right-0 bottom-0 size-6"
-            />
-          </div>
-          <p className="max-w-[400px]">{message}</p>
-        </div>
-        <div className="flex justify-center gap-[6px]">
-          <Button type="submit" isDefault>
-            <u>Y</u>es
-          </Button>
-          <Button onClick={() => onAnswer(false)}>
-            <u>N</u>o
           </Button>
         </div>
       </form>

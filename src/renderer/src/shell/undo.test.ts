@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { emptyDrive, fsReducer } from '../../fs/fs'
-import { DOCUMENTS_DIR, type FsState, ROOT } from '../../fs/types'
-import { planUndo, undoEntry } from './history'
+import { emptyDrive, fsReducer } from '../fs/fs'
+import { DOCUMENTS_DIR, type FsState, ROOT } from '../fs/types'
+import { planUndo, undoEntry } from './undo'
 
 describe('Explorer undo', () => {
   const before = emptyDrive(0)

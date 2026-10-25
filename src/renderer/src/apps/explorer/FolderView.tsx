@@ -7,11 +7,13 @@ import { useStore } from '../../lib/store'
 import { CreateShortcut } from '../../shell/CreateShortcut'
 import { type Clip, clipboard, type Plan, planPaste, planShortcuts } from '../../shell/clipboard'
 import { useKeyDown } from '../../shell/context'
+import { DeleteConfirmation } from '../../shell/DeleteConfirmation'
 import { backgroundMenu, type DesktopActions, type MenuFacts, nodeMenu } from '../../shell/desktopMenus'
 import { folderOptions, useNaming } from '../../shell/folderOptions'
 import { getApp } from '../../shell/registry'
 import { launch, openNode, useWindows, windowsStore } from '../../shell/system'
 import type { WindowApi } from '../../shell/types'
+import { history, remember, undoLabel, undoLast } from '../../shell/undo'
 import {
   AboutDialog,
   Button,
@@ -28,10 +30,9 @@ import {
 import type { MenuEntry } from '../../ui/Menu'
 import { formatSize, isHidden } from '../../ui/properties'
 import { fileIcon, floppyIcon, printerIcon, radioDot } from './art'
-import { DeleteConfirmation, FolderOptions, RecycleProperties } from './dialogs'
+import { FolderOptions, RecycleProperties } from './dialogs'
 import { FolderTree, treeIcon } from './FolderTree'
 import { DragGhost, useFileDrag } from './fileDrag'
-import { history, planUndo, remember } from './history'
 import {
   cellValue,
   columns,
@@ -346,14 +347,8 @@ export function FolderView({
       )
   }
   const undo = () => {
-    const entry = history.get().at(-1)
-    if (!entry) return
-    const plan = planUndo(fs.get(), entry, Date.now())
-    if (!plan.ok) setPrompt({ kind: 'error', title: 'Undo', message: plan.message })
-    else {
-      for (const action of plan.actions) fsStore.dispatch(action)
-      history.dispatch(history.get().slice(0, -1))
-    }
+    const problem = undoLast(fs.get(), fsStore.dispatch)
+    if (problem) setPrompt({ kind: 'error', title: 'Undo', message: problem })
   }
   const restore = () => {
     for (const node of selected) fs.restore(node.id)
@@ -489,6 +484,7 @@ export function FolderView({
     const ids = scope.map((item) => item.id)
     const destination = node && (node.kind === 'folder' || node.kind === 'drive') ? node.id : folder?.id
     return {
+      undo,
       open: () => scope.forEach(open),
       explore: () => destination && launch('explorer', { folder: destination }),
       find: () => launch('find', destination ? { folder: destination } : {}),
@@ -552,6 +548,7 @@ export function FolderView({
       single: !node || !selection.ids.has(node.id) || selected.length === 1,
       mutable: Boolean(node && !isProtected(node.id)),
       hasProperties: Boolean(node),
+      undo: undoStack.length ? undoLabel(undoStack) : null,
     }
     if (recycled && node)
       return [
@@ -588,13 +585,7 @@ export function FolderView({
           onSelect: () => setView(item.id),
         })),
       },
-      ...background.slice(0, 6),
-      {
-        label: `&Undo${undoStack.at(-1) ? ` ${undoStack.at(-1)?.label}` : ''}`,
-        disabled: !undoStack.length,
-        onSelect: undo,
-      },
-      ...background.slice(6),
+      ...background,
     ]
   }
   const fileItems: MenuEntry[] = recycled
@@ -789,7 +780,7 @@ export function FolderView({
             label: '&Edit',
             items: [
               {
-                label: `&Undo${undoStack.at(-1) ? ` ${undoStack.at(-1)?.label}` : ''}`,
+                label: undoLabel(undoStack),
                 shortcut: 'Ctrl+Z',
                 disabled: !undoStack.length,
                 onSelect: undo,
@@ -847,6 +838,7 @@ export function FolderView({
                   single: false,
                   mutable: false,
                   hasProperties: false,
+                  undo: null,
                 },
                 actionsFor(null),
               ).slice(0, 2),
