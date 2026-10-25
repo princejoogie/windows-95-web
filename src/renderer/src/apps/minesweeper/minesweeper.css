@@ -1,0 +1,188 @@
+.minesweeper {
+  width: max-content;
+  background: #c0c0c0;
+}
+.mine-frame {
+  padding: 6px;
+  border: 3px solid;
+  border-color: #fff #808080 #808080 #fff;
+}
+.mine-panel {
+  height: 37px;
+  padding: 4px 5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 2px solid;
+  border-color: #808080 #fff #fff #808080;
+  margin-bottom: 6px;
+}
+.mine-counter {
+  display: flex;
+  padding: 1px;
+  background: #000;
+  border: 1px solid;
+  border-color: #808080 #fff #fff #808080;
+}
+.mine-face {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  background: #c0c0c0;
+  border: 1px solid #808080;
+  box-shadow:
+    inset 2px 2px #fff,
+    inset -2px -2px #808080;
+}
+.mine-face:active {
+  box-shadow: inset 1px 1px #808080;
+  padding: 1px 0 0 1px;
+}
+.mine-face:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: -4px;
+}
+.mine-board {
+  display: grid;
+  width: max-content;
+  border: 3px solid;
+  border-color: #808080 #fff #fff #808080;
+}
+.mine-cell {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  background: #c0c0c0;
+  border: 0;
+  border-radius: 0;
+  box-shadow:
+    inset 2px 2px #fff,
+    inset -2px -2px #808080;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font:
+    bold 14px / 14px Arial,
+    sans-serif;
+  touch-action: none;
+}
+.mine-cell img {
+  width: 16px;
+  height: 16px;
+  max-width: none;
+}
+.mine-cell.mine-open {
+  border-left: 1px solid #808080;
+  border-top: 1px solid #808080;
+  box-shadow: none;
+}
+.mine-cell.mine-open img {
+  position: absolute;
+  left: -1px;
+  top: -1px;
+}
+.mine-cell.mine-exploded {
+  background: #ff0000;
+}
+.mine-cell:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: -3px;
+  z-index: 1;
+}
+.mine-cell[data-number="1"].mine-open {
+  color: #0000ff;
+}
+.mine-cell[data-number="2"].mine-open {
+  color: #008000;
+}
+.mine-cell[data-number="3"].mine-open {
+  color: #ff0000;
+}
+.mine-cell[data-number="4"].mine-open {
+  color: #000080;
+}
+.mine-cell[data-number="5"].mine-open {
+  color: #800000;
+}
+.mine-cell[data-number="6"].mine-open {
+  color: #008080;
+}
+.mine-cell[data-number="7"].mine-open {
+  color: #000;
+}
+.mine-cell[data-number="8"].mine-open {
+  color: #808080;
+}
+.mine-monochrome .mine-frame {
+  filter: grayscale(1);
+}
+.mine-custom {
+  display: flex;
+  gap: 24px;
+  padding: 16px;
+}
+.mine-custom-fields {
+  display: grid;
+  gap: 8px;
+}
+.mine-custom-fields label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.mine-custom-fields input {
+  width: 54px;
+}
+.mine-dialog-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mine-record {
+  width: 300px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mine-record button {
+  align-self: center;
+}
+.mine-scores {
+  min-width: 320px;
+  padding: 16px;
+}
+.mine-scores table {
+  width: 100%;
+  margin-bottom: 16px;
+}
+.mine-scores th {
+  text-align: left;
+  font-weight: normal;
+}
+.mine-scores td {
+  padding: 4px 10px;
+  max-width: 220px;
+  overflow-wrap: anywhere;
+}
+.mine-scores > div {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+.mine-about {
+  width: 300px;
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 16px;
+  padding: 16px;
+}
+.mine-about p {
+  margin-bottom: 8px;
+}
+.mine-about button {
+  grid-column: 2;
+  justify-self: end;
+}
