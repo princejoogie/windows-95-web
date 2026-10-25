@@ -65,5 +65,15 @@ const backs4x = cards.BACKS.map((_, i) =>
     : '',
 ).join('')
 writeFileSync(resolve(outDir, 'sheet-backs-4x.html'), page('backs at 4x', backs4x))
+for (const suit of suits)
+  for (const [rank, name] of [
+    [11, 'jack'],
+    [12, 'queen'],
+    [13, 'king'],
+  ])
+    writeFileSync(
+      resolve(outDir, `sheet-court-${name}-${suit}.html`),
+      page(`${name} of ${suit} at 4x`, img(cards.cardImage({ suit, rank }), 4)),
+    )
 console.log('deck size', game.deck().length, 'distinct faces', new Set(game.deck().map(cards.cardImage)).size)
 console.log('wrote sheets to', outDir)
