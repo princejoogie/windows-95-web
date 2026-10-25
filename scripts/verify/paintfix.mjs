@@ -596,6 +596,7 @@ await check(
   !(await evaluate(`!!document.querySelector('[data-paint="view-bitmap"]')`)),
 )
 
+await clickSelector(`${W} button[aria-label="Color #ff8040"]`)
 await menu('Options')
 await item('Edit Colors...')
 await wait(200)
@@ -813,6 +814,98 @@ await check(
   `Open lists ${openTypes.join(' | ')}`,
   openTypes[0] === 'Bitmap Files (*.bmp;*.dib)' && openTypes[1] === 'All Files (*.*)',
   '43-open-types',
+)
+await closeDialogs()
+
+// More of findings 18 and 42: selection transforms, the paste-enlarge prompt, Color Eraser, recent files.
+await clickSelector(`${W} button[aria-label="Color #000000"]`)
+await clearImage()
+await tool('Rectangle')
+await clickSelector(`${W} button[aria-label="solid shape"]`)
+await drag(...at(20, 20), ...at(40, 60))
+await clickSelector(`${W} button[aria-label="outline shape"]`)
+await tool('Select')
+await drag(...at(10, 10), ...at(110, 70))
+await key('r', { ctrl: true })
+await wait(150)
+await key('Enter')
+await wait(150)
+await check(
+  42,
+  'Flip/Rotate flips only the selection',
+  (await pixel(90, 40)) === '#000000' && (await pixel(30, 40)) === '#ffffff',
+  '42-flip-selection',
+)
+await click(...at(420, 260))
+await tool('Eraser/Color Eraser')
+await clickSelector(`${W} button[aria-label="Color #ff0000"]`, { button: 'right' })
+await drag(...at(90, 20), ...at(90, 60), { button: 'right' })
+await check(
+  18,
+  'right-dragging the Eraser is the Color Eraser: black turns red, white stays',
+  (await pixel(90, 40)) === '#ff0000' &&
+    (await pixel(90, 15)) === '#ffffff' &&
+    (await pixel(82, 40)) === '#000000',
+  '18-color-eraser',
+)
+await clickSelector(`${W} button[aria-label="Color #ffffff"]`, { button: 'right' })
+await key('l', { ctrl: true })
+await key('c', { ctrl: true })
+await click(...at(420, 260))
+await key('e', { ctrl: true })
+await wait(200)
+await clickSelector('[role="dialog"] input[aria-label="Width"]', { count: 3 })
+await type('200')
+await clickText('[role="dialog"] label', 'Black and white')
+await key('Enter')
+await wait(200)
+const mono = await count(0, 0, 200, 280, '#ff0000')
+await check(
+  42,
+  'Attributes resizes to 200 wide and Black and white removes the red',
+  (await evaluate(`document.querySelector('${W} canvas[aria-label="Paint canvas"]').width`)) === 200 &&
+    mono === 0,
+  '42-attributes-mono',
+)
+await key('v', { ctrl: true })
+await wait(200)
+await check(
+  18,
+  'pasting a larger picture asks to enlarge the bitmap',
+  (await dialogs())[0]?.text.includes('larger than the bitmap'),
+  '18-paste-enlarge',
+)
+await clickText('[role="dialog"] button', 'Yes')
+await wait(200)
+await check(
+  18,
+  'Yes enlarges the bitmap to hold the paste',
+  (await evaluate(`document.querySelector('${W} canvas[aria-label="Paint canvas"]').width`)) === 440,
+)
+await click(...at(430, 270))
+await key('s', { ctrl: true })
+await wait(250)
+await type('art.bmp')
+await key('Enter')
+await wait(300)
+await menu('File')
+const recentItems = await menuItems()
+await check(
+  39,
+  `File lists the saved picture: ${recentItems.find((t) => t.startsWith('1 '))}`,
+  recentItems.some((t) => /^1 C:/.test(t) && t.endsWith('art.bmp')),
+  '39-recent-file',
+)
+await key('Escape')
+await menu('Image')
+await item('Attributes...')
+await wait(200)
+const savedAttributes = (await dialogs())[0]?.text ?? ''
+await check(
+  42,
+  'Attributes shows the save date and size on disk once saved',
+  !savedAttributes.includes('Not Available') && /\d+ bytes/.test(savedAttributes.replace(/,/g, '')),
+  '42-attributes-saved',
 )
 await closeDialogs()
 

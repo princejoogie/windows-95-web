@@ -4,6 +4,40 @@ import { hex, type Transform } from './bitmap'
 import { basicColors, fromHsl, type Hsl, toHsl } from './colors'
 import { paintIcon } from './tools'
 
+/** A dialog body that starts on its first control and takes Enter as OK, as Windows dialogs do. */
+function DialogForm({
+  focus,
+  className,
+  onSubmit,
+  children,
+}: {
+  focus: string
+  className: string
+  onSubmit: () => void
+  children: ReactNode
+}) {
+  const form = useRef<HTMLFormElement>(null)
+  useEffect(() => {
+    form.current?.querySelector<HTMLElement>(focus)?.focus()
+  }, [focus])
+  return (
+    <form
+      ref={form}
+      className={className}
+      onSubmit={(event) => {
+        event.preventDefault()
+        onSubmit()
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' || event.target instanceof HTMLButtonElement) return
+        event.preventDefault()
+        event.currentTarget.requestSubmit()
+      }}
+    >
+      {children}
+    </form>
+  )
+}
 function Buttons({ children }: { children: ReactNode }) {
   return <div className="flex flex-col gap-[6px] shrink-0">{children}</div>
 }
@@ -70,10 +104,10 @@ export function AttributesDialog({
   }
   return (
     <Dialog title="Attributes" onClose={onClose} className="w-[300px]">
-      <form
+      <DialogForm
+        focus={'input[aria-label="Width"]'}
         className="flex gap-[10px] p-[10px]"
-        onSubmit={(event) => {
-          event.preventDefault()
+        onSubmit={() => {
           const w = Math.round(Number(fields.width) * PER_UNIT[units]),
             h = Math.round(Number(fields.height) * PER_UNIT[units])
           if (!Number.isFinite(w) || !Number.isFinite(h) || w < 1 || h < 1 || w > 2048 || h > 2048) {
@@ -155,7 +189,7 @@ export function AttributesDialog({
             </Button>
           }
         />
-      </form>
+      </DialogForm>
       {box}
     </Dialog>
   )
@@ -173,10 +207,10 @@ export function FlipRotateDialog({
   const id = useId()
   return (
     <Dialog title="Flip and Rotate" onClose={onClose} className="w-[270px]">
-      <form
+      <DialogForm
+        focus={'input[type="radio"]:checked'}
         className="flex gap-[10px] p-[10px]"
-        onSubmit={(event) => {
-          event.preventDefault()
+        onSubmit={() => {
           onApply(mode === 'rotate' ? angle : mode)
         }}
       >
@@ -215,7 +249,7 @@ export function FlipRotateDialog({
           </div>
         </GroupBox>
         <OkCancel onCancel={onClose} />
-      </form>
+      </DialogForm>
     </Dialog>
   )
 }
@@ -265,10 +299,10 @@ export function StretchSkewDialog({
   )
   return (
     <Dialog title="Stretch and Skew" onClose={onClose} className="w-[300px]">
-      <form
+      <DialogForm
+        focus={'input'}
         className="flex gap-[10px] p-[10px]"
-        onSubmit={(event) => {
-          event.preventDefault()
+        onSubmit={() => {
           const [sh, sv, kh, kv] = [values.sh, values.sv, values.kh, values.kv].map(Number) as [
             number,
             number,
@@ -301,7 +335,7 @@ export function StretchSkewDialog({
           </GroupBox>
         </div>
         <OkCancel onCancel={onClose} />
-      </form>
+      </DialogForm>
       {box}
     </Dialog>
   )
@@ -320,10 +354,10 @@ export function CustomZoomDialog({
   const id = useId()
   return (
     <Dialog title="Custom Zoom" onClose={onClose} className="w-[330px]">
-      <form
+      <DialogForm
+        focus={'input[type="radio"]:checked'}
         className="flex gap-[10px] p-[10px]"
-        onSubmit={(event) => {
-          event.preventDefault()
+        onSubmit={() => {
           onApply(choice)
         }}
       >
@@ -344,7 +378,7 @@ export function CustomZoomDialog({
           </GroupBox>
         </div>
         <OkCancel onCancel={onClose} />
-      </form>
+      </DialogForm>
     </Dialog>
   )
 }
@@ -526,10 +560,10 @@ export function EditColorsDialog({
   )
   return (
     <Dialog title="Edit Colors" onClose={onClose} className={expanded ? 'w-[450px]' : 'w-[226px]'}>
-      <form
+      <DialogForm
+        focus={'button[aria-pressed="true"], button[type="submit"]'}
         className="flex gap-[10px] p-[8px]"
-        onSubmit={(event) => {
-          event.preventDefault()
+        onSubmit={() => {
           onApply(current)
         }}
       >
@@ -598,7 +632,7 @@ export function EditColorsDialog({
             </Button>
           </div>
         )}
-      </form>
+      </DialogForm>
     </Dialog>
   )
 }
@@ -607,10 +641,10 @@ export function EditColorsDialog({
 export function AboutDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog title="About Paint" onClose={onClose} className="w-[400px]">
-      <form
+      <DialogForm
+        focus={'button[type="submit"]'}
         className="flex gap-[14px] px-[12px] pt-[12px] pb-[10px]"
-        onSubmit={(event) => {
-          event.preventDefault()
+        onSubmit={() => {
           onClose()
         }}
       >
@@ -631,12 +665,12 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
             <span className="text-right">85% Free</span>
           </div>
           <div className="mt-[10px] flex justify-end">
-            <Button type="submit" isDefault autoFocus>
+            <Button type="submit" isDefault>
               OK
             </Button>
           </div>
         </div>
-      </form>
+      </DialogForm>
     </Dialog>
   )
 }
