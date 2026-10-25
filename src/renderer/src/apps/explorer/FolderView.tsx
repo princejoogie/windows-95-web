@@ -1,5 +1,15 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { children, fileSize, isInside, isProtected, pathOf, resolvePath, uniqueName } from '../../fs/fs'
+import {
+  children,
+  DRIVE_CAPACITY,
+  driveUsed,
+  fileSize,
+  isInside,
+  isProtected,
+  pathOf,
+  resolvePath,
+  uniqueName,
+} from '../../fs/fs'
 import { createNode, fs, fsStore, newNodeId, useFs } from '../../fs/store'
 import { DESKTOP_DIR, DOCUMENTS_DIR, type FsNode, type NodeId, RECYCLED_DIR } from '../../fs/types'
 import { icons } from '../../icons'
@@ -47,6 +57,7 @@ import {
 } from './model'
 import { folderPreferences, saveFolderPreferences } from './preferences'
 import { useRubberBand } from './rubberBand'
+import { Splitter } from './Splitter'
 import { toolbarIcons } from './toolbar'
 import { folderTree, TREE_DESKTOP, treeRows } from './tree'
 import './explorer.css'
@@ -114,6 +125,7 @@ export function FolderView({
   const settings = useStore(folderOptions, (s) => s)
   const naming = useNaming()
   const labelOf = naming.label
+  const root = useRef<HTMLDivElement>(null)
   const list = useRef<HTMLDivElement>(null)
   const typed = useRef({ text: '', at: 0 })
   const [location, setLocation] = useState(initial)
@@ -207,7 +219,8 @@ export function FolderView({
     setAutoArrange(saved.autoArrange)
     setPositions(saved.positions)
     setLoadedKey(preferenceKey)
-    if (saved.geometry) windowsStore.dispatch({ type: 'resize', id: window.id, ...saved.geometry })
+    if (saved.geometry && !geometryRestored.current)
+      windowsStore.dispatch({ type: 'resize', id: window.id, ...saved.geometry })
     geometryRestored.current = preferenceKey
   }, [preferenceKey, exploring, recycled, window.id])
   useEffect(() => {
@@ -356,6 +369,28 @@ export function FolderView({
   }
 
   useKeyDown((event) => {
+    if ((event.key === 'Tab' || event.key === 'F6') && !prompt && !context && !shellMenu && !renaming) {
+      if (event.target instanceof Element && event.target.closest('[role="menubar"], [role="menu"]')) return
+      const panes = [
+        root.current?.querySelector<HTMLElement>('.explorer-toolbar [role="combobox"]'),
+        root.current?.querySelector<HTMLElement>('[role="tree"]'),
+        list.current,
+      ].flatMap((pane) => (pane ? [pane] : []))
+      if (!panes.length) return
+      event.preventDefault()
+      const at = panes.findIndex((pane) => event.target instanceof Node && pane.contains(event.target))
+      const next =
+        at < 0
+          ? panes[event.shiftKey ? panes.length - 1 : 0]
+          : panes[(at + (event.shiftKey ? -1 : 1) + panes.length) % panes.length]
+      if (next?.role === 'tree')
+        (
+          next.querySelector<HTMLElement>('[role="treeitem"][tabindex="0"]') ??
+          next.querySelector<HTMLElement>('[role="treeitem"]')
+        )?.focus()
+      else next?.focus()
+      return
+    }
     if (
       prompt ||
       context ||
@@ -393,6 +428,7 @@ export function FolderView({
           : view === 'list'
             ? { ArrowDown: 1, ArrowUp: -1, ArrowLeft: -rows, ArrowRight: rows }
             : { ArrowDown: 1, ArrowUp: -1, ArrowLeft: -1, ArrowRight: 1 }
+      const step = current + (steps[event.key] ?? 0)
       const index =
         event.key === 'Home'
           ? 0
@@ -400,7 +436,9 @@ export function FolderView({
             ? order.length - 1
             : current < 0
               ? 0
-              : Math.max(0, Math.min(order.length - 1, current + (steps[event.key] ?? 0)))
+              : step < 0 || step >= order.length
+                ? current
+                : step
       const id = order[index]
       if (id) {
         setSelection(
@@ -772,7 +810,7 @@ export function FolderView({
   })
   const band = useRubberBand(selection, setSelection)
   return (
-    <div className="explorer h-full w-full flex flex-col" data-location={title}>
+    <div ref={root} className="explorer h-full w-full flex flex-col" data-location={title}>
       <MenuBar
         menus={[
           { label: '&File', items: fileItems },
@@ -930,6 +968,7 @@ export function FolderView({
             <button
               key={item.label}
               type="button"
+              tabIndex={-1}
               aria-label={item.label}
               title={item.label}
               className="bevel-raised"
@@ -960,36 +999,7 @@ export function FolderView({
                 }}
               />
             </div>
-            <hr
-              aria-label="Folder pane width"
-              aria-orientation="vertical"
-              aria-valuenow={treeWidth}
-              tabIndex={0}
-              className="explorer-splitter"
-              onKeyDown={(event) => {
-                if (event.key === 'ArrowLeft') setTreeWidth(Math.max(100, treeWidth - 10))
-                if (event.key === 'ArrowRight') setTreeWidth(treeWidth + 10)
-              }}
-              onPointerDown={(event) => {
-                const start = event.clientX
-                const width = treeWidth
-                const target = event.currentTarget
-                target.setPointerCapture(event.pointerId)
-                const move = (e: PointerEvent) =>
-                  setTreeWidth(
-                    Math.max(
-                      100,
-                      Math.min(width + e.clientX - start, (target.parentElement?.clientWidth ?? 600) - 120),
-                    ),
-                  )
-                const end = () => {
-                  target.removeEventListener('pointermove', move)
-                  target.removeEventListener('pointerup', end)
-                }
-                target.addEventListener('pointermove', move)
-                target.addEventListener('pointerup', end)
-              }}
-            />
+            <Splitter width={treeWidth} onResize={setTreeWidth} />
           </>
         )}
         <div className="explorer-content-pane">
@@ -1004,6 +1014,7 @@ export function FolderView({
                   <button
                     type="button"
                     key={column.id}
+                    tabIndex={-1}
                     className="bevel-raised"
                     style={{ width: column.width }}
                     aria-label={`Sort by ${column.label}`}
@@ -1152,10 +1163,12 @@ export function FolderView({
           </StatusPane>
           <StatusPane className="flex-1">
             {single?.kind === 'drive'
-              ? `Free Space: ${formatSize(Math.max(0, 536870912 - Object.values(state.nodes).reduce((sum, node) => sum + fileSize(node), 0))).split(' (')[0]}, Capacity: 512MB`
-              : formatSize(
-                  (selectedCount ? selected : nodes).reduce((sum, node) => sum + fileSize(node), 0),
-                ).split(' (')[0]}
+              ? `Free Space: ${formatSize(DRIVE_CAPACITY - driveUsed(state)).split(' (')[0]}, Capacity: ${formatSize(DRIVE_CAPACITY).split(' (')[0]}`
+              : location.kind === 'computer'
+                ? ''
+                : formatSize(
+                    (selectedCount ? selected : nodes).reduce((sum, node) => sum + fileSize(node), 0),
+                  ).split(' (')[0]}
           </StatusPane>
         </StatusBar>
       )}
@@ -1192,6 +1205,8 @@ export function FolderView({
                 id={`goto-${window.id}`}
                 aria-label="Go to folder"
                 value={goPath}
+                autoFocus
+                onFocus={(event) => event.currentTarget.select()}
                 onChange={(event) => setGoPath(event.target.value)}
                 className="flex-1"
               />
@@ -1256,7 +1271,7 @@ export function FolderView({
       {prompt?.kind === 'bin-properties' && <RecycleProperties onClose={() => setPrompt(null)} />}
       {prompt?.kind === 'floppy' && (
         <MessageBox
-          title="A:\\"
+          title={'A:\\'}
           message={'A:\\ is not accessible.\n\nThe device is not ready.'}
           icon="error"
           buttons={['Retry', 'Cancel']}

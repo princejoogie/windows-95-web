@@ -1,0 +1,303 @@
+// Live proof for apps fix round 3, unit U3 (Explorer, My Computer, Recycle Bin). Run against a fresh app:
+//   W95_CDP_PORT=9412 W95_DATA_DIR=D:/tmp/explorerfix3-data bash scripts/verify/relaunch.sh --fresh
+//   node scripts/verify/explorerfix3.mjs <phase>
+import assert from 'node:assert/strict'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { connect, sleep } from './cdp.mjs'
+
+const port = Number(process.env.W95_CDP_PORT ?? 9412)
+const proof = resolve(process.env.W95_PROOF_DIR ?? '../proof/explorerfix3')
+mkdirSync(proof, { recursive: true })
+const phase = process.argv[2] ?? 'all'
+const app = await connect(port)
+const results = []
+
+function check(condition, item, name, detail) {
+  assert.ok(condition, `${item}: ${name}${detail === undefined ? '' : ` (${JSON.stringify(detail)})`}`)
+  results.push({ item, name, detail })
+  process.stdout.write(`PASS [${item}] ${name}${detail === undefined ? '' : ` ${JSON.stringify(detail)}`}\n`)
+}
+const q = (value) => JSON.stringify(value)
+const shot = (name, clip) => app.shot(join(proof, `${name}.png`), clip)
+const exists = (selector) => app.eval(`!!document.querySelector(${q(selector)})`)
+const dialog = (title) => `document.querySelector('[role="dialog"][aria-label=${q(title)}]')`
+const anyDialog = `[...document.querySelectorAll('[role="dialog"]')].at(-1)`
+const boxOf = (expression, pad = 4) =>
+  app.eval(
+    `(()=>{const b=(${expression}).getBoundingClientRect();return {x:Math.max(0,b.x-${pad}),y:Math.max(0,b.y-${pad}),width:b.width+${pad * 2},height:b.height+${pad * 2}}})()`,
+  )
+const dialogBox = (title, pad = 4) => boxOf(dialog(title), pad)
+const buttonIn = (scope, label) =>
+  `[...(${scope}).querySelectorAll('button')].find(b => b.textContent.trim() === ${q(label)} || b.getAttribute('aria-label') === ${q(label)})`
+const menuItem = (label) =>
+  `[...document.querySelectorAll('[role="menuitem"]')].find(e => e.innerText.replace(/\\s+/g,' ').trim().startsWith(${q(label)}))`
+const menuLabels = () =>
+  app.eval(
+    `[...document.querySelectorAll('[role="menu"]')].at(-1) ? [...[...document.querySelectorAll('[role="menu"]')].at(-1).querySelectorAll('[role="menuitem"], [role="separator"]')].map(e => e.getAttribute('role') === 'separator' ? '-' : e.innerText.replace(/\\s+/g,' ').trim() + (e.disabled || e.getAttribute('aria-disabled') === 'true' ? ' (disabled)' : '')) : []`,
+  )
+const topWindow = `[...document.querySelectorAll('[data-window]')].filter(w => !w.classList.contains('hidden')).sort((a, b) => (Number(b.style.zIndex) || 0) - (Number(a.style.zIndex) || 0))[0]`
+const windowNamed = (title) =>
+  `[...document.querySelectorAll('[data-window]')].find(w => w.getAttribute('aria-label') === ${q(title)})`
+const windowTitles = () =>
+  app.eval(`[...document.querySelectorAll('[data-window]')].map(w => w.getAttribute('aria-label'))`)
+const centerOf = (expression) =>
+  app.eval(`(()=>{const b=(${expression}).getBoundingClientRect();return [b.x+b.width/2,b.y+b.height/2]})()`)
+async function clickExpr(expression, options) {
+  await app.waitFor(`!!(${expression})`)
+  const [x, y] = await centerOf(expression)
+  await app.click(x, y, options)
+}
+const press = (type, [x, y], buttons) =>
+  app.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons, clickCount: 1 })
+async function holdDrag(from, to, steps = 8) {
+  await press('mouseMoved', from, 0)
+  await press('mousePressed', from, 1)
+  for (let i = 1; i <= steps; i++)
+    await press(
+      'mouseMoved',
+      [from[0] + ((to[0] - from[0]) * i) / steps, from[1] + ((to[1] - from[1]) * i) / steps],
+      1,
+    )
+  await sleep(100)
+  return { release: () => press('mouseReleased', to, 0) }
+}
+const pickMenu = (label) => clickExpr(menuItem(label))
+async function openMenu(menu, item, scope = topWindow) {
+  await clickExpr(
+    `[...(${scope}).querySelectorAll('[role="menubar"] *')].find(e => e.textContent.trim() === ${q(menu)})`,
+  )
+  if (item) await pickMenu(item)
+}
+async function openStartItem(label) {
+  await app.clickOn('[data-start-button]')
+  await pickMenu(label)
+}
+async function run(command) {
+  await openStartItem('Run...')
+  await app.waitFor(`!!document.querySelector('#run-command')`)
+  await app.key('a', ['Control'])
+  await app.type(command)
+  await app.key('Enter')
+  await sleep(500)
+}
+const desktopItem = (label) =>
+  `[...document.querySelectorAll('[data-desktop-item]')].find(e => e.getAttribute('aria-label') === ${q(label)})`
+const itemIn = (scope, label) =>
+  `[...(${scope}).querySelectorAll('[role="listbox"] [role="option"]')].find(e => e.getAttribute('aria-label') === ${q(label)} || e.textContent.trim() === ${q(label)})`
+const statusOf = (scope) =>
+  app.eval(
+    `[...(${scope}).querySelectorAll('.explorer > div.shrink-0 > .bevel-shallow')].map(e => e.textContent)`,
+  )
+const fsNodes = () => app.eval(`Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes)`)
+
+async function fresh() {
+  await sleep(400)
+  await app.eval("addEventListener('beforeunload', () => localStorage.clear()); localStorage.clear()")
+  await app.send('Page.reload', {})
+  await sleep(800)
+  await app.waitFor(`!!document.querySelector('[data-desktop-item]')`, 10000)
+  await sleep(500)
+}
+async function openOnDesktop(label, title = label) {
+  await clickExpr(desktopItem(label), { count: 2 })
+  await app.waitFor(`!!${windowNamed(title)}`)
+  await sleep(200)
+}
+async function openIn(scope, label, title) {
+  await clickExpr(itemIn(scope, label), { count: 2 })
+  if (title) await app.waitFor(`!!${windowNamed(title)}`)
+  await sleep(250)
+}
+
+async function panes() {
+  await fresh()
+  await openOnDesktop('My Computer')
+  const mc = windowNamed('My Computer')
+  const status = await statusOf(mc)
+  check(
+    Array.isArray(status) && status.length === 2 && status[1] === '',
+    '38',
+    "My Computer's right status pane is empty with nothing selected",
+    status,
+  )
+  await clickExpr(itemIn(mc, '(C:)'))
+  const withDrive = await statusOf(mc)
+  check(
+    /^Free Space: .+MB, Capacity: 512MB$/.test(withDrive[1]),
+    '38',
+    'selecting (C:) shows its free space and capacity',
+    withDrive,
+  )
+  await shot('38-mycomputer-status', await boxOf(mc))
+
+  await clickExpr(itemIn(mc, '3½ Floppy (A:)'), { count: 2 })
+  await app.waitFor(`!!${anyDialog}`)
+  const floppy = await app.eval(`${anyDialog}.getAttribute('aria-label')`)
+  check(floppy === 'A:\\', '24', 'the floppy error box is titled A:\\ with one backslash', floppy)
+  await shot('24-floppy-title', await boxOf(anyDialog))
+  await clickExpr(buttonIn(anyDialog, 'Cancel'))
+
+  await openIn(mc, '(C:)', '(C:)')
+  const c = windowNamed('(C:)')
+  await openMenu('View', 'Toolbar', c)
+  await sleep(200)
+  const bar = await app.eval(
+    `(()=>{const t=${c}.querySelector('.explorer-toolbar');const b=[...t.querySelectorAll('button')];return {height:t.offsetHeight,width:t.clientWidth,scroll:t.scrollWidth,rows:new Set(b.map(x=>x.offsetTop)).size}})()`,
+  )
+  check(
+    bar.rows === 1 && bar.height <= 30 && bar.scroll > bar.width,
+    '15',
+    'the toolbar stays one row in a narrow window and clips the buttons that do not fit',
+    bar,
+  )
+  await shot('15-toolbar-one-row', await boxOf(c))
+  await openMenu('View', 'Toolbar', c)
+
+  const layout = await app.eval(
+    `[...${c}.querySelectorAll('[role="listbox"] [role="option"]')].map(o => ({ label: o.getAttribute('aria-label'), top: o.offsetTop }))`,
+  )
+  const lastRowTop = Math.max(...layout.map((item) => item.top))
+  const onLastRow = layout.filter((item) => item.top === lastRowTop)
+  const firstRow = layout.filter((item) => item.top === layout[0].top)
+  const start = firstRow.length < layout.length ? firstRow.at(-1) : layout[0]
+  await clickExpr(itemIn(c, start.label))
+  await app.key('ArrowDown')
+  await sleep(100)
+  const afterDown = await app.eval(
+    `[...${c}.querySelectorAll('[role="option"][aria-selected="true"]')].map(o => o.getAttribute('aria-label'))`,
+  )
+  const below = layout.find(
+    (item) =>
+      item.top > start.top && Math.abs(layout.indexOf(item) - layout.indexOf(start)) === firstRow.length,
+  )
+  check(
+    below ? afterDown[0] === below.label : afterDown[0] === start.label,
+    '26',
+    'Down with no icon directly below keeps the selection',
+    { start: start.label, afterDown, rows: { first: firstRow.length, last: onLastRow.length } },
+  )
+  await app.key('ArrowRight')
+  const afterRight = await app.eval(
+    `[...${c}.querySelectorAll('[role="option"][aria-selected="true"]')].map(o => o.getAttribute('aria-label'))`,
+  )
+  check(afterRight[0] !== afterDown[0], '26', 'Right still moves one icon', afterRight)
+
+  await openIn(c, 'My Documents', 'My Documents')
+  const docs = windowNamed('My Documents')
+  const before = await app.eval(`(()=>{const s=${docs}.style;return [s.left,s.top]})()`)
+  await clickExpr(`${docs}.querySelector('[role="listbox"]')`)
+  await app.key('Backspace')
+  await sleep(300)
+  const moved = await app.eval(
+    `(()=>{const w=${topWindow};return {title:w.getAttribute('aria-label'),pos:[w.style.left,w.style.top]}})()`,
+  )
+  check(
+    moved.title === '(C:)' && moved.pos[0] === before[0] && moved.pos[1] === before[1],
+    '25',
+    'Backspace takes the window up to (C:) and leaves it where it was',
+    { before, after: moved },
+  )
+  await shot('25-backspace-stays')
+}
+
+async function explorer() {
+  await fresh()
+  await run('explorer')
+  await app.waitFor(`!!${windowNamed('Exploring - C:\\')}`)
+  const ex = windowNamed('Exploring - C:\\')
+  const sash = await app.eval(
+    `(()=>{const s=${ex}.querySelector('.explorer-splitter').getBoundingClientRect();return {x:s.x,y:s.y,w:s.width,h:s.height}})()`,
+  )
+  const treeBefore = await app.eval(`${ex}.querySelector('.explorer-tree-pane').offsetWidth`)
+  check(sash.w === 4 && sash.h > 100, '9', 'the splitter is a full-height 4px sash', sash)
+  const from = [sash.x + 2, sash.y + sash.h / 2]
+  const to = [from[0] + 80, from[1]]
+  const gesture = await holdDrag(from, to)
+  await sleep(100)
+  const during = await app.eval(
+    `({bar: !!document.querySelector('.explorer-splitter-bar'), tree: ${ex}.querySelector('.explorer-tree-pane').offsetWidth})`,
+  )
+  await shot('09-splitter-dragging', await boxOf(ex))
+  await gesture.release()
+  await sleep(150)
+  const treeAfter = await app.eval(`${ex}.querySelector('.explorer-tree-pane').offsetWidth`)
+  check(
+    during.bar && during.tree === treeBefore && treeAfter === treeBefore + 80,
+    '9',
+    'dragging tracks a dithered bar, and the tree pane takes the width on release',
+    { treeBefore, during, treeAfter },
+  )
+  await shot('09-splitter-after', await boxOf(ex))
+
+  await clickExpr(`${ex}.querySelector('[role="treeitem"][aria-selected="true"]')`)
+  const where = () =>
+    app.eval(
+      `(()=>{const a=document.activeElement;return a.closest('[role="tree"]')?'tree':a.closest('.explorer-toolbar')?'combo':a.getAttribute('role')==='listbox'?'list':a.className.includes('expander')?'expander':(a.getAttribute('aria-label')||a.tagName)})()`,
+    )
+  const seen = []
+  for (const key of ['Tab', 'Tab', 'Tab']) {
+    await app.key(key)
+    seen.push(await where())
+  }
+  await app.key('Tab', ['Shift'])
+  seen.push(await where())
+  for (const key of ['F6', 'F6']) {
+    await app.key(key)
+    seen.push(await where())
+  }
+  check(
+    seen.join(',') === 'list,combo,tree,combo,tree,list',
+    '18',
+    'Tab, Shift+Tab, and F6 cycle the combo, tree, and list, never stopping on an expander',
+    seen,
+  )
+
+  await openMenu('Tools', 'Go to...', ex)
+  await app.waitFor(`!!${dialog('Go to Folder')}`)
+  const box = await app.eval(
+    `(()=>{const i=${dialog('Go to Folder')}.querySelector('input');return {value:i.value,start:i.selectionStart,end:i.selectionEnd,focused:document.activeElement===i}})()`,
+  )
+  check(
+    box.focused && box.start === 0 && box.end === box.value.length && box.value === 'C:\\',
+    '23',
+    'Go to Folder opens with its path selected',
+    box,
+  )
+  await shot('23-goto-selected', await dialogBox('Go to Folder'))
+  await app.type('C:\\WINDOWS')
+  await app.key('Enter')
+  await app.waitFor(`!!${windowNamed('Exploring - WINDOWS')}`)
+  check(true, '23', 'typing over the selection and Enter goes to C:\\WINDOWS')
+}
+
+async function sizes() {
+  await fresh()
+  await run('explorer')
+  await app.waitFor(`!!${windowNamed('Exploring - C:\\')}`)
+  const ex = windowNamed('Exploring - C:\\')
+  await openMenu('View', 'Details', ex)
+  await sleep(200)
+  const row = await app.eval(
+    `[...${itemIn(ex, 'AUTOEXEC.BAT')}.querySelectorAll('.explorer-cell')].map(c => c.textContent)`,
+  )
+  check(row[1] === '1KB', '21', 'Details shows 1KB with no space', row)
+  await shot('21-details-size', await boxOf(ex))
+  await clickExpr(itemIn(ex, 'AUTOEXEC.BAT'))
+  await app.key('Enter', ['Alt'])
+  await app.waitFor(`!!${dialog('AUTOEXEC Properties')}`)
+  const size = await app.eval(
+    `[...${dialog('AUTOEXEC Properties')}.querySelectorAll('span')].find(s => s.textContent === 'Size:').nextElementSibling.textContent`,
+  )
+  check(/^\d+ bytes \(\d+ bytes\)$/.test(size), '21', 'Properties reads N bytes (N bytes)', size)
+  await shot('21-properties-size', await dialogBox('AUTOEXEC Properties'))
+  await app.key('Escape')
+}
+
+const phases = { panes, explorer, sizes }
+try {
+  for (const [name, body] of Object.entries(phases)) if (phase === 'all' || phase === name) await body()
+} finally {
+  writeFileSync(join(proof, `checks-${phase}.json`), JSON.stringify(results, null, 2))
+  app.close()
+}

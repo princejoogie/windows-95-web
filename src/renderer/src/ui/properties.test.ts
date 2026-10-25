@@ -87,7 +87,7 @@ describe('attributes', () => {
 
 describe('sizes', () => {
   it('shows bytes, then KB with the exact count', () => {
-    expect(formatSize(422)).toBe('422 bytes')
+    expect(formatSize(422)).toBe('422 bytes (422 bytes)')
     expect(formatSize(1201)).toBe('1.17KB (1,201 bytes)')
     expect(formatSize(30 * 1024)).toBe('30.0KB (30,720 bytes)')
   })

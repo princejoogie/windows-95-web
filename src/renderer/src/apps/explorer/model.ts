@@ -54,7 +54,7 @@ export function cellValue(state: FsState, node: FsNode, column: Column): string 
       return node.name
     case 'size':
       return node.kind === 'file' || node.kind === 'program' || node.kind === 'shortcut'
-        ? `${Math.ceil(sizeOf(node) / 1024)} KB`
+        ? `${Math.ceil(sizeOf(node) / 1024)}KB`
         : ''
     case 'type':
       return typeOf(node)

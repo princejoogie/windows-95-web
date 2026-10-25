@@ -101,9 +101,9 @@ export function contentsOf(state: FsState, node: FsNode): { files: number; folde
 
 const thousands = (n: number) => n.toLocaleString('en-US')
 
-/** `422 bytes`, or `1.17KB (1,201 bytes)` once the size passes 1 KB. */
+/** `422 bytes (422 bytes)`, or `1.17KB (1,201 bytes)` once the size passes 1 KB, as the General tab reads. */
 export function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${thousands(bytes)} bytes`
+  if (bytes < 1024) return `${thousands(bytes)} bytes (${thousands(bytes)} bytes)`
   const units = ['KB', 'MB', 'GB']
   let value = bytes / 1024
   let unit = 0

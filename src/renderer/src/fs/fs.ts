@@ -129,6 +129,17 @@ export function uniqueName(state: FsState, parent: NodeId, base: string): string
   }
 }
 
+/** C: is a 512 MB disk. */
+export const DRIVE_CAPACITY = 536870912
+
+/** Bytes in use on C:, counting every node, the Recycle Bin's included. */
+export function driveUsed(state: FsState): number {
+  return Math.min(
+    DRIVE_CAPACITY,
+    Object.values(state.nodes).reduce((sum, node) => sum + fileSize(node), 0),
+  )
+}
+
 function put(state: FsState, node: FsNode): FsState {
   return { ...state, nodes: { ...state.nodes, [node.id]: node } }
 }
