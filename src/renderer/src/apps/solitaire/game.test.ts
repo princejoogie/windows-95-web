@@ -4,6 +4,8 @@ import {
   canRecycle,
   DEFAULT_OPTIONS,
   deck,
+  FOUNDATION_SLOTS,
+  type Foundations,
   type Game,
   gameReducer,
   newGame,
@@ -38,11 +40,29 @@ function emptyStock(game: Game): Game {
 }
 
 describe('Klondike deal and moves', () => {
-  it.each(SUITS)('accepts an Ace of clubs in the empty %s foundation position', (slot) => {
+  it.each(FOUNDATION_SLOTS)('accepts an Ace of clubs in empty foundation position %i', (slot) => {
     const game = position({ waste: [up(1, 'clubs')] })
-    const next = move(game, { kind: 'waste' }, { kind: 'foundation', suit: slot })
+    const next = move(game, { kind: 'waste' }, { kind: 'foundation', pile: slot })
     expect(next.foundations[slot]).toEqual([up(1, 'clubs')])
     expect(next.waste).toEqual([])
+  })
+
+  it.each(FOUNDATION_SLOTS)('builds the chosen suit in position %i and releases it when emptied', (pile) => {
+    const game = position({ waste: [up(1, 'hearts')], tableau: [[up(2, 'clubs')], [], [], [], [], [], []] })
+    const ace = move(game, { kind: 'waste' }, { kind: 'foundation', pile })
+    expect(
+      canMove({ ...ace, waste: [up(2, 'diamonds')] }, { kind: 'waste' }, { kind: 'foundation', pile }),
+    ).toBe(false)
+    expect(
+      canMove({ ...ace, waste: [up(3, 'hearts')] }, { kind: 'waste' }, { kind: 'foundation', pile }),
+    ).toBe(false)
+    const two = move({ ...ace, waste: [up(2, 'hearts')] }, { kind: 'waste' }, { kind: 'foundation', pile })
+    expect(two.foundations[pile].map((card) => card.rank)).toEqual([1, 2])
+    const returned = move(ace, { kind: 'foundation', pile }, { kind: 'tableau', column: 0 })
+    expect(returned.foundations[pile]).toEqual([])
+    expect(
+      canMove({ ...returned, waste: [up(1, 'spades')] }, { kind: 'waste' }, { kind: 'foundation', pile }),
+    ).toBe(true)
   })
 
   it('deals 52 distinct cards with one face-up card per column and a repeatable seed', () => {
@@ -119,17 +139,17 @@ describe('Klondike deal and moves', () => {
       waste: [up(1, 'hearts')],
       tableau: [[up(2, 'hearts')], [up(1, 'clubs'), up(13, 'hearts')], [], [], [], [], []],
     })
-    expect(canMove(game, { kind: 'waste' }, { kind: 'foundation', suit: 'spades' })).toBe(false)
-    expect(
-      canMove(game, { kind: 'tableau', column: 0, index: 0 }, { kind: 'foundation', suit: 'hearts' }),
-    ).toBe(false)
-    expect(
-      canMove(game, { kind: 'tableau', column: 1, index: 0 }, { kind: 'foundation', suit: 'clubs' }),
-    ).toBe(false)
-    const ace = move(game, { kind: 'waste' }, { kind: 'foundation', suit: 'hearts' })
-    expect(ace.foundations.hearts.map((card) => card.rank)).toEqual([1])
-    const two = move(ace, { kind: 'tableau', column: 0, index: 0 }, { kind: 'foundation', suit: 'hearts' })
-    expect(two.foundations.hearts.map((card) => card.rank)).toEqual([1, 2])
+    expect(canMove(game, { kind: 'waste' }, { kind: 'foundation', pile: 3 })).toBe(true)
+    expect(canMove(game, { kind: 'tableau', column: 0, index: 0 }, { kind: 'foundation', pile: 2 })).toBe(
+      false,
+    )
+    expect(canMove(game, { kind: 'tableau', column: 1, index: 0 }, { kind: 'foundation', pile: 0 })).toBe(
+      false,
+    )
+    const ace = move(game, { kind: 'waste' }, { kind: 'foundation', pile: 2 })
+    expect(ace.foundations[2].map((card) => card.rank)).toEqual([1])
+    const two = move(ace, { kind: 'tableau', column: 0, index: 0 }, { kind: 'foundation', pile: 2 })
+    expect(two.foundations[2].map((card) => card.rank)).toEqual([1, 2])
   })
 
   it('flips only a face-down top card when explicitly clicked', () => {
@@ -179,10 +199,10 @@ describe('Standard scoring and undo', () => {
       tableau: [[up(2, 'clubs')], [{ ...up(4, 'spades'), faceUp: false }], [], [], [], [], []],
     })
     expect(move(game, { kind: 'waste' }, { kind: 'tableau', column: 0 }).score).toBe(5)
-    expect(move(game, { kind: 'waste' }, { kind: 'foundation', suit: 'hearts' }).score).toBe(10)
+    expect(move(game, { kind: 'waste' }, { kind: 'foundation', pile: 2 }).score).toBe(10)
     const onTableau = move(game, { kind: 'waste' }, { kind: 'tableau', column: 0 })
     expect(
-      move(onTableau, { kind: 'tableau', column: 0, index: 1 }, { kind: 'foundation', suit: 'hearts' }).score,
+      move(onTableau, { kind: 'tableau', column: 0, index: 1 }, { kind: 'foundation', pile: 2 }).score,
     ).toBe(15)
     expect(gameReducer(game, { type: 'flip', column: 1 }).score).toBe(5)
   })
@@ -190,13 +210,12 @@ describe('Standard scoring and undo', () => {
   it('deducts 15 for foundation to tableau and floors Standard scores at zero', () => {
     const game = position({
       score: 20,
-      foundations: { clubs: [], diamonds: [], hearts: [up(1, 'hearts')], spades: [] },
+      foundations: [[], [], [up(1, 'hearts')], []],
       tableau: [[up(2, 'clubs')], [], [], [], [], [], []],
     })
-    expect(move(game, { kind: 'foundation', suit: 'hearts' }, { kind: 'tableau', column: 0 }).score).toBe(5)
+    expect(move(game, { kind: 'foundation', pile: 2 }, { kind: 'tableau', column: 0 }).score).toBe(5)
     expect(
-      move({ ...game, score: 3 }, { kind: 'foundation', suit: 'hearts' }, { kind: 'tableau', column: 0 })
-        .score,
+      move({ ...game, score: 3 }, { kind: 'foundation', pile: 2 }, { kind: 'tableau', column: 0 }).score,
     ).toBe(0)
   })
 
@@ -222,7 +241,7 @@ describe('Standard scoring and undo', () => {
 
   it('undo restores the board and prior score with the Standard 2-point penalty, preserving time', () => {
     const game = position({ score: 30, waste: [up(1, 'hearts')], elapsed: 9, started: true })
-    const moved = move(game, { kind: 'waste' }, { kind: 'foundation', suit: 'hearts' })
+    const moved = move(game, { kind: 'waste' }, { kind: 'foundation', pile: 2 })
     const restored = undo(gameReducer(moved, { type: 'tick' }))
     expect(restored).toMatchObject({
       waste: game.waste,
@@ -262,10 +281,10 @@ describe('Vegas, no scoring, and winning', () => {
       { scoring: 'vegas' },
     )
     expect(game.score).toBe(-52)
-    const paid = move(game, { kind: 'waste' }, { kind: 'foundation', suit: 'hearts' })
+    const paid = move(game, { kind: 'waste' }, { kind: 'foundation', pile: 2 })
     expect(paid.score).toBe(-47)
     expect(undo(paid).score).toBe(-52)
-    expect(move(paid, { kind: 'foundation', suit: 'hearts' }, { kind: 'tableau', column: 0 }).score).toBe(-52)
+    expect(move(paid, { kind: 'foundation', pile: 2 }, { kind: 'tableau', column: 0 }).score).toBe(-52)
     expect(move(game, { kind: 'waste' }, { kind: 'tableau', column: 0 }).score).toBe(-52)
     expect(draw(position({ waste: [up(4, 'clubs')] }, { scoring: 'vegas' })).score).toBe(-52)
     expect(gameReducer({ ...paid, elapsed: 9 }, { type: 'tick' }).score).toBe(-47)
@@ -282,21 +301,21 @@ describe('Vegas, no scoring, and winning', () => {
 
   it('leaves scores at zero when scoring is None', () => {
     const game = position({ waste: [up(1, 'hearts')] }, { scoring: 'none' })
-    expect(move(game, { kind: 'waste' }, { kind: 'foundation', suit: 'hearts' }).score).toBe(0)
+    expect(move(game, { kind: 'waste' }, { kind: 'foundation', pile: 2 }).score).toBe(0)
   })
 
   it.each([30, 31, 100])(
     'wins only at 52 foundation cards and awards the timed bonus at %i seconds',
     (elapsed) => {
-      const foundations = {
-        clubs: RANKS.map((rank) => ({ rank, suit: SUITS[0] })),
-        diamonds: RANKS.map((rank) => ({ rank, suit: SUITS[1] })),
-        hearts: RANKS.map((rank) => ({ rank, suit: SUITS[2] })),
-        spades: RANKS.slice(0, 12).map((rank) => ({ rank, suit: SUITS[3] })),
-      }
+      const foundations: Foundations = [
+        RANKS.map((rank) => ({ rank, suit: SUITS[0] })),
+        RANKS.map((rank) => ({ rank, suit: SUITS[1] })),
+        RANKS.map((rank) => ({ rank, suit: SUITS[2] })),
+        RANKS.slice(0, 12).map((rank) => ({ rank, suit: SUITS[3] })),
+      ]
       const game = position({ foundations, waste: [up(13, 'spades')], score: 500, elapsed })
       expect(game.phase).toBe('playing')
-      const won = move(game, { kind: 'waste' }, { kind: 'foundation', suit: 'spades' })
+      const won = move(game, { kind: 'waste' }, { kind: 'foundation', pile: 3 })
       expect(won.phase).toBe('won')
       expect(won.score).toBe(510 + (elapsed > 30 ? Math.floor(700000 / elapsed) : 0))
       expect(gameReducer(won, { type: 'tick' })).toBe(won)

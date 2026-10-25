@@ -3,19 +3,20 @@ import { useKeyDown } from '../../shell/context'
 import type { AppManifest, AppProps } from '../../shell/types'
 import { Button, Checkbox, Dialog, GroupBox, MenuBar, Radio, StatusBar, StatusPane } from '../../ui'
 import { Cascade } from './Cascade'
-import { BACKS, type Back, backImage, cardImage, cardName, icon, SUIT_SYMBOLS, smallIcon } from './cards'
+import { BACKS, type Back, backImage, cardImage, cardName, icon, smallIcon } from './cards'
 import { proofDeal } from './fixtures'
 import {
   type Action,
   type Card,
+  canMove,
   canRecycle,
   DEFAULT_OPTIONS,
+  FOUNDATION_SLOTS,
   type Game,
   gameReducer,
   newGame,
   type Options,
   type Source,
-  SUITS,
   seededRandom,
   sourceCards,
   type Target,
@@ -232,8 +233,8 @@ function Solitaire({ window }: AppProps) {
     height: cardHeight,
   })
   const autoFoundation = (source: Source) => {
-    const card = sourceCards(game, source)[0]
-    if (card) dispatch({ type: 'move', source, target: { kind: 'foundation', suit: card.suit } })
+    const pile = FOUNDATION_SLOTS.find((pile) => canMove(game, source, { kind: 'foundation', pile }))
+    if (pile !== undefined) dispatch({ type: 'move', source, target: { kind: 'foundation', pile } })
   }
   const begin = (event: PointerEvent<HTMLButtonElement>, source: Source) => {
     if (event.button !== 0 || game.phase !== 'playing' || !sourceCards(game, source).length) return
@@ -268,8 +269,9 @@ function Solitaire({ window }: AppProps) {
       for (let column = 0; column < 7; column++) {
         if (x < columnX(column) || x > columnX(column) + cardWidth) continue
         if (y >= tableauY && y < size.height) target = { kind: 'tableau', column }
-        const suit = SUITS[column - 3]
-        if (suit && y >= margin && y <= margin + cardHeight) target = { kind: 'foundation', suit }
+        const pile = FOUNDATION_SLOTS[column - 3]
+        if (pile !== undefined && y >= margin && y <= margin + cardHeight)
+          target = { kind: 'foundation', pile }
       }
       if (target) dispatch({ type: 'move', source: drag.source, target })
     }
@@ -281,7 +283,7 @@ function Solitaire({ window }: AppProps) {
     if (!drag?.moving || drag.source.kind !== source.kind) return false
     if (source.kind === 'waste') return true
     if (source.kind === 'foundation')
-      return drag.source.kind === 'foundation' && drag.source.suit === source.suit
+      return drag.source.kind === 'foundation' && drag.source.pile === source.pile
     return (
       drag.source.kind === 'tableau' &&
       source.column === drag.source.column &&
@@ -404,23 +406,19 @@ function Solitaire({ window }: AppProps) {
             />
           )
         })}
-        {SUITS.map((suit, index) => {
-          const card = game.foundations[suit].at(-1)
+        {FOUNDATION_SLOTS.map((pile) => {
+          const card = game.foundations[pile].at(-1)
           return (
-            <div key={suit}>
+            <div key={pile}>
               <div
                 role="img"
                 className="solitaire-slot pointer-events-none"
-                style={rect(columnX(index + 3), margin)}
-                aria-label={`${suit} foundation`}
-                data-foundation={suit}
-                data-count={game.foundations[suit].length}
-              >
-                <span style={{ fontSize: 35 * scale, color: '#008000', textShadow: '1px 1px #000' }}>
-                  {SUIT_SYMBOLS[suit]}
-                </span>
-              </div>
-              {card && cardButton(card, { kind: 'foundation', suit }, columnX(index + 3), margin)}
+                style={rect(columnX(pile + 3), margin)}
+                aria-label={`${card ? card.suit : 'Empty'} foundation ${pile + 1}`}
+                data-foundation={pile}
+                data-count={game.foundations[pile].length}
+              />
+              {card && cardButton(card, { kind: 'foundation', pile }, columnX(pile + 3), margin)}
             </div>
           )
         })}

@@ -2,6 +2,9 @@ export const SUITS = ['clubs', 'diamonds', 'hearts', 'spades'] as const
 export const RANKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] as const
 export type Suit = (typeof SUITS)[number]
 export type Rank = (typeof RANKS)[number]
+export const FOUNDATION_SLOTS = [0, 1, 2, 3] as const
+export type FoundationSlot = (typeof FOUNDATION_SLOTS)[number]
+export type Foundations = readonly [readonly Card[], readonly Card[], readonly Card[], readonly Card[]]
 export interface Card {
   readonly suit: Suit
   readonly rank: Rank
@@ -28,7 +31,7 @@ export interface Position {
   readonly waste: readonly Card[]
   readonly wasteFan: number
   readonly tableau: readonly (readonly TableauCard[])[]
-  readonly foundations: Readonly<Record<Suit, readonly Card[]>>
+  readonly foundations: Foundations
   readonly recycles: number
   readonly score: number
   readonly elapsed: number
@@ -42,10 +45,10 @@ export interface Game extends Position {
 export type Source =
   | { readonly kind: 'waste' }
   | { readonly kind: 'tableau'; readonly column: number; readonly index: number }
-  | { readonly kind: 'foundation'; readonly suit: Suit }
+  | { readonly kind: 'foundation'; readonly pile: FoundationSlot }
 export type Target =
   | { readonly kind: 'tableau'; readonly column: number }
-  | { readonly kind: 'foundation'; readonly suit: Suit }
+  | { readonly kind: 'foundation'; readonly pile: FoundationSlot }
 export type Action =
   | { readonly type: 'stock' }
   | { readonly type: 'move'; readonly source: Source; readonly target: Target }
@@ -89,7 +92,7 @@ export function newGame(options: Options = DEFAULT_OPTIONS, random: () => number
     waste: [],
     wasteFan: 0,
     tableau,
-    foundations: { clubs: [], diamonds: [], hearts: [], spades: [] },
+    foundations: [[], [], [], []],
     recycles: 0,
     score: options.scoring === 'vegas' ? -52 : 0,
     elapsed: 0,
@@ -110,7 +113,7 @@ export function sourceCards(game: Game, source: Source): readonly Card[] {
       return card ? [card] : []
     }
     case 'foundation': {
-      const card = game.foundations[source.suit].at(-1)
+      const card = game.foundations[source.pile].at(-1)
       return card ? [card] : []
     }
     case 'tableau': {
@@ -136,11 +139,13 @@ export function canMove(game: Game, source: Source, target: Target): boolean {
   const card = cards[0]
   if (!card) return false
   if (target.kind === 'foundation') {
+    const pile = game.foundations[target.pile]
+    const first = pile[0]
     return (
       source.kind !== 'foundation' &&
       cards.length === 1 &&
-      card.suit === target.suit &&
-      card.rank === game.foundations[target.suit].length + 1
+      (!first || card.suit === first.suit) &&
+      card.rank === pile.length + 1
     )
   }
   if (source.kind === 'tableau' && source.column === target.column) return false
@@ -241,15 +246,16 @@ export function gameReducer(game: Game, action: Action): Game {
       let tableau = game.tableau.map((column, index) =>
         source.kind === 'tableau' && index === source.column ? column.slice(0, source.index) : column,
       )
-      let foundations = game.foundations
-      if (source.kind === 'foundation')
-        foundations = { ...foundations, [source.suit]: foundations[source.suit].slice(0, -1) }
+      const foundations: [readonly Card[], readonly Card[], readonly Card[], readonly Card[]] = [
+        ...game.foundations,
+      ]
+      if (source.kind === 'foundation') foundations[source.pile] = foundations[source.pile].slice(0, -1)
       if (target.kind === 'tableau') {
         tableau = tableau.map((column, index) =>
           index === target.column ? [...column, ...cards.map((card) => ({ ...card, faceUp: true }))] : column,
         )
       } else {
-        foundations = { ...foundations, [target.suit]: [...foundations[target.suit], ...cards] }
+        foundations[target.pile] = [...foundations[target.pile], ...cards]
       }
       const standard =
         target.kind === 'foundation'
@@ -267,7 +273,7 @@ export function gameReducer(game: Game, action: Action): Game {
         wasteFan: source.kind === 'waste' ? Math.max(0, game.wasteFan - 1) : game.wasteFan,
         score: score(game, standard, vegas),
       })
-      if (SUITS.every((suit) => foundations[suit].length === 13)) {
+      if (foundations.every((pile) => pile.length === 13)) {
         const bonus =
           game.options.scoring === 'standard' && game.options.timed && game.elapsed > 30
             ? Math.floor(700000 / game.elapsed)
