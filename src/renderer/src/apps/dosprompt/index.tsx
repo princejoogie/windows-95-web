@@ -1,4 +1,4 @@
-import { type CSSProperties, type PointerEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type CSSProperties, type PointerEvent, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { fsStore, useFs } from '../../fs/store'
 import { WINDOWS_DIR } from '../../fs/types'
@@ -60,7 +60,7 @@ function DosPrompt({ window: api, args }: AppProps) {
     addEventListener('resize', resize)
     return () => removeEventListener('resize', resize)
   }, [])
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (api.focused && !api.minimized && dialog === 'none' && !menu && !error)
       commandInput.current?.focus({ preventScroll: !fullVisible })
   }, [api.focused, api.minimized, dialog, menu, error, fullVisible])
