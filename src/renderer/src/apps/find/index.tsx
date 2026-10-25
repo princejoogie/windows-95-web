@@ -6,8 +6,19 @@ import { icons } from '../../icons'
 import { useKeyDown } from '../../shell/context'
 import { launch, openNode, windowsStore } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
-import { Accel, Button, Checkbox, Dialog, MessageBox, Radio, StatusBar, StatusPane, TextBox } from '../../ui'
-import { CommandMenu, Tabs } from '../help/controls'
+import {
+  Accel,
+  Button,
+  Checkbox,
+  Dialog,
+  MenuBar,
+  MessageBox,
+  Radio,
+  StatusBar,
+  StatusPane,
+  TextBox,
+} from '../../ui'
+import { Tabs } from '../help/controls'
 import '../help/help.css'
 import { findIcon } from './icons'
 import {
@@ -67,9 +78,15 @@ function Find({ window: appWindow, args }: AppProps) {
   const [details, setDetails] = useState(true)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const root = useRef<HTMLDivElement>(null)
+  const initialFocus = useRef(false)
   const collapsedHeight = useRef(238)
   const id = useId()
   const running = search.kind === 'running'
+  useEffect(() => {
+    if (!appWindow.focused || initialFocus.current) return
+    root.current?.querySelector<HTMLInputElement>('[name=named]')?.focus()
+    initialFocus.current = true
+  }, [appWindow.focused])
   const fileTypes = useMemo(
     () =>
       [
@@ -196,9 +213,6 @@ function Find({ window: appWindow, args }: AppProps) {
     } else if (event.key === 'Escape' && running) {
       event.preventDefault()
       stop()
-    } else if (event.altKey && letter === 'f') {
-      event.preventDefault()
-      start()
     } else if (event.altKey && letter === 's') {
       event.preventDefault()
       stop()
@@ -216,9 +230,6 @@ function Find({ window: appWindow, args }: AppProps) {
     } else if (event.altKey && letter === 'b') {
       event.preventDefault()
       setBrowse(criteria.folder)
-    } else if (event.key === 'F10' || (event.key === 'Alt' && !event.ctrlKey)) {
-      event.preventDefault()
-      root.current?.querySelector<HTMLButtonElement>('.classic-menu-button')?.focus()
     } else if (event.ctrlKey && letter === 'a' && !(event.target instanceof HTMLInputElement)) {
       event.preventDefault()
       setSelected(new Set(results.map((result) => result.node.id)))
@@ -229,80 +240,84 @@ function Find({ window: appWindow, args }: AppProps) {
   })
   return (
     <div ref={root} className="find-app">
-      <div role="menubar" className="flex h-[19px] shrink-0">
-        <CommandMenu
-          label="&File"
-          commands={[
-            {
-              label: '&Open',
-              action: () => {
-                if (chosen) open(chosen)
+      <MenuBar
+        menus={[
+          {
+            label: '&File',
+            items: [
+              {
+                label: '&Open',
+                onSelect: () => {
+                  if (chosen) open(chosen)
+                },
+                disabled: !chosen,
               },
-              disabled: !chosen,
-            },
-            {
-              label: 'Open Containing &Folder',
-              action: () => {
-                if (chosen?.node.parent) openNode(chosen.node.parent)
+              {
+                label: 'Open Containing &Folder',
+                onSelect: () => {
+                  if (chosen?.node.parent) openNode(chosen.node.parent)
+                },
+                disabled: !chosen,
               },
-              disabled: !chosen,
-            },
-            { label: '&Properties', action: () => setProperties(chosen ?? null), disabled: !chosen },
-            'separator',
-            { label: '&Close', action: appWindow.close },
-          ]}
-        />
-        <CommandMenu
-          label="&Edit"
-          commands={[
-            { label: '&Copy', shortcut: 'Ctrl+C', action: copy, disabled: !chosen },
-            {
-              label: 'Select &All',
-              shortcut: 'Ctrl+A',
-              action: () => setSelected(new Set(results.map((result) => result.node.id))),
-              disabled: !results.length,
-            },
-            {
-              label: '&Invert Selection',
-              action: () =>
-                setSelected(
-                  new Set(
-                    results.filter((result) => !selected.has(result.node.id)).map((result) => result.node.id),
+              { label: '&Properties', onSelect: () => setProperties(chosen ?? null), disabled: !chosen },
+              'separator',
+              { label: '&Close', onSelect: appWindow.close },
+            ],
+          },
+          {
+            label: '&Edit',
+            items: [
+              { label: '&Copy', shortcut: 'Ctrl+C', onSelect: copy, disabled: !chosen },
+              {
+                label: 'Select &All',
+                shortcut: 'Ctrl+A',
+                onSelect: () => setSelected(new Set(results.map((result) => result.node.id))),
+                disabled: !results.length,
+              },
+              {
+                label: '&Invert Selection',
+                onSelect: () =>
+                  setSelected(
+                    new Set(
+                      results
+                        .filter((result) => !selected.has(result.node.id))
+                        .map((result) => result.node.id),
+                    ),
                   ),
-                ),
-              disabled: !results.length,
-            },
-          ]}
-        />
-        <CommandMenu
-          label="&View"
-          commands={[
-            { label: '&List', checked: !details, action: () => setDetails(false) },
-            { label: '&Details', checked: details, action: () => setDetails(true) },
-            'separator',
-            { label: '&Refresh', shortcut: 'F5', action: start, disabled: running },
-          ]}
-        />
-        <CommandMenu
-          label="&Options"
-          commands={[
-            {
-              label: '&Case Sensitive',
-              checked: criteria.caseSensitive,
-              disabled: running,
-              action: () => update({ caseSensitive: !criteria.caseSensitive }),
-            },
-          ]}
-        />
-        <CommandMenu
-          label="&Help"
-          commands={[
-            { label: '&Help Topics', shortcut: 'F1', action: () => launch('help', { book: 'find' }) },
-            'separator',
-            { label: '&About Windows', action: () => setAbout(true) },
-          ]}
-        />
-      </div>
+                disabled: !results.length,
+              },
+            ],
+          },
+          {
+            label: '&View',
+            items: [
+              { label: '&List', checked: !details, onSelect: () => setDetails(false) },
+              { label: '&Details', checked: details, onSelect: () => setDetails(true) },
+              'separator',
+              { label: '&Refresh', shortcut: 'F5', onSelect: start, disabled: running },
+            ],
+          },
+          {
+            label: '&Options',
+            items: [
+              {
+                label: '&Case Sensitive',
+                checked: criteria.caseSensitive,
+                disabled: running,
+                onSelect: () => update({ caseSensitive: !criteria.caseSensitive }),
+              },
+            ],
+          },
+          {
+            label: '&Help',
+            items: [
+              { label: '&Help Topics', shortcut: 'F1', onSelect: () => launch('help', { book: 'find' }) },
+              'separator',
+              { label: '&About Windows', onSelect: () => setAbout(true) },
+            ],
+          },
+        ]}
+      />
       <form
         className="find-controls"
         onSubmit={(event) => {
