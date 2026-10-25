@@ -163,6 +163,7 @@ export function WordPad({ window: windowApi, args }: AppProps) {
   const [hasSelection, setHasSelection] = useState(false)
   const [dialog, setDialog] = useState<WordPadDialog | null>(null)
   const [preview, setPreview] = useState(false)
+  const [previewStatus, setPreviewStatus] = useState('Page 1')
   const [find, setFind] = useState<FindState>({
     query: '',
     replacement: '',
@@ -604,6 +605,7 @@ export function WordPad({ window: windowApi, args }: AppProps) {
             requestAnimationFrame(() => keeper.restore())
           }}
           onPrint={() => setDialog({ kind: 'print' })}
+          onStatus={setPreviewStatus}
         />
       )}
       {!preview && view.toolbar && (
@@ -676,7 +678,7 @@ export function WordPad({ window: windowApi, args }: AppProps) {
       </div>
       {view.statusBar && (
         <StatusBar>
-          <StatusPane className="flex-1">{preview ? 'Page 1' : 'For Help, press F1'}</StatusPane>
+          <StatusPane className="flex-1">{preview ? previewStatus : 'For Help, press F1'}</StatusPane>
           <StatusPane className="w-[36px] text-center">{locks.caps ? 'CAP' : ''}</StatusPane>
           <StatusPane className="w-[36px] text-center">{locks.num ? 'NUM' : ''}</StatusPane>
           <StatusPane className="w-[40px] text-center">{locks.scroll ? 'SCRL' : ''}</StatusPane>
@@ -845,11 +847,14 @@ function PrintPreview({
   page,
   onClose,
   onPrint,
+  onStatus,
 }: {
   doc: Document
   page: PageSetup
   onClose: () => void
   onPrint: () => void
+  /** The status bar text, such as `Page 1` or `Pages 1-2`. */
+  onStatus: (text: string) => void
 }) {
   const area = pageArea(page)
   const [zoom, setZoom] = useState(0)
@@ -868,6 +873,9 @@ function PrintPreview({
   }, [html, textHeight])
   const scale = PREVIEW_ZOOMS[zoom] ?? 0.35
   const shown = twoPage ? [current, current + 1].filter((p) => p < pages) : [current]
+  useEffect(() => {
+    onStatus(shown.length > 1 ? `Pages ${current + 1}-${current + 2}` : `Page ${current + 1}`)
+  }, [onStatus, shown.length, current])
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 gap-[4px] border-b border-shadow p-[4px]">
@@ -948,10 +956,6 @@ function PrintPreview({
           // biome-ignore lint/security/noDangerouslySetInnerHtml: the HTML is rendered from the typed document model
           dangerouslySetInnerHTML={{ __html: html }}
         />
-      </div>
-      <div className="shrink-0 px-[4px] text-right">
-        Page {current + 1}
-        {twoPage && shown.length > 1 ? `-${current + 2}` : ''} of {pages}
       </div>
     </div>
   )

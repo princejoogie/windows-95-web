@@ -75,6 +75,9 @@ function ListBox<T extends string | number>({
             item === value ? 'bg-select text-white' : ''
           }`}
           style={style?.(item)}
+          ref={(el) => {
+            if (el && item === value) el.scrollIntoView({ block: 'nearest' })
+          }}
           onClick={() => onChange(item)}
           onDoubleClick={() => onPick?.(item)}
         >
