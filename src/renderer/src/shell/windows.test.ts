@@ -62,7 +62,13 @@ describe('windowsReducer', () => {
   })
 
   it('closes a window and focuses the next one down', () => {
-    const state = run(open('a'), open('b'), open('c'), { type: 'focus', id: id(2) }, { type: 'close', id: id(2) })
+    const state = run(
+      open('a'),
+      open('b'),
+      open('c'),
+      { type: 'focus', id: id(2) },
+      { type: 'close', id: id(2) },
+    )
     expect(order(state)).toEqual(['a', 'c'])
     expect(state.focused).toBe(id(3))
   })
@@ -80,11 +86,12 @@ describe('windowsReducer', () => {
   })
 
   it('moves and resizes only the target window', () => {
-    const state = run(
-      open('a'),
-      open('b'),
-      { type: 'resize', id: id(1), position: { x: 5, y: 6 }, size: { width: 300, height: 200 } },
-    )
+    const state = run(open('a'), open('b'), {
+      type: 'resize',
+      id: id(1),
+      position: { x: 5, y: 6 },
+      size: { width: 300, height: 200 },
+    })
     expect(state.windows[0]).toMatchObject({ position: { x: 5, y: 6 }, size: { width: 300, height: 200 } })
     expect(state.windows[1]?.size).toBeNull()
   })

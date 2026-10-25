@@ -20,7 +20,7 @@ export function RunDialog({ onClose }: { onClose: () => void }) {
     const command = value.trim()
     if (!command) return
     const node = resolvePath(fs.get(), command)
-    const app = node ? undefined : findAppByExe(command.split('\').pop() ?? command)
+    const app = node ? undefined : findAppByExe(command.split('\\').pop() ?? command)
     const ok = node ? openNode(node.id) : app ? launch(app.id) !== null : false
     if (!ok) {
       setError(
@@ -46,12 +46,12 @@ export function RunDialog({ onClose }: { onClose: () => void }) {
             <img src={icons.start.run} alt="" className="size-8" />
             <p>Type the name of a program, folder, or document, and Windows will open it for you.</p>
           </div>
-          <label className="flex items-center gap-[8px]">
+          <label htmlFor="run-command" className="flex items-center gap-[8px]">
             <span>
               <span className="underline">O</span>pen:
             </span>
             <TextBox
-              // biome-ignore lint/a11y/noAutofocus: Run focuses its command line, as Windows does
+              id="run-command"
               autoFocus
               className="flex-1"
               value={value}
@@ -67,7 +67,15 @@ export function RunDialog({ onClose }: { onClose: () => void }) {
           </div>
         </form>
       </Dialog>
-      {error && <MessageBox title={value.trim()} icon="error" message={error} buttons={['OK']} onClose={() => setError(null)} />}
+      {error && (
+        <MessageBox
+          title={value.trim()}
+          icon="error"
+          message={error}
+          buttons={['OK']}
+          onClose={() => setError(null)}
+        />
+      )}
     </>
   )
 }

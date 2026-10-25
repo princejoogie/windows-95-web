@@ -7,7 +7,14 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   pressed?: boolean
 }
 
-export function Button({ isDefault, pressed, className = '', children, type = 'button', ...rest }: ButtonProps) {
+export function Button({
+  isDefault,
+  pressed,
+  className = '',
+  children,
+  type = 'button',
+  ...rest
+}: ButtonProps) {
   const ring = isDefault ? 'outline outline-1 outline-black -outline-offset-1' : ''
   return (
     <button

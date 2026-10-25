@@ -69,7 +69,15 @@ function Outline({ rect }: { rect: Rect }) {
 }
 
 /** Keeps app content from re-rendering when only the frame moves. */
-const AppHost = memo(function AppHost({ app, api, args }: { app: AppManifest; api: WindowApi; args: LaunchArgs }) {
+const AppHost = memo(function AppHost({
+  app,
+  api,
+  args,
+}: {
+  app: AppManifest
+  api: WindowApi
+  args: LaunchArgs
+}) {
   const Component = app.component
   return <Component window={api} args={args} />
 })
@@ -118,7 +126,10 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
     const { width, height } = frame.getBoundingClientRect()
     const { x, y } = position.current
     const next = placed.current
-      ? { x: clamp(x, KEEP_VISIBLE - width, desktop.width - KEEP_VISIBLE), y: clamp(y, 0, desktop.height - 20) }
+      ? {
+          x: clamp(x, KEEP_VISIBLE - width, desktop.width - KEEP_VISIBLE),
+          y: clamp(y, 0, desktop.height - 20),
+        }
       : { x: clamp(x, 0, desktop.width - width), y: clamp(y, 0, desktop.height - height) }
     placed.current = true
     if (next.x !== x || next.y !== y) windowsStore.dispatch({ type: 'move', id, position: next })
@@ -218,7 +229,11 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
         onDoubleClick={toggleMaximize}
         {...gestureHandlers}
       >
-        <TitleButton glyph="minimize" label="Minimize" onClick={() => windowsStore.dispatch({ type: 'minimize', id })} />
+        <TitleButton
+          glyph="minimize"
+          label="Minimize"
+          onClick={() => windowsStore.dispatch({ type: 'minimize', id })}
+        />
         <TitleButton
           glyph={maximized ? 'restore' : 'maximize'}
           label={maximized ? 'Restore' : 'Maximize'}
@@ -226,7 +241,11 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
           onClick={toggleMaximize}
         />
         <span className="w-[2px]" />
-        <TitleButton glyph="close" label="Close" onClick={() => windowsStore.dispatch({ type: 'close', id })} />
+        <TitleButton
+          glyph="close"
+          label="Close"
+          onClick={() => windowsStore.dispatch({ type: 'close', id })}
+        />
       </TitleBar>
       <div
         ref={clientRef}

@@ -118,7 +118,9 @@ function subtree(state: FsState, id: NodeId): Set<NodeId> {
 function remove(state: FsState, id: NodeId): FsState {
   const doomed = subtree(state, id)
   const nodes = Object.fromEntries(Object.entries(state.nodes).filter(([key]) => !doomed.has(key as NodeId)))
-  const recycled = Object.fromEntries(Object.entries(state.recycled).filter(([key]) => !doomed.has(key as NodeId)))
+  const recycled = Object.fromEntries(
+    Object.entries(state.recycled).filter(([key]) => !doomed.has(key as NodeId)),
+  )
   return { ...state, nodes, recycled }
 }
 
@@ -140,18 +142,42 @@ function ensureFolderPath(state: FsState, path: string, at: number): { state: Fs
 }
 
 /** Puts each program's executable in its install folder. Running it twice changes nothing. */
-function installPrograms(state: FsState, programs: readonly ProgramSpec[], shortcuts: boolean, at: number): FsState {
+function installPrograms(
+  state: FsState,
+  programs: readonly ProgramSpec[],
+  shortcuts: boolean,
+  at: number,
+): FsState {
   let next = state
   for (const program of programs) {
     const folder = ensureFolderPath(next, program.installDir, at)
     next = folder.state
     if (!findChild(next, folder.id, program.exe)) {
       const id = `exe:${program.app}` as NodeId
-      next = put(next, { kind: 'program', id, name: program.exe, parent: folder.id, app: program.app, modified: at })
+      next = put(next, {
+        kind: 'program',
+        id,
+        name: program.exe,
+        parent: folder.id,
+        app: program.app,
+        modified: at,
+      })
     }
     const link = `lnk:${program.app}` as NodeId
-    if (shortcuts && program.desktopShortcut && !next.nodes[link] && !findChild(next, DESKTOP_DIR, program.title)) {
-      next = put(next, { kind: 'shortcut', id: link, name: program.title, parent: DESKTOP_DIR, app: program.app, modified: at })
+    if (
+      shortcuts &&
+      program.desktopShortcut &&
+      !next.nodes[link] &&
+      !findChild(next, DESKTOP_DIR, program.title)
+    ) {
+      next = put(next, {
+        kind: 'shortcut',
+        id: link,
+        name: program.title,
+        parent: DESKTOP_DIR,
+        app: program.app,
+        modified: at,
+      })
     }
   }
   return next
@@ -162,7 +188,9 @@ export function fsReducer(state: FsState, action: FsAction): FsState {
     case 'create': {
       const { node } = action
       if (state.nodes[node.id] || !node.parent || !state.nodes[node.parent]) return state
-      return validateName(state, node.parent, node.name) ? state : put(state, { ...node, name: node.name.trim() })
+      return validateName(state, node.parent, node.name)
+        ? state
+        : put(state, { ...node, name: node.name.trim() })
     }
     case 'write': {
       const node = state.nodes[action.id]
@@ -194,7 +222,8 @@ export function fsReducer(state: FsState, action: FsAction): FsState {
       const node = state.nodes[action.id]
       const record = state.recycled[action.id]
       if (!node || !record) return state
-      const home = state.nodes[record.from] && !isInside(state, record.from, RECYCLED_DIR) ? record.from : DESKTOP_DIR
+      const home =
+        state.nodes[record.from] && !isInside(state, record.from, RECYCLED_DIR) ? record.from : DESKTOP_DIR
       const { [action.id]: _, ...recycled } = state.recycled
       const name = uniqueName(state, home, node.name)
       return { ...put(state, { ...node, parent: home, name }), recycled }
@@ -221,7 +250,13 @@ Things to try:
 
 /** A fresh C: drive with no programs. */
 export function emptyDrive(at: number): FsState {
-  const folder = (id: NodeId, name: string, parent: NodeId): FsNode => ({ kind: 'folder', id, name, parent, modified: at })
+  const folder = (id: NodeId, name: string, parent: NodeId): FsNode => ({
+    kind: 'folder',
+    id,
+    name,
+    parent,
+    modified: at,
+  })
   const file = (id: string, name: string, parent: NodeId, content: string): FsNode => ({
     kind: 'file',
     id: id as NodeId,
@@ -237,6 +272,7 @@ export function emptyDrive(at: number): FsState {
     folder(DOCUMENTS_DIR, 'My Documents', ROOT),
     folder(RECYCLED_DIR, 'RECYCLED', ROOT),
     file('readme', 'Readme.txt', DOCUMENTS_DIR, README),
+    file('desktop-readme', 'Readme.txt', DESKTOP_DIR, README),
     file('autoexec', 'AUTOEXEC.BAT', ROOT, '@ECHO OFF\r\nPROMPT $p$g\r\nSET TEMP=C:\\WINDOWS\\TEMP\r\n'),
     file('config', 'CONFIG.SYS', ROOT, 'DEVICE=C:\\WINDOWS\\HIMEM.SYS\r\nFILES=40\r\n'),
   ]

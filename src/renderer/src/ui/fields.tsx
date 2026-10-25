@@ -57,9 +57,19 @@ export function Radio({ label, className = '', ...rest }: ChoiceProps) {
   )
 }
 
-export function GroupBox({ label, children, className = '' }: { label: ReactNode; children: ReactNode; className?: string }) {
+export function GroupBox({
+  label,
+  children,
+  className = '',
+}: {
+  label: ReactNode
+  children: ReactNode
+  className?: string
+}) {
   return (
-    <fieldset className={`border border-shadow shadow-[1px_1px_#fff,inset_1px_1px_#fff] px-[8px] pt-[4px] pb-[8px] ${className}`}>
+    <fieldset
+      className={`border border-shadow shadow-[1px_1px_#fff,inset_1px_1px_#fff] px-[8px] pt-[4px] pb-[8px] ${className}`}
+    >
       <legend className="px-[2px]">{label}</legend>
       {children}
     </fieldset>
@@ -76,5 +86,7 @@ export function StatusBar({ children, className = '' }: { children: ReactNode; c
 }
 
 export function StatusPane({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`bevel-shallow h-[18px] px-[4px] leading-[18px] truncate ${className}`}>{children}</div>
+  return (
+    <div className={`bevel-shallow h-[18px] px-[4px] leading-[18px] truncate ${className}`}>{children}</div>
+  )
 }

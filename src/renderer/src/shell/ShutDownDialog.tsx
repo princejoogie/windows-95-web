@@ -11,7 +11,13 @@ const CHOICES: { value: ShutDownChoice; label: string }[] = [
   { value: 'restart', label: 'Restart the computer?' },
 ]
 
-export function ShutDownDialog({ onChoose, onClose }: { onChoose: (choice: ShutDownChoice) => void; onClose: () => void }) {
+export function ShutDownDialog({
+  onChoose,
+  onClose,
+}: {
+  onChoose: (choice: ShutDownChoice) => void
+  onClose: () => void
+}) {
   const [choice, setChoice] = useState<ShutDownChoice>('shutdown')
   return (
     <Dialog title="Shut Down Windows" onClose={onClose} dim className="w-[335px]">

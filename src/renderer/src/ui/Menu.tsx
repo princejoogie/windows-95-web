@@ -20,7 +20,14 @@ const SUBMENU_DELAY_MS = 300
 
 function Arrow() {
   return (
-    <svg width="4" height="7" viewBox="0 0 4 7" shapeRendering="crispEdges" className="fill-current">
+    <svg
+      aria-hidden="true"
+      width="4"
+      height="7"
+      viewBox="0 0 4 7"
+      shapeRendering="crispEdges"
+      className="fill-current"
+    >
       <path d="M0 0h1v1h1v1h1v1h1v1H3v1H2v1H1v1H0z" />
     </svg>
   )
@@ -29,7 +36,14 @@ function Arrow() {
 function Check({ on }: { on: boolean }) {
   if (!on) return null
   return (
-    <svg width="7" height="7" viewBox="0 0 7 7" shapeRendering="crispEdges" className="fill-current">
+    <svg
+      aria-hidden="true"
+      width="7"
+      height="7"
+      viewBox="0 0 7 7"
+      shapeRendering="crispEdges"
+      className="fill-current"
+    >
       <path d="M6 0h1v3H6v1H5v1H4v1H3v1H2V6H1V5H0V2h1v1h1v1h1V3h1V2h1V1h1z" />
     </svg>
   )
@@ -73,21 +87,29 @@ export function MenuList({ items, onClose, style, className = '' }: MenuListProp
     >
       {items.map((item, index) => {
         if (item === 'separator') {
-          // biome-ignore lint/suspicious/noArrayIndexKey: separators have no identity
-          return <div key={`sep-${index}`} className="my-[3px] mx-[1px] h-[2px] border-t border-shadow border-b border-b-white" />
+          const next = items[index + 1]
+          return (
+            <div
+              key={next && next !== 'separator' ? `before-${next.label}` : 'trailing-separator'}
+              className="my-[3px] mx-[1px] h-[2px] border-t border-shadow border-b border-b-white"
+            />
+          )
         }
         const submenu = item.items
         const lit = hot === index
         return (
           <div key={item.label} className="relative">
-            <div
+            <button
+              type="button"
               role="menuitem"
               aria-disabled={item.disabled}
               aria-haspopup={submenu ? 'menu' : undefined}
-              className={`flex items-center h-[18px] pr-[6px] whitespace-nowrap ${lit ? 'bg-select text-white' : ''}
+              className={`flex w-full text-left outline-none items-center h-[18px] pr-[6px] whitespace-nowrap ${lit ? 'bg-select text-white' : ''}
                 ${item.disabled ? (lit ? 'text-shadow' : 'text-embossed') : ''} ${item.bold ? 'font-bold' : ''}`}
               onPointerEnter={() => hover(index, Boolean(submenu))}
-              onPointerLeave={() => setHot((current) => (current === index && open !== index ? null : current))}
+              onPointerLeave={() =>
+                setHot((current) => (current === index && open !== index ? null : current))
+              }
               onClick={() => {
                 if (item.disabled) return
                 if (submenu) {
@@ -100,16 +122,25 @@ export function MenuList({ items, onClose, style, className = '' }: MenuListProp
               }}
             >
               <span className="w-[20px] flex justify-center shrink-0">
-                {item.icon ? <img src={item.icon} alt="" className="size-4" /> : <Check on={Boolean(item.checked)} />}
+                {item.icon ? (
+                  <img src={item.icon} alt="" className="size-4" />
+                ) : (
+                  <Check on={Boolean(item.checked)} />
+                )}
               </span>
               <span className="flex-1 pr-[16px]">
                 <Accel label={item.label} />
               </span>
               {item.shortcut && <span className="pl-[12px]">{item.shortcut}</span>}
               {submenu && <Arrow />}
-            </div>
+            </button>
             {submenu && open === index && (
-              <MenuList items={submenu} onClose={onClose} style={{ left: '100%', top: -3 }} className="ml-[-3px]" />
+              <MenuList
+                items={submenu}
+                onClose={onClose}
+                style={{ left: '100%', top: -3 }}
+                className="ml-[-3px]"
+              />
             )}
           </div>
         )
@@ -133,14 +164,14 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
     const close = (event: PointerEvent) => {
       if (!root.current?.contains(event.target as Node)) setOpen(null)
     }
-    const escape = (event: KeyboardEvent) => {
+    const onEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpen(null)
     }
     document.addEventListener('pointerdown', close, true)
-    document.addEventListener('keydown', escape)
+    document.addEventListener('keydown', onEscape)
     return () => {
       document.removeEventListener('pointerdown', close, true)
-      document.removeEventListener('keydown', escape)
+      document.removeEventListener('keydown', onEscape)
     }
   }, [open])
 
@@ -161,7 +192,9 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
               <Accel label={menu.label} />
             </span>
           </button>
-          {open === index && <MenuList items={menu.items} onClose={() => setOpen(null)} style={{ left: 0, top: '100%' }} />}
+          {open === index && (
+            <MenuList items={menu.items} onClose={() => setOpen(null)} style={{ left: 0, top: '100%' }} />
+          )}
         </div>
       ))}
     </div>
@@ -169,7 +202,15 @@ export function MenuBar({ menus }: { menus: readonly MenuBarMenu[] }) {
 }
 
 /** A right-click menu at a viewport point. It flips to stay on screen. */
-export function ContextMenu({ at, items, onClose }: { at: Point; items: readonly MenuEntry[]; onClose: () => void }) {
+export function ContextMenu({
+  at,
+  items,
+  onClose,
+}: {
+  at: Point
+  items: readonly MenuEntry[]
+  onClose: () => void
+}) {
   const ref = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState(at)
 
@@ -184,13 +225,13 @@ export function ContextMenu({ at, items, onClose }: { at: Point; items: readonly
 
   useEffect(() => {
     const close = () => onClose()
-    const escape = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
+    const onEscape = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
     document.addEventListener('pointerdown', close)
-    document.addEventListener('keydown', escape)
+    document.addEventListener('keydown', onEscape)
     addEventListener('blur', close)
     return () => {
       document.removeEventListener('pointerdown', close)
-      document.removeEventListener('keydown', escape)
+      document.removeEventListener('keydown', onEscape)
       removeEventListener('blur', close)
     }
   }, [onClose])
@@ -202,4 +243,3 @@ export function ContextMenu({ at, items, onClose }: { at: Point; items: readonly
     document.body,
   )
 }
-

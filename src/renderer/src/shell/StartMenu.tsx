@@ -65,7 +65,10 @@ export function StartMenu({ onClose, onRun, onShutDown }: StartMenuProps) {
 
   const state = useFs((s) => s)
   const files = useMemo(
-    () => children(state, DOCUMENTS_DIR).filter((node) => node.kind === 'file').slice(0, 15),
+    () =>
+      children(state, DOCUMENTS_DIR)
+        .filter((node) => node.kind === 'file')
+        .slice(0, 15),
     [state],
   )
   const appEntry = (id: string, label: string): MenuEntry[] => {
@@ -116,16 +119,21 @@ export function StartMenu({ onClose, onRun, onShutDown }: StartMenuProps) {
       <div className="flex flex-col w-[150px]">
         {top.map((item, index) => {
           if (item === 'separator') {
-            // biome-ignore lint/suspicious/noArrayIndexKey: separators have no identity
-            return <div key={`sep-${index}`} className="my-[1px] h-[2px] border-t border-shadow border-b border-b-white" />
+            return (
+              <div
+                key="shutdown-separator"
+                className="my-[1px] h-[2px] border-t border-shadow border-b border-b-white"
+              />
+            )
           }
           const lit = hot === index
           return (
             <div key={item.label} className="relative">
-              <div
+              <button
+                type="button"
                 role="menuitem"
                 aria-haspopup={item.items ? 'menu' : undefined}
-                className={`flex items-center h-[32px] pr-[6px] gap-[8px] pl-[4px] ${lit ? 'bg-select text-white' : ''}`}
+                className={`flex w-full text-left outline-none items-center h-[32px] pr-[6px] gap-[8px] pl-[4px] ${lit ? 'bg-select text-white' : ''}`}
                 onPointerEnter={() => hover(index, item)}
                 onClick={() => {
                   if (item.items) {
@@ -142,13 +150,25 @@ export function StartMenu({ onClose, onRun, onShutDown }: StartMenuProps) {
                   <Accel label={item.label} />
                 </span>
                 {item.items && (
-                  <svg width="4" height="7" viewBox="0 0 4 7" shapeRendering="crispEdges" className="fill-current">
+                  <svg
+                    aria-hidden="true"
+                    width="4"
+                    height="7"
+                    viewBox="0 0 4 7"
+                    shapeRendering="crispEdges"
+                    className="fill-current"
+                  >
                     <path d="M0 0h1v1h1v1h1v1h1v1H3v1H2v1H1v1H0z" />
                   </svg>
                 )}
-              </div>
+              </button>
               {item.items && open === index && (
-                <MenuList items={item.items} onClose={onClose} style={{ left: '100%', top: 0 }} className="ml-[-2px]" />
+                <MenuList
+                  items={item.items}
+                  onClose={onClose}
+                  style={{ left: '100%', top: 0 }}
+                  className="ml-[-2px]"
+                />
               )}
             </div>
           )

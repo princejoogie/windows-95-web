@@ -35,19 +35,27 @@ export function Taskbar({ startOpen, onStart }: TaskbarProps) {
   return (
     <div
       className="relative z-[8000] flex items-center gap-[3px] h-[28px] px-[2px] pt-[2px] bg-face shadow-[inset_0_1px_#dfdfdf,inset_0_2px_#fff] shrink-0"
-      onPointerDown={(event) => event.target === event.currentTarget && windowsStore.dispatch({ type: 'blur' })}
+      onPointerDown={(event) =>
+        event.target === event.currentTarget && windowsStore.dispatch({ type: 'blur' })
+      }
     >
       <button
         type="button"
+        data-start-button
         aria-pressed={startOpen}
+        aria-expanded={startOpen}
         className={`flex items-center gap-[3px] h-[22px] pl-[4px] pr-[5px] font-bold outline-none shrink-0
           ${startOpen ? 'bevel-pressed' : 'bevel-raised'}`}
         onPointerDown={(event) => {
           event.stopPropagation()
-          onStart()
         }}
+        onClick={onStart}
       >
-        <img src={icons.windowsLogo} alt="" className={`size-4 ${startOpen ? 'translate-x-px translate-y-px' : ''}`} />
+        <img
+          src={icons.windowsLogo}
+          alt=""
+          className={`size-4 ${startOpen ? 'translate-x-px translate-y-px' : ''}`}
+        />
         <span className={startOpen ? 'translate-x-px translate-y-px' : ''}>Start</span>
       </button>
       <div className="flex flex-1 min-w-0 gap-[3px] pl-[2px]">
@@ -65,7 +73,13 @@ export function Taskbar({ startOpen, onStart }: TaskbarProps) {
               onPointerDown={(event) => event.stopPropagation()}
               onClick={() => windowsStore.dispatch({ type: 'taskbarClick', id: window.id })}
             >
-              {app && <img src={smallIcon(app)} alt="" className={`size-4 shrink-0 ${active ? 'translate-y-px' : ''}`} />}
+              {app && (
+                <img
+                  src={smallIcon(app)}
+                  alt=""
+                  className={`size-4 shrink-0 ${active ? 'translate-y-px' : ''}`}
+                />
+              )}
               <span className={`truncate ${active ? 'translate-y-px' : ''}`}>{window.title}</span>
             </button>
           )

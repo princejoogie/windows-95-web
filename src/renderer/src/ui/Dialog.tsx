@@ -29,20 +29,22 @@ export function Dialog({ title, children, onClose, icon, dim, className = '' }: 
   latestClose.current = onClose
   useEffect(() => {
     if (!active) return
-    const escape = (event: KeyboardEvent) => {
+    const onEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || !latestClose.current) return
       event.stopImmediatePropagation()
       latestClose.current()
     }
-    document.addEventListener('keydown', escape, true)
-    return () => document.removeEventListener('keydown', escape, true)
+    document.addEventListener('keydown', onEscape, true)
+    return () => document.removeEventListener('keydown', onEscape, true)
   }, [active])
 
   if (!host) return null
 
   return createPortal(
     <div className="absolute inset-0 z-40 pointer-events-auto">
-      {dim && <div className="absolute inset-0 bg-[repeating-conic-gradient(#000_0_25%,transparent_0_50%)] bg-size-[2px_2px]" />}
+      {dim && (
+        <div className="absolute inset-0 bg-[repeating-conic-gradient(#000_0_25%,transparent_0_50%)] bg-size-[2px_2px]" />
+      )}
       <div
         role="dialog"
         aria-label={title}
@@ -60,7 +62,10 @@ export function Dialog({ title, children, onClose, icon, dim, className = '' }: 
           onPointerMove={(event) => {
             const start = drag.current
             if (!start) return
-            setOffset({ x: start.from.x + event.clientX - start.x, y: start.from.y + event.clientY - start.y })
+            setOffset({
+              x: start.from.x + event.clientX - start.x,
+              y: start.from.y + event.clientY - start.y,
+            })
           }}
           onPointerUp={() => {
             drag.current = null

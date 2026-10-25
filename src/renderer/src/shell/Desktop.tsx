@@ -40,7 +40,10 @@ const cellAt = (point: Point) => ({
   column: Math.round((point.x - ORIGIN.x) / CELL.width),
   row: Math.round((point.y - ORIGIN.y) / CELL.height),
 })
-const pointOf = (column: number, row: number): Point => ({ x: ORIGIN.x + column * CELL.width, y: ORIGIN.y + row * CELL.height })
+const pointOf = (column: number, row: number): Point => ({
+  x: ORIGIN.x + column * CELL.width,
+  y: ORIGIN.y + row * CELL.height,
+})
 
 /** Saved spots first; everything else fills free cells top to bottom, then left to right. */
 function layout(items: readonly Item[], saved: Positions, desktop: Size): Map<string, Point> {
@@ -93,9 +96,7 @@ interface Drag {
   started: boolean
 }
 
-type Prompt =
-  | { kind: 'delete'; node: FsNode }
-  | { kind: 'error'; title: string; message: string }
+type Prompt = { kind: 'delete'; node: FsNode } | { kind: 'error'; title: string; message: string }
 
 function DesktopIcon({
   item,
@@ -114,10 +115,10 @@ function DesktopIcon({
 }) {
   return (
     <div
-      role="button"
+      role="option"
       tabIndex={-1}
       aria-label={item.label}
-      aria-pressed={selected}
+      aria-selected={selected}
       data-desktop-item={item.key}
       className="absolute flex flex-col items-center w-[75px] outline-none"
       style={{ left: at.x, top: at.y }}
@@ -126,7 +127,9 @@ function DesktopIcon({
     >
       <div className="relative size-8 mt-[2px]">
         <img src={item.icon} alt="" className="size-8" draggable={false} />
-        {item.overlay && <img src={item.overlay} alt="" className="absolute left-0 bottom-0" draggable={false} />}
+        {item.overlay && (
+          <img src={item.overlay} alt="" className="absolute left-0 bottom-0" draggable={false} />
+        )}
         {selected && (
           <div
             className="absolute inset-0 bg-select opacity-50"
@@ -243,7 +246,13 @@ export function Desktop({ size }: { size: Size }) {
     const from = positions.get(item.key) ?? ORIGIN
     event.currentTarget.setPointerCapture(event.pointerId)
     const target = event.currentTarget
-    const start: Drag = { key: item.key, pointer: { x: event.clientX, y: event.clientY }, from, offset: { x: 0, y: 0 }, started: false }
+    const start: Drag = {
+      key: item.key,
+      pointer: { x: event.clientX, y: event.clientY },
+      from,
+      offset: { x: 0, y: 0 },
+      started: false,
+    }
     dragRef.current = start
     const move = (e: PointerEvent) => {
       const current = dragRef.current
@@ -336,7 +345,11 @@ export function Desktop({ size }: { size: Size }) {
 
   return (
     <div
-      className="absolute inset-0 bg-desktop"
+      role="listbox"
+      aria-label="Desktop"
+      aria-multiselectable="true"
+      tabIndex={0}
+      className="absolute inset-0 bg-desktop outline-none"
       onPointerDown={(event) => {
         if (event.target !== event.currentTarget) return
         windowsStore.dispatch({ type: 'blur' })
@@ -345,13 +358,16 @@ export function Desktop({ size }: { size: Size }) {
       }}
       onContextMenu={(event) => {
         event.preventDefault()
-        const key = (event.target as HTMLElement).closest<HTMLElement>('[data-desktop-item]')?.dataset.desktopItem ?? null
+        const key =
+          (event.target as HTMLElement).closest<HTMLElement>('[data-desktop-item]')?.dataset.desktopItem ??
+          null
         setMenu({ at: { x: event.clientX, y: event.clientY }, key })
       }}
     >
       {items.map((item) => {
         const at = positions.get(item.key) ?? ORIGIN
-        const moving = drag?.started && (drag.key === item.key || (selected.has(drag.key) && selected.has(item.key)))
+        const moving =
+          drag?.started && (drag.key === item.key || (selected.has(drag.key) && selected.has(item.key)))
         return (
           <DesktopIcon
             key={item.key}
@@ -381,9 +397,14 @@ export function Desktop({ size }: { size: Size }) {
         />
       )}
       {prompt?.kind === 'error' && (
-        <MessageBox title={prompt.title} icon="error" message={prompt.message} buttons={['OK']} onClose={() => setPrompt(null)} />
+        <MessageBox
+          title={prompt.title}
+          icon="error"
+          message={prompt.message}
+          buttons={['OK']}
+          onClose={() => setPrompt(null)}
+        />
       )}
     </div>
   )
 }
-

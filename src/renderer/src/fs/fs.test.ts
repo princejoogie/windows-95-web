@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'vitest'
+import { children, type FsAction, fsReducer, pathOf, resolvePath, seed, uniqueName, validateName } from './fs'
 import {
-  children,
-  type FsAction,
-  fsReducer,
-  pathOf,
-  resolvePath,
-  seed,
-  uniqueName,
-  validateName,
-} from './fs'
-import { DESKTOP_DIR, DOCUMENTS_DIR, type FsState, type NodeId, type ProgramSpec, RECYCLED_DIR, ROOT } from './types'
+  DESKTOP_DIR,
+  DOCUMENTS_DIR,
+  type FsState,
+  type NodeId,
+  type ProgramSpec,
+  RECYCLED_DIR,
+  ROOT,
+} from './types'
 
 const programs: ProgramSpec[] = [
   { app: 'calc', title: 'Calculator', exe: 'CALC.EXE', installDir: 'C:\\WINDOWS', desktopShortcut: false },
@@ -30,7 +29,7 @@ describe('file system', () => {
     const state = fresh()
     expect(resolvePath(state, 'c:\\windows\\calc.exe')).toMatchObject({ kind: 'program', app: 'calc' })
     expect(resolvePath(state, 'C:\\Games\\Doom\\DOOM95.EXE')).toMatchObject({ kind: 'program', app: 'doom' })
-    expect(names(state, DESKTOP_DIR)).toEqual(['Doom 95'])
+    expect(names(state, DESKTOP_DIR)).toEqual(['Doom 95', 'Readme.txt'])
     expect(pathOf(state, DOCUMENTS_DIR)).toBe('C:\\My Documents')
     expect(pathOf(state, ROOT)).toBe('C:\\')
   })
@@ -46,7 +45,7 @@ describe('file system', () => {
   it('does not bring back a desktop shortcut the user deleted', () => {
     const state = run(fresh(), { type: 'purge', id: 'lnk:doom' as NodeId })
     const next = fsReducer(state, { type: 'installPrograms', programs, shortcuts: false, at })
-    expect(names(next, DESKTOP_DIR)).toEqual([])
+    expect(names(next, DESKTOP_DIR)).toEqual(['Readme.txt'])
   })
 
   it('lists folders before files, by name, ignoring case', () => {
@@ -96,7 +95,10 @@ describe('file system', () => {
   it('empties the recycle bin, deleting whole folders', () => {
     const state = run(
       fresh(),
-      { type: 'create', node: { kind: 'folder', id: 'f' as NodeId, name: 'Old', parent: DOCUMENTS_DIR, modified: at } },
+      {
+        type: 'create',
+        node: { kind: 'folder', id: 'f' as NodeId, name: 'Old', parent: DOCUMENTS_DIR, modified: at },
+      },
       newFile('inner', 'inner.txt', 'f' as NodeId),
       { type: 'recycle', id: 'f' as NodeId, at },
       { type: 'emptyRecycleBin' },
@@ -109,8 +111,14 @@ describe('file system', () => {
   it('refuses to move a folder into itself or to touch system folders', () => {
     const state = run(
       fresh(),
-      { type: 'create', node: { kind: 'folder', id: 'f' as NodeId, name: 'A', parent: DOCUMENTS_DIR, modified: at } },
-      { type: 'create', node: { kind: 'folder', id: 'g' as NodeId, name: 'B', parent: 'f' as NodeId, modified: at } },
+      {
+        type: 'create',
+        node: { kind: 'folder', id: 'f' as NodeId, name: 'A', parent: DOCUMENTS_DIR, modified: at },
+      },
+      {
+        type: 'create',
+        node: { kind: 'folder', id: 'g' as NodeId, name: 'B', parent: 'f' as NodeId, modified: at },
+      },
     )
     expect(fsReducer(state, { type: 'move', id: 'f' as NodeId, parent: 'g' as NodeId, at })).toBe(state)
     expect(fsReducer(state, { type: 'recycle', id: DESKTOP_DIR, at })).toBe(state)

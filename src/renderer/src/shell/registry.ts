@@ -18,13 +18,16 @@ export const programSpecs: readonly ProgramSpec[] = apps.map((app) => ({
   app: app.id,
   title: app.title,
   exe: app.exe,
-  installDir: app.installDir ?? 'C:\WINDOWS',
+  installDir: app.installDir ?? 'C:WINDOWS',
   desktopShortcut: app.desktopShortcut ?? false,
 }))
 
 /** `calc`, `CALC.EXE`, and `calc.exe` all find Calculator. */
 export function findAppByExe(name: string): AppManifest | undefined {
-  const wanted = name.trim().toLowerCase().replace(/\.exe$/, '')
+  const wanted = name
+    .trim()
+    .toLowerCase()
+    .replace(/\.exe$/, '')
   return apps.find((app) => app.exe.toLowerCase().replace(/\.exe$/, '') === wanted)
 }
 

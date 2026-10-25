@@ -3,8 +3,28 @@ import { pixelArt } from '../icons/pixel'
 
 const GLYPHS = {
   minimize: ['........', '........', '........', '........', '........', '.kkkkkk.', '.kkkkkk.'],
-  maximize: ['kkkkkkkkk', 'kkkkkkkkk', 'k.......k', 'k.......k', 'k.......k', 'k.......k', 'k.......k', 'k.......k', 'kkkkkkkkk'],
-  restore: ['..kkkkkk', '..kkkkkk', '..k....k', 'kkkkkk.k', 'kkkkkk.k', 'k....kkk', 'k....k..', 'k....k..', 'kkkkkk..'],
+  maximize: [
+    'kkkkkkkkk',
+    'kkkkkkkkk',
+    'k.......k',
+    'k.......k',
+    'k.......k',
+    'k.......k',
+    'k.......k',
+    'k.......k',
+    'kkkkkkkkk',
+  ],
+  restore: [
+    '..kkkkkk',
+    '..kkkkkk',
+    '..k....k',
+    'kkkkkk.k',
+    'kkkkkk.k',
+    'k....kkk',
+    'k....k..',
+    'k....k..',
+    'kkkkkk..',
+  ],
   close: ['kk....kk', '.kk..kk.', '..kkkk..', '...kk...', '..kkkk..', '.kk..kk.', 'kk....kk'],
   help: ['..kkkk..', '.kk..kk.', '.....kk.', '....kk..', '...kk...', '........', '...kk...'],
 } as const
@@ -30,7 +50,17 @@ const glyphUrl = Object.fromEntries(
   ]),
 ) as Record<string, string>
 
-export function TitleButton({ glyph, disabled, onClick, label }: { glyph: Glyph; disabled?: boolean; onClick: () => void; label: string }) {
+export function TitleButton({
+  glyph,
+  disabled,
+  onClick,
+  label,
+}: {
+  glyph: Glyph
+  disabled?: boolean
+  onClick: () => void
+  label: string
+}) {
   return (
     <button
       type="button"
@@ -42,7 +72,11 @@ export function TitleButton({ glyph, disabled, onClick, label }: { glyph: Glyph;
       onDoubleClick={(event) => event.stopPropagation()}
       onClick={onClick}
     >
-      <img src={glyphUrl[disabled ? `${glyph}-disabled` : glyph]} alt="" className="group-enabled:group-active:translate-x-px group-enabled:group-active:translate-y-px" />
+      <img
+        src={glyphUrl[disabled ? `${glyph}-disabled` : glyph]}
+        alt=""
+        className="group-enabled:group-active:translate-x-px group-enabled:group-active:translate-y-px"
+      />
     </button>
   )
 }
