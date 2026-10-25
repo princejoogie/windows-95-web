@@ -1,6 +1,15 @@
-import { memo, type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  memo,
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { TitleBar, TitleButton } from '../ui/TitleBar'
+import { registerCloseRequest } from './closeRequests'
 import { WindowContext } from './context'
 import { smallIcon } from './registry'
 import { windowsStore } from './system'
@@ -98,11 +107,13 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
   const [outline, setOutline] = useState<Rect | null>(null)
   const [dialogHost, setDialogHost] = useState<HTMLDivElement | null>(null)
   const resizable = app.window.kind === 'resizable'
-  const closeHandler = useRef<(() => void) | null>(null)
-  const requestClose = () => {
-    if (closeHandler.current) closeHandler.current()
-    else windowsStore.dispatch({ type: 'close', id })
-  }
+  const closeHandler = useRef<(() => Promise<boolean>) | null>(null)
+  const requestClose = useCallback(async () => {
+    if (closeHandler.current) return closeHandler.current()
+    windowsStore.dispatch({ type: 'close', id })
+    return true
+  }, [id])
+  useEffect(() => registerCloseRequest(id, requestClose), [id, requestClose])
 
   const api = useMemo<WindowApi>(
     () => ({

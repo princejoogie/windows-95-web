@@ -57,6 +57,12 @@ function Paint({ window: windowApi, args }: AppProps) {
   const [dialog, setDialog] = useState<PaintDialog | null>(null)
   const [loading, setLoading] = useState(false)
   const loadVersion = useRef(0)
+  const closeResult = useRef<((closed: boolean) => void) | null>(null)
+  const cancelClose = () => {
+    setDialog(null)
+    closeResult.current?.(false)
+    closeResult.current = null
+  }
   const image = history.present
   const dirty = image !== saved
   const name = node?.name ?? 'untitled'
@@ -100,14 +106,26 @@ function Paint({ window: windowApi, args }: AppProps) {
     }
   }, [initialFile, openFile])
   const run = (command: Command) => {
-    if (command === 'exit') windowApi.close()
-    else if (command === 'open') setDialog({ kind: 'file', mode: 'open', next: null })
+    if (command === 'exit') {
+      closeResult.current?.(true)
+      closeResult.current = null
+      windowApi.close()
+    } else if (command === 'open') setDialog({ kind: 'file', mode: 'open', next: null })
     else {
       reset(bitmap(image.width, image.height), null)
       setDialog(null)
     }
   }
   const request = (command: Command) => (dirty ? setDialog({ kind: 'confirm', next: command }) : run(command))
+  useEffect(() =>
+    windowApi.onCloseRequest(
+      () =>
+        new Promise<boolean>((resolve) => {
+          closeResult.current = resolve
+          request('exit')
+        }),
+    ),
+  )
   const save = (next: Command | null = null) => {
     if (file && fs.get().nodes[file]?.kind === 'file') {
       fs.write(file, encodeBitmap(image))
@@ -388,7 +406,7 @@ function Paint({ window: windowApi, args }: AppProps) {
           filters={[{ label: 'Bitmap Files (*.bmp)', extensions: ['bmp'] }]}
           defaultExtension="bmp"
           onSelect={choose}
-          onCancel={() => setDialog(null)}
+          onCancel={cancelClose}
         />
       )}
       {dialog?.kind === 'confirm' && (
@@ -402,16 +420,12 @@ function Paint({ window: windowApi, args }: AppProps) {
             setDialog(null)
             if (answer === 'Yes') save(next)
             if (answer === 'No') run(next)
+            if (answer === 'Cancel') cancelClose()
           }}
         />
       )}
       {dialog?.kind === 'message' && (
-        <MessageBox
-          title={dialog.title}
-          message={dialog.message}
-          buttons={['OK']}
-          onClose={() => setDialog(null)}
-        />
+        <MessageBox title={dialog.title} message={dialog.message} buttons={['OK']} onClose={cancelClose} />
       )}
       {dialog?.kind === 'attributes' && (
         <AttributesDialog

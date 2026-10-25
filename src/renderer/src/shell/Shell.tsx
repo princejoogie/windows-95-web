@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { installPrograms } from '../fs/store'
+import { closeInOrder, requestWindowClose } from './closeRequests'
 import { ShellDialogHost } from './context'
 import { Desktop } from './Desktop'
+import { shellEvents } from './events'
 import { RunDialog } from './RunDialog'
 import { getApp, programSpecs } from './registry'
 import { type ShutDownChoice, ShutDownDialog } from './ShutDownDialog'
@@ -22,10 +24,23 @@ export function Shell() {
   const desktopRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const installed = useRef(false)
+  const closing = useRef(false)
   const [size, setSize] = useState<Size>({ width: innerWidth, height: innerHeight - 28 })
   const state = useWindows((s) => s)
   const ordered = useMemo(() => [...state.windows].sort((a, b) => a.id - b.id), [state.windows])
   const stacking = new Map(state.windows.map((window, index) => [window.id, index + 1]))
+
+  useEffect(() => {
+    return window.win95?.onEvent((event) => {
+      if (event.type === 'host-close') setDialog('shutdown')
+      if (event.type === 'start') setStartOpen((open) => !open)
+      if (event.type === 'alt-f4') {
+        const id = windowsStore.get().focused
+        if (id !== null) void requestWindowClose(id)
+        else setDialog('shutdown')
+      }
+    })
+  }, [])
 
   useEffect(() => {
     if (!installed.current) {
@@ -76,7 +91,12 @@ export function Shell() {
       setStartOpen(false)
     }
     const key = (event: KeyboardEvent) => {
-      if (event.ctrlKey && event.key === 'Escape') {
+      if (event.altKey && event.key === 'F4') {
+        event.preventDefault()
+        const id = windowsStore.get().focused
+        if (id !== null) void requestWindowClose(id)
+        else setDialog('shutdown')
+      } else if (event.ctrlKey && event.key === 'Escape') {
         event.preventDefault()
         setStartOpen((open) => !open)
       } else if (event.key === 'Escape') setStartOpen(false)
@@ -89,11 +109,22 @@ export function Shell() {
     }
   }, [power])
 
-  const shutDown = (choice: ShutDownChoice) => {
+  const shutDown = async (choice: ShutDownChoice) => {
+    if (closing.current) return
+    closing.current = true
     setDialog(null)
     setStartOpen(false)
-    windowsStore.dispatch({ type: 'closeAll' })
-    setPower(choice === 'restart' ? 'restarting' : 'shutting-down')
+    try {
+      const closed = await closeInOrder([...windowsStore.get().windows].reverse(), async (owner) => {
+        windowsStore.dispatch({ type: 'focus', id: owner.id })
+        return requestWindowClose(owner.id)
+      })
+      if (!closed) return
+      shellEvents.emit('shutdown')
+      setPower(choice === 'restart' ? 'restarting' : 'shutting-down')
+    } finally {
+      closing.current = false
+    }
   }
 
   if (power !== 'running') {
