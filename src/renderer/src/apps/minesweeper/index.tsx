@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import windowsLogo from '../../assets/win-icons/windows-logo.ico'
+import { icons } from '../../icons'
 import { useKeyDown } from '../../shell/context'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
@@ -449,7 +449,7 @@ function Minesweeper({ window: appWindow }: AppProps) {
       {dialog.kind === 'about' && (
         <Dialog title="About Minesweeper" onClose={closeDialog}>
           <div className="mine-about">
-            <img src={windowsLogo} alt="" width="32" height="32" />
+            <img src={icons.windowsLogo} alt="" width="32" height="32" />
             <div className="mine-about-product">
               <p>Microsoft Windows 95</p>
               <p>Minesweeper</p>
