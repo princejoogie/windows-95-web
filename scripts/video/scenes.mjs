@@ -522,7 +522,6 @@ export const scenes = [
       await choose(c, 'Screen saver', 'Starfield Simulation')
       await c.framed('[role=dialog]', 'Display Properties dialog')
       await c.click(text('Preview', '[role=dialog] button'))
-      await c.camera('center')
       await wait(1300)
       await c.check(
         `!!document.querySelector('canvas')`,
