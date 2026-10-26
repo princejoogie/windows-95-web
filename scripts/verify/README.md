@@ -44,8 +44,41 @@ node scripts/verify/doomfix-episode.mjs 9420 2
 
 The route picks up the existing shotgun and shells, then the new Reactor armor. It visits the nearby medikit after the opening fight. Strict mode fails on the first death. The script writes `episode.jsonl` and screenshots through the finale.
 
+## Final audit repairs
+
+These are current production Electron checks. Each worker uses its own profile and port. Build once, check that the selected port is free, and launch from the repository root.
+
+```powershell
+pnpm install --offline
+pnpm build
+if (Get-NetTCPConnection -LocalPort 9450 -State Listen -ErrorAction SilentlyContinue) { throw 'Port 9450 is occupied' }
+Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+$env:W95_CDP_PORT = '9450'
+$env:W95_DATA_DIR = 'D:/tmp/win95-final-documents'
+pnpm start
+```
+
+In another terminal, run the document checks. The driver clears the selected test profile between scenarios. It uses trusted CDP mouse and keyboard input, reads persisted files, compares reopened image pixels, and captures screenshots. The optional final argument selects `pictures`, `readonly`, `clock`, `help`, or `charmap`. Omit it to run every scenario.
+
+```powershell
+node scripts/verify/finalfix-apps-documents.mjs 9450 D:/codes/worktrees/windows-95-web/proof/finalfix-apps-documents
+```
+
+`finalfix-shell.mjs` and `finalfix-shell-assets.mjs` use CDP port 9440 and proof directory `D:/codes/worktrees/windows-95-web/proof/finalfix-shell`. Launch a separate production process with those values before running them. The shell driver accepts `dialogs`, `modeless`, `shell`, `power`, `regressions`, or `existing` as its first argument. Power commands can close that process.
+
+`finalfix-apps-controlpanel.mjs` uses `cdp.mjs` and defaults to port 9452. Launch a separate production process with `W95_CDP_PORT=9452` and a dedicated `W95_DATA_DIR`. Its proof defaults to `D:/codes/worktrees/windows-95-web/proof/finalfix-apps-controlpanel`. `W95_PROOF_DIR` overrides that path. The font format regression check is `node --test scripts/fonts.test.mjs`.
+
+```powershell
+$env:W95_CDP_PORT = '9452'
+node scripts/verify/finalfix-apps-controlpanel.mjs fonts
+```
+
+```powershell
+node scripts/verify/polish-housekeeping.mjs
+```
+
 ## Historical proofs
 
-Every other file in this directory has a `Historical proof` marker near its first line. These files preserve evidence from earlier rebuild rounds, including their helper modules and capture scripts. They may require an old branch, a dev renderer, a particular saved game, or the original proof directory. They are not the current acceptance suite. Their original usage notes remain in each file.
+Files outside the current sets above have a `Historical proof` marker near their first line. These files preserve evidence from earlier rebuild rounds, including their helper modules and capture scripts. They may require an old branch, a dev renderer, a particular saved game, or the original proof directory. Their original usage notes remain in each file.
 
 `polish-housekeeping.mjs` checks that every file is either in the current set above or explicitly marked historical. It also checks JavaScript syntax and rejects report or scratch filenames under `src`. `src/renderer/src/system/README.md` is maintained asset documentation and stays beside the system code.

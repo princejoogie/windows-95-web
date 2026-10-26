@@ -1,6 +1,6 @@
 import { type CSSProperties, type PointerEvent, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { fsStore, useFs } from '../../fs/store'
+import { fsStore, fsTimestamp, useFs } from '../../fs/store'
 import { WINDOWS_DIR } from '../../fs/types'
 import { useKeyDown, useSystemMenu } from '../../shell/context'
 import { launch, openNode, windowsStore } from '../../shell/system'
@@ -41,7 +41,7 @@ function DosPrompt({ window: api, args }: AppProps) {
   const font = FONTS[settings.font] ?? FONTS[1]
   const fullVisible = full && api.focused && !api.minimized && dialog === 'none' && !error
   const waiting = screen.queue.length > 0
-  const prefix = session.pending.kind === 'ready' ? prompt(session, filesystem, Date.now()) : ''
+  const prefix = session.pending.kind === 'ready' ? prompt(session, filesystem, fsTimestamp()) : ''
   const commandLines = wrap([`${prefix}${input}${(prefix.length + input.length) % COLUMNS === 0 ? ' ' : ''}`])
   const visible = waiting ? [...screen.lines, '-- More --'] : [...screen.lines, ...commandLines].slice(-ROWS)
   const caretIndex = prefix.length + caret
@@ -83,7 +83,7 @@ function DosPrompt({ window: api, args }: AppProps) {
     })
   }
   const submit = () => {
-    const result = execute(session, fsStore.get(), input, Date.now())
+    const result = execute(session, fsStore.get(), input, fsTimestamp())
     for (const action of result.actions) fsStore.dispatch(action)
     if (session.pending.kind === 'ready' && input.trim()) {
       history.current = [...history.current, input].slice(-50)

@@ -1,4 +1,4 @@
-import type { LaunchArgs, Point, Size, WindowId } from './types'
+import type { LaunchArgs, Point, Size, WindowId, WindowSpec } from './types'
 
 export interface WindowState {
   readonly id: WindowId
@@ -11,6 +11,7 @@ export interface WindowState {
   readonly size: Size | null
   readonly minimized: boolean
   readonly maximized: boolean
+  readonly presentation?: WindowSpec
 }
 
 export interface WindowsState {
@@ -34,6 +35,7 @@ export type WindowsAction =
   | { type: 'move'; id: WindowId; position: Point }
   | { type: 'resize'; id: WindowId; position: Point; size: Size }
   | { type: 'setTitle'; id: WindowId; title: string }
+  | { type: 'setWindowSpec'; id: WindowId; spec: WindowSpec }
   | { type: 'blur' }
   | { type: 'minimizeAll' }
   | { type: 'undoMinimizeAll' }
@@ -123,6 +125,20 @@ export function windowsReducer(state: WindowsState, action: WindowsAction): Wind
       return update(state, action.id, (w) => ({ ...w, position: action.position, size: action.size }))
     case 'setTitle':
       return update(state, action.id, (w) => (w.title === action.title ? w : { ...w, title: action.title }))
+    case 'setWindowSpec':
+      return update(state, action.id, (w) =>
+        w.presentation?.kind === action.spec.kind
+          ? w
+          : {
+              ...w,
+              presentation: action.spec,
+              maximized: false,
+              size:
+                action.spec.kind === 'resizable'
+                  ? { width: action.spec.width, height: action.spec.height }
+                  : null,
+            },
+      )
     case 'blur':
       return state.focused === null ? state : { ...state, focused: null }
     case 'minimizeAll': {

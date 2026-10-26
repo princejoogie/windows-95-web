@@ -103,7 +103,8 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
   const modalCount = useModalCount(dialogHost)
   const lastControl = useRef<HTMLElement | null>(null)
   const keyboard = useRef<{ mode: 'move' | 'size'; frame: Rect; client: Size } | null>(null)
-  const resizable = app.window.kind === 'resizable'
+  const spec = state.presentation ?? app.window
+  const resizable = spec.kind === 'resizable'
   const closeHandler = useRef<(() => Promise<boolean>) | null>(null)
   const [helpHandler, setHelpHandler] = useState<(() => void) | null>(null)
   const requestClose = useCallback(async () => {
@@ -119,6 +120,7 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
       focused,
       minimized,
       setTitle: (title) => windowsStore.dispatch({ type: 'setTitle', id, title }),
+      setWindowSpec: (spec) => windowsStore.dispatch({ type: 'setWindowSpec', id, spec }),
       onCloseRequest: (handler) => {
         closeHandler.current = handler
         return () => {
@@ -190,9 +192,9 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
         current.frame.x += dx
         current.frame.y += dy
       } else {
-        const spec = app.window.kind === 'resizable' ? app.window : null
-        const width = Math.max(spec?.minWidth ?? 120, current.client.width + dx),
-          height = Math.max(spec?.minHeight ?? 40, current.client.height + dy)
+        const sizing = spec.kind === 'resizable' ? spec : null
+        const width = Math.max(sizing?.minWidth ?? 120, current.client.width + dx),
+          height = Math.max(sizing?.minHeight ?? 40, current.client.height + dy)
         current.frame.width += width - current.client.width
         current.frame.height += height - current.client.height
         current.client = { width, height }
@@ -201,7 +203,7 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
     }
     document.addEventListener('keydown', key, true)
     return () => document.removeEventListener('keydown', key, true)
-  }, [id, app.window])
+  }, [id, spec])
 
   // A new window opens fully on screen. After that, a shrinking desktop only keeps its title bar reachable.
   const position = useRef(state.position)
@@ -255,9 +257,9 @@ export function Window({ state, app, focused, zIndex, desktop }: WindowProps) {
         y: clamp(frame.y + dy, current.origin.y, current.origin.y + desktop.height - 20),
       }
     }
-    const spec = app.window.kind === 'resizable' ? app.window : null
-    const minWidth = frame.width - current.client.width + (spec?.minWidth ?? MIN_CLIENT.width)
-    const minHeight = frame.height - current.client.height + (spec?.minHeight ?? MIN_CLIENT.height)
+    const sizing = spec.kind === 'resizable' ? spec : null
+    const minWidth = frame.width - current.client.width + (sizing?.minWidth ?? MIN_CLIENT.width)
+    const minHeight = frame.height - current.client.height + (sizing?.minHeight ?? MIN_CLIENT.height)
     const { edges } = gesture
     const width = Math.max(minWidth, frame.width + (edges.e ? dx : edges.w ? -dx : 0))
     const height = Math.max(minHeight, frame.height + (edges.s ? dy : edges.n ? -dy : 0))

@@ -10,7 +10,7 @@ import {
   resolvePath,
   uniqueName,
 } from '../../fs/fs'
-import { createNode, fs, fsStore, newNodeId, useFs } from '../../fs/store'
+import { createNode, fs, fsStore, fsTimestamp, newNodeId, useFs } from '../../fs/store'
 import { DESKTOP_DIR, DOCUMENTS_DIR, type FsNode, type NodeId, RECYCLED_DIR } from '../../fs/types'
 import { icons } from '../../icons'
 import { useStore } from '../../lib/store'
@@ -369,7 +369,7 @@ export function FolderView({
   const paste = (destination = folder?.id, source: Clip = clipboard.get()) => {
     if (!destination || recycled) return
     const done = carry(
-      planPaste(fs.get(), source, destination, Date.now(), newNodeId),
+      planPaste(fs.get(), source, destination, fsTimestamp(), newNodeId),
       source?.op === 'cut' ? 'Move' : 'Copy',
     )
     if (done && source?.op === 'cut') clipboard.dispatch(null)
@@ -381,13 +381,13 @@ export function FolderView({
           fs.get(),
           ids.map((id) => ({ kind: 'node', id })),
           destination,
-          Date.now(),
+          fsTimestamp(),
           newNodeId,
         ),
       )
   }
   const undo = () => {
-    const problem = undoLast(fs.get(), fsStore.dispatch)
+    const problem = undoLast(fs.get(), fsStore.dispatch, fsTimestamp())
     if (problem) setPrompt({ kind: 'error', title: 'Undo', message: problem })
   }
   const restore = () => {

@@ -132,7 +132,7 @@ const hasFormatting = (doc: Document): boolean =>
       p.first !== 0 ||
       p.tabs.length > 0 ||
       p.bullet ||
-      p.runs.some((run) => !sameRunStyle(run, DEFAULT_RUN)),
+      p.runs.some((run) => 'kind' in run || !sameRunStyle(run, DEFAULT_RUN)),
   )
 
 function readRecent(): NodeId[] {
@@ -307,7 +307,11 @@ export function WordPad({ window: windowApi, args }: AppProps) {
     let id: NodeId
     if (target.kind === 'existing') {
       id = target.id
-      fs.write(id, content)
+      const result = fs.write(id, content)
+      if (!result.ok) {
+        message(result.error, 'warning')
+        return
+      }
     } else {
       const created = createNode(target.parent, target.name, { kind: 'file', content })
       if ('error' in created) {
@@ -340,8 +344,13 @@ export function WordPad({ window: windowApi, args }: AppProps) {
   const acceptFile = (result: FileDialogResult) => {
     if (dialog?.kind === 'printFile') {
       const content = plainText(currentDocument())
-      if (result.kind === 'existing') fs.write(result.id, content)
-      else {
+      if (result.kind === 'existing') {
+        const written = fs.write(result.id, content)
+        if (!written.ok) {
+          message(written.error, 'warning')
+          return
+        }
+      } else {
         const created = createNode(result.parent, result.name, { kind: 'file', content })
         if ('error' in created) {
           message(created.error, 'warning')
@@ -372,6 +381,11 @@ export function WordPad({ window: windowApi, args }: AppProps) {
     try {
       const items = await navigator.clipboard.read()
       for (const item of items) {
+        if (kind === 'rich' && item.types.includes('image/png')) {
+          const blob = await item.getType('image/png')
+          await pasteImage(blob)
+          return
+        }
         if (kind === 'rich' && item.types.includes('text/html')) {
           const html = await (await item.getType('text/html')).text()
           edit(() => insertHtml(html))
@@ -391,6 +405,24 @@ export function WordPad({ window: windowApi, args }: AppProps) {
         message('The Clipboard is not available. Press Ctrl+V to paste.', 'warning')
       }
     }
+  }
+
+  const pasteImage = async (blob: Blob) => {
+    const data = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () =>
+        typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Invalid picture'))
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+    const image = new Image()
+    image.src = data
+    await image.decode()
+    edit(() =>
+      insertHtml(
+        `<img src="${data}" width="${image.naturalWidth}" height="${image.naturalHeight}" alt="Picture">`,
+      ),
+    )
   }
 
   const findNext = () => {
@@ -681,6 +713,15 @@ export function WordPad({ window: windowApi, args }: AppProps) {
           onInput={() => {
             setDirty(true)
             refreshSelection()
+          }}
+          onPaste={(event) => {
+            const image = [...event.clipboardData.files].find(
+              (file) => file.type === 'image/png' || file.type === 'image/jpeg',
+            )
+            if (!image) return
+            event.preventDefault()
+            keeper.remember()
+            void pasteImage(image).catch(() => message('WordPad cannot paste this picture.', 'warning'))
           }}
           onKeyDown={(event) => {
             if (event.key === 'Tab') {

@@ -76,11 +76,7 @@ export function remember(before: FsState, after: FsState, label: string): void {
 }
 
 /** Undoes the newest entry. Returns the message Windows shows when it can't, or `null` when it worked. */
-export function undoLast(
-  state: FsState,
-  dispatch: (action: FsAction) => void,
-  at = Date.now(),
-): string | null {
+export function undoLast(state: FsState, dispatch: (action: FsAction) => void, at: number): string | null {
   const entry = history.get().at(-1)
   if (!entry) return null
   const plan = planUndo(state, entry, at)

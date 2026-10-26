@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { children, type FsAction, fsReducer, pathOf, resolvePath, seed, uniqueName, validateName } from './fs'
+import {
+  checkWrite,
+  children,
+  type FsAction,
+  fsReducer,
+  pathOf,
+  resolvePath,
+  seed,
+  uniqueName,
+  validateName,
+} from './fs'
 import {
   DESKTOP_DIR,
   DOCUMENTS_DIR,
@@ -25,6 +35,35 @@ const newFile = (id: string, name: string, parent: NodeId = DOCUMENTS_DIR): FsAc
 const names = (state: FsState, parent: NodeId) => children(state, parent).map((n) => n.name)
 
 describe('file system', () => {
+  it('rejects read-only writes without changing content or timestamps and permits a new recovery file', () => {
+    const original = resolvePath(fresh(), 'C:\\My Documents\\Readme.txt')
+    if (!original) throw new Error('missing fixture')
+    const locked = fsReducer(fresh(), {
+      type: 'setAttributes',
+      id: original.id,
+      attributes: { readOnly: true },
+    })
+    expect(checkWrite(locked, original.id)).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('read-only'),
+    })
+    expect(fsReducer(locked, { type: 'write', id: original.id, content: 'lost', at: 99 })).toBe(locked)
+    const recovery = fsReducer(locked, {
+      type: 'create',
+      node: {
+        kind: 'file',
+        id: 'recovery' as NodeId,
+        name: 'Recovery.txt',
+        parent: DOCUMENTS_DIR,
+        content: 'recovered edit',
+        modified: 99,
+      },
+    })
+    expect(recovery.nodes[original.id]).toEqual(locked.nodes[original.id])
+    expect(recovery.nodes['recovery' as NodeId]).toMatchObject({ content: 'recovered edit' })
+    expect(checkWrite(recovery, DOCUMENTS_DIR).ok).toBe(false)
+    expect(checkWrite(recovery, 'missing' as NodeId).ok).toBe(false)
+  })
   it('re-points a shortcut and keeps only the settings that differ from the defaults', () => {
     const link = 'lnk:doom' as NodeId
     const pointed = run(fresh(), {

@@ -307,7 +307,11 @@ function Paint({ window: windowApi, args }: AppProps) {
     if (file && fs.get().nodes[file]?.kind === 'file') {
       const content = quantize(flatten(), depth)
       if (content !== shown) commit(content)
-      fs.write(file, encodeBitmap(content))
+      const result = fs.write(file, encodeBitmap(content))
+      if (!result.ok) {
+        error(result.error)
+        return
+      }
       setSaved(content)
       addRecent(file)
       setDialog(null)
@@ -326,7 +330,11 @@ function Paint({ window: windowApi, args }: AppProps) {
     const content = encodeBitmap(flat)
     let id: NodeId
     if (choice.kind === 'existing') {
-      fs.write(choice.id, content)
+      const result = fs.write(choice.id, content)
+      if (!result.ok) {
+        error(result.error)
+        return
+      }
       id = choice.id
     } else {
       const created = createNode(choice.parent, choice.name, { kind: 'file', content })
@@ -430,8 +438,10 @@ function Paint({ window: windowApi, args }: AppProps) {
         place(bitmap(piece.width, piece.height, colors.background), piece, { x: 0, y: 0 }),
       )
     }
-    if (choice.kind === 'existing') fs.write(choice.id, content)
-    else {
+    if (choice.kind === 'existing') {
+      const result = fs.write(choice.id, content)
+      if (!result.ok) error(result.error)
+    } else {
       const created = createNode(choice.parent, choice.name, { kind: 'file', content })
       if ('error' in created) error(created.error)
     }
