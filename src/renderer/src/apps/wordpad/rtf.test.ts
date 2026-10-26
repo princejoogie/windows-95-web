@@ -31,6 +31,84 @@ const letter: Document = {
 }
 
 describe('RTF', () => {
+  it.each([
+    ['blipuid', '{\\*\\blipuid 0123456789abcdef0123456789abcdef}'],
+    [
+      'picprop',
+      '{\\*\\picprop{\\sp{\\sn wzDescription}{\\sv abcdef0123456789}}{\\sp{\\sn pictureSize}{\\sv \\picw999\\pich999}}}',
+    ],
+  ])(
+    'ignores nested %s picture metadata while retaining exact bytes and surrounding styles',
+    (_name, metadata) => {
+      const rtf = `{\\rtf1\\ansi{\\fonttbl{\\f0 Arial;}}\\f0\\b Before
+{\\pict\\pngblip\\picw1\\pich1\\picwgoal15\\pichgoal15
+${metadata}
+89504e47
+{\\*\\blipuid fedcba9876543210fedcba9876543210}
+0d0a1a0a}\\b0 After}`
+      const doc = parseRtf(rtf)
+      const picture = doc.paragraphs[0]?.runs.find((inline) => 'kind' in inline)
+      expect(picture).toMatchObject({ kind: 'picture', width: 1, height: 1 })
+      if (!picture || !('kind' in picture)) throw new Error('Expected the embedded picture')
+      expect(Array.from(atob(picture.data), (byte) => byte.charCodeAt(0))).toEqual([
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      ])
+      expect(picture.data).toBe('iVBORw0KGgo=')
+      expect(doc.paragraphs[0]?.runs[0]).toMatchObject({ text: 'Before', bold: true, font: 'Arial' })
+      expect(doc.paragraphs[0]?.runs.at(-1)).toMatchObject({ text: 'After', bold: false, font: 'Arial' })
+      expect(parseRtf(writeRtf(doc))).toEqual(doc)
+    },
+  )
+
+  it('keeps a foreign picture after saving dimensions whose twip size is not divisible by fifteen', () => {
+    const doc = parseRtf(
+      '{\\rtf1 Before{\\pict\\pngblip\\picw1\\pich1\\picwgoal1000\\pichgoal673 89504e470d0a1a0a}After}',
+    )
+    const saved = parseRtf(writeRtf(doc))
+    expect(saved.paragraphs[0]?.runs.find((inline) => 'kind' in inline)).toEqual({
+      kind: 'picture',
+      format: 'png',
+      data: 'iVBORw0KGgo=',
+      width: 67,
+      height: 45,
+    })
+    expect(plainText(saved)).toBe('BeforeAfter')
+  })
+
+  it('rounds foreign twip dimensions to positive whole pixels and retains pictures through repeated saves', () => {
+    for (const [goalWidth, goalHeight, width, height] of [
+      [1000, 673, 67, 45],
+      [1, 7, 1, 1],
+      [22, 23, 1, 2],
+    ]) {
+      let doc = parseRtf(
+        `{\\rtf1 Before{\\pict\\pngblip\\picw1\\pich1\\picwgoal${goalWidth}\\pichgoal${goalHeight} 89504e470d0a1a0a}After}`,
+      )
+      for (let save = 0; save < 4; save++) {
+        const picture = doc.paragraphs[0]?.runs.find((inline) => 'kind' in inline)
+        expect(picture).toEqual({ kind: 'picture', format: 'png', data: 'iVBORw0KGgo=', width, height })
+        expect(plainText(doc)).toBe('BeforeAfter')
+        doc = parseRtf(writeRtf(doc))
+      }
+    }
+  })
+  it('writes fractional pixel inputs as recoverable integer picture dimensions', () => {
+    const doc: Document = {
+      paragraphs: [
+        {
+          ...DEFAULT_PARAGRAPH,
+          runs: [
+            { kind: 'picture', format: 'png', data: 'iVBORw0KGgo=', width: 1000 / 15, height: 673 / 15 },
+          ],
+        },
+      ],
+    }
+    const saved = parseRtf(writeRtf(doc))
+    expect(saved.paragraphs[0]?.runs).toEqual([
+      { kind: 'picture', format: 'png', data: 'iVBORw0KGgo=', width: 67, height: 45 },
+    ])
+    expect(parseRtf(writeRtf(saved))).toEqual(saved)
+  })
   it('preserves picture bytes, dimensions, and placement between formatted text', () => {
     const picture = { kind: 'picture', format: 'png', data: 'iVBORw0KGgo=', width: 120, height: 70 } as const
     const doc: Document = {
