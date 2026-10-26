@@ -59,6 +59,8 @@ export async function connect(port) {
   const c = {
     url: target.url,
     cue: () => {},
+    pos: [512, 384],
+    smooth: false,
     send(method, params = {}) {
       return new Promise((resolve, reject) => {
         const id = ++nextId
@@ -120,6 +122,7 @@ export async function connect(port) {
       return result
     },
     async mouse(type, x, y, { button = 'left', buttons = 0, count = 1 } = {}) {
+      c.pos = [Math.round(x), Math.round(y)]
       await c.send('Input.dispatchMouseEvent', {
         type,
         x: Math.round(x),
@@ -132,9 +135,23 @@ export async function connect(port) {
     async move(x, y) {
       await c.mouse('mouseMoved', x, y)
     },
+    async glide(x, y, { buttons = 0 } = {}) {
+      const [fromX, fromY] = c.pos
+      const distance = Math.hypot(x - fromX, y - fromY)
+      if (!c.smooth || distance < 3) return c.mouse('mouseMoved', x, y, { buttons })
+      const ms = Math.min(380, 110 + distance * 0.45)
+      const steps = Math.max(4, Math.round(ms / 16))
+      const begin = performance.now()
+      for (let step = 1; step <= steps; step++) {
+        const t = step / steps
+        const eased = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2
+        await c.mouse('mouseMoved', fromX + (x - fromX) * eased, fromY + (y - fromY) * eased, { buttons })
+        await wait(Math.max(0, begin + ms * t - performance.now()))
+      }
+    },
     async click(expression, { count = 1, button = 'left', offset } = {}) {
       const [x, y] = Array.isArray(expression) ? expression : await c.point(expression, offset)
-      await c.move(x, y)
+      await c.glide(x, y)
       for (let n = 1; n <= count; n++) {
         await c.mouse('mousePressed', x, y, { button, buttons: button === 'left' ? 1 : 2, count: n })
         await c.mouse('mouseReleased', x, y, { button, count: n })
@@ -142,9 +159,9 @@ export async function connect(port) {
       c.cue('click')
       await wait(90)
     },
-    async hover(expression) {
-      await c.move(...(await c.point(expression)))
-      await wait(380)
+    async hover(expression, settle = 380) {
+      await c.glide(...(await c.point(expression)))
+      await wait(settle)
     },
     async keyDown(key, modifiers = 0) {
       await c.send('Input.dispatchKeyEvent', {
@@ -186,11 +203,23 @@ export async function connect(port) {
       }
     },
     async drag(points, ms = 350) {
-      await c.move(...points[0])
+      await c.glide(...points[0])
       await c.mouse('mousePressed', ...points[0], { buttons: 1 })
-      for (const point of points.slice(1)) {
-        await c.mouse('mouseMoved', ...point, { buttons: 1 })
-        await wait(ms / (points.length - 1))
+      const path = c.smooth
+        ? points.flatMap((point, index) => {
+            if (!index) return [point]
+            const [fromX, fromY] = points[index - 1]
+            const steps = Math.max(1, Math.round(Math.hypot(point[0] - fromX, point[1] - fromY) / 6))
+            return Array.from({ length: steps }, (_, step) => [
+              fromX + ((point[0] - fromX) * (step + 1)) / steps,
+              fromY + ((point[1] - fromY) * (step + 1)) / steps,
+            ])
+          })
+        : points
+      const begin = performance.now()
+      for (let index = 1; index < path.length; index++) {
+        await c.mouse('mouseMoved', ...path[index], { buttons: 1 })
+        await wait(Math.max(0, begin + (ms * index) / (path.length - 1) - performance.now()))
       }
       await c.mouse('mouseReleased', ...points.at(-1))
     },
