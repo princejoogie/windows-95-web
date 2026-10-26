@@ -186,7 +186,9 @@ export function ControlPanel({ window, args }: AppProps) {
   return (
     <FolderView
       initial={{ kind: 'shell', id: folder }}
-      initialDialog={item?.action.kind === 'dialog' ? item.action.id : undefined}
+      initialDialog={
+        item?.action.kind === 'dialog' ? item.action.id : target?.kind === 'item' ? target.item : undefined
+      }
       window={window}
     />
   )
