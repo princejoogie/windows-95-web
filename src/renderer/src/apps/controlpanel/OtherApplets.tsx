@@ -1,4 +1,5 @@
 import { useId, useState } from 'react'
+import type { AccessibilityFeature } from '../../settings/featureSettings'
 import { locales } from '../../settings/model'
 import { apps } from '../../shell/registry'
 import { ListBox, MessageBox } from '../../ui'
@@ -6,8 +7,10 @@ import { Button } from '../../ui/Button'
 import { ComboBox } from '../../ui/ComboBox'
 import { Dialog } from '../../ui/Dialog'
 import { Checkbox, GroupBox, Radio, TextBox } from '../../ui/fields'
+import { AccessibilityFeatureDialog } from './AccessibilityFeatureDialog'
 import { appletIcons } from './icons'
 import { PropertySheet, useSettingsDraft } from './PropertySheet'
+import { RegionalNumber } from './RegionalNumber'
 import { WorldMap } from './WorldMap'
 
 export function DeviceGeneral({ name, manufacturer }: { name: string; manufacturer: string }) {
@@ -223,35 +226,10 @@ export function RegionalProperties({ onClose }: { onClose: () => void }) {
         {
           label: 'Number',
           content: (
-            <>
-              <GroupBox label="Sample" className="mt-2">
-                <p>Positive: 123,456,789.00</p>
-                <p className="mt-2">Negative: -123,456,789.00</p>
-              </GroupBox>
-              <div className="grid grid-cols-[140px_1fr] gap-3 mt-5">
-                {[
-                  ['Decimal symbol', '.'],
-                  ['No. of digits after decimal', '2'],
-                  ['Digit grouping symbol', ','],
-                  ['No. of digits in group', '3'],
-                  ['Negative sign symbol', '-'],
-                  ['Negative number format', '-1.1'],
-                  ['Display leading zeroes', '0.7'],
-                  ['Measurement system', 'U.S.'],
-                  ['List separator', ','],
-                ].map(([label = '', value = '']) => (
-                  <div key={label} className="contents">
-                    <span>{label}:</span>
-                    <ComboBox
-                      aria-label={label}
-                      value={value}
-                      options={[{ key: value, label: value }]}
-                      onChange={() => {}}
-                    />
-                  </div>
-                ))}
-              </div>
-            </>
+            <RegionalNumber
+              value={regional.number}
+              onChange={(number) => state.change({ regional: { ...regional, number } })}
+            />
           ),
         },
         {
@@ -319,11 +297,13 @@ export function RegionalProperties({ onClose }: { onClose: () => void }) {
                             ? 'dd/MM/yyyy'
                             : value === 'yyyy-MM-dd'
                               ? 'yyyy-MM-dd'
-                              : 'M/d/yyyy',
+                              : value === 'M/d/yyyy'
+                                ? 'M/d/yyyy'
+                                : 'M/d/yy',
                       },
                     })
                   }
-                  options={['M/d/yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd'].map((name) => ({
+                  options={['M/d/yy', 'M/d/yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd'].map((name) => ({
                     key: name,
                     label: name,
                   }))}
@@ -334,7 +314,9 @@ export function RegionalProperties({ onClose }: { onClose: () => void }) {
                   ? '24/08/1995'
                   : regional.dateFormat === 'yyyy-MM-dd'
                     ? '1995-08-24'
-                    : '8/24/1995'}
+                    : regional.dateFormat === 'M/d/yy'
+                      ? '8/24/95'
+                      : '8/24/1995'}
               </GroupBox>
             </>
           ),
@@ -347,14 +329,27 @@ export function RegionalProperties({ onClose }: { onClose: () => void }) {
 export function AccessibilityProperties({ onClose }: { onClose: () => void }) {
   const state = useSettingsDraft()
   const access = state.draft.accessibility
-  const [setting, setSetting] = useState<string | null>(null)
-  const settingsButton = (name: string) => (
+  const [setting, setSetting] = useState<AccessibilityFeature | null>(null)
+  const settingsButton = (name: AccessibilityFeature) => (
     <Button aria-label={`${name} Settings`} className="float-right" onClick={() => setSetting(name)}>
       Settings...
     </Button>
   )
-  const toggle = (key: keyof typeof access, value: boolean) =>
-    state.change({ accessibility: { ...access, [key]: value } })
+  const toggle = (
+    key:
+      | 'stickyKeys'
+      | 'filterKeys'
+      | 'toggleKeys'
+      | 'highContrast'
+      | 'mouseKeys'
+      | 'showSounds'
+      | 'soundSentry'
+      | 'serialKeys'
+      | 'resetIdle'
+      | 'warning'
+      | 'activationSound',
+    value: boolean,
+  ) => state.change({ accessibility: { ...access, [key]: value } })
   return (
     <>
       <PropertySheet
@@ -408,7 +403,11 @@ export function AccessibilityProperties({ onClose }: { onClose: () => void }) {
                     Use SoundSentry if you want Windows to generate visual warnings when your system makes a
                     sound.
                   </p>
-                  <Checkbox label="Use SoundSentry" />
+                  <Checkbox
+                    label="Use SoundSentry"
+                    checked={access.soundSentry}
+                    onChange={(event) => toggle('soundSentry', event.target.checked)}
+                  />
                   {settingsButton('SoundSentry')}
                 </GroupBox>
                 <GroupBox label="ShowSounds" className="mt-4">
@@ -420,7 +419,6 @@ export function AccessibilityProperties({ onClose }: { onClose: () => void }) {
                     checked={access.showSounds}
                     onChange={(event) => toggle('showSounds', event.target.checked)}
                   />
-                  {settingsButton('ShowSounds')}
                 </GroupBox>
               </>
             ),
@@ -461,28 +459,43 @@ export function AccessibilityProperties({ onClose }: { onClose: () => void }) {
             content: (
               <>
                 <GroupBox label="Automatic reset" className="mt-2">
-                  <Checkbox label="Turn off accessibility features after idle for:" />
+                  <Checkbox
+                    label="Turn off accessibility features after idle for:"
+                    checked={access.resetIdle}
+                    onChange={(event) => toggle('resetIdle', event.target.checked)}
+                  />
                   <ComboBox
                     aria-label="Accessibility idle time"
-                    value="5 minutes"
+                    value={`${access.idleMinutes} minutes`}
                     options={['5 minutes', '10 minutes', '15 minutes', '20 minutes', '30 minutes'].map(
                       (label) => ({ key: label, label }),
                     )}
-                    onChange={() => {}}
+                    onChange={(value) =>
+                      state.change({ accessibility: { ...access, idleMinutes: Number.parseInt(value, 10) } })
+                    }
                     className="mt-3 w-[150px]"
                   />
                 </GroupBox>
                 <GroupBox label="Notification" className="mt-4">
-                  <Checkbox label="Give warning message when turning a feature on" defaultChecked />
+                  <Checkbox
+                    label="Give warning message when turning a feature on"
+                    checked={access.warning}
+                    onChange={(event) => toggle('warning', event.target.checked)}
+                  />
                   <Checkbox
                     label="Make a sound when turning a feature on or off"
-                    defaultChecked
+                    checked={access.activationSound}
+                    onChange={(event) => toggle('activationSound', event.target.checked)}
                     className="mt-3"
                   />
                 </GroupBox>
                 <GroupBox label="SerialKeys" className="mt-4">
                   <p className="mb-3">Use an alternative input device connected to a serial port.</p>
-                  <Checkbox label="Use SerialKeys" />
+                  <Checkbox
+                    label="Use SerialKeys"
+                    checked={access.serialKeys}
+                    onChange={(event) => toggle('serialKeys', event.target.checked)}
+                  />
                   {settingsButton('SerialKeys')}
                 </GroupBox>
               </>
@@ -491,30 +504,13 @@ export function AccessibilityProperties({ onClose }: { onClose: () => void }) {
         ]}
       />
       {setting && (
-        <Dialog title={`Settings for ${setting}`} onClose={() => setSetting(null)}>
-          <div className="p-3 w-[340px]">
-            <GroupBox label="Keyboard shortcut">
-              <Checkbox label={`Use shortcut for ${setting}`} defaultChecked />
-              <p className="mt-3">
-                {setting === 'StickyKeys'
-                  ? 'Press the SHIFT key five times to turn StickyKeys on or off.'
-                  : setting === 'MouseKeys'
-                    ? 'Press LEFT ALT + LEFT SHIFT + NUM LOCK to turn MouseKeys on or off.'
-                    : 'Use the keyboard shortcut to turn this feature on or off.'}
-              </p>
-            </GroupBox>
-            <GroupBox label="Options" className="mt-4">
-              <Checkbox label="Make sounds when modifier keys are pressed" defaultChecked />
-              <Checkbox label="Display status on screen" defaultChecked className="mt-3" />
-            </GroupBox>
-            <div className="flex justify-end gap-2 mt-4">
-              <Button isDefault onClick={() => setSetting(null)}>
-                OK
-              </Button>
-              <Button onClick={() => setSetting(null)}>Cancel</Button>
-            </div>
-          </div>
-        </Dialog>
+        <AccessibilityFeatureDialog
+          key={setting}
+          feature={setting}
+          features={access.features}
+          onOK={(features) => state.change({ accessibility: { ...access, features } })}
+          onClose={() => setSetting(null)}
+        />
       )}
     </>
   )

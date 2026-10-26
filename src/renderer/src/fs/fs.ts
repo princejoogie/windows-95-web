@@ -16,6 +16,16 @@ import {
 /** What a shortcut opens: an installed app, or a node. */
 export type ShortcutTarget = { readonly app: string } | { readonly node: NodeId }
 
+export type WriteResult = { readonly ok: true } | { readonly ok: false; readonly error: string }
+
+export function checkWrite(state: FsState, id: NodeId): WriteResult {
+  const node = state.nodes[id]
+  if (node?.kind !== 'file') return { ok: false, error: 'The file no longer exists or cannot be written.' }
+  if (node.attributes?.readOnly)
+    return { ok: false, error: `${node.name} is read-only. Save the file with a different name.` }
+  return { ok: true }
+}
+
 export type FsAction =
   | { type: 'create'; node: FsNode }
   | { type: 'write'; id: NodeId; content: string; at: number }
@@ -254,7 +264,8 @@ export function fsReducer(state: FsState, action: FsAction): FsState {
     }
     case 'write': {
       const node = state.nodes[action.id]
-      if (node?.kind !== 'file' || node.content === action.content) return state
+      if (!checkWrite(state, action.id).ok || node?.kind !== 'file' || node.content === action.content)
+        return state
       return put(state, { ...node, content: action.content, modified: action.at })
     }
     case 'rename': {

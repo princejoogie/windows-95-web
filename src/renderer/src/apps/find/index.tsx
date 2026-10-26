@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { extension, isInside, isProtected, pathOf, uniqueName } from '../../fs/fs'
-import { createNode, fs, fsStore, newNodeId, useFs } from '../../fs/store'
+import { createNode, fs, fsStore, fsTimestamp, newNodeId, useFs } from '../../fs/store'
 import { DESKTOP_DIR, DOCUMENTS_DIR, type NodeId, RECYCLED_DIR, ROOT } from '../../fs/types'
 import { icons } from '../../icons'
+import { formatDateTime, wallClockDate } from '../../settings/clock'
+import { getClockDate, useSettings } from '../../settings/store'
 import { clipboard, planPaste, planShortcuts } from '../../shell/clipboard'
 import { useKeyDown } from '../../shell/context'
 import { DeleteConfirmation } from '../../shell/DeleteConfirmation'
@@ -60,6 +62,7 @@ function dateInput(date: Date): string {
 }
 
 function Find({ window: appWindow, args }: AppProps) {
+  const settings = useSettings()
   const state = useFs((value) => value)
   const [saved] = useState(() => {
     const node = args.file ? fs.get().nodes[args.file] : undefined
@@ -205,7 +208,7 @@ function Find({ window: appWindow, args }: AppProps) {
     appWindow.setTitle(criteria.name ? `Find: Files named ${criteria.name}` : 'Find: All Files')
     setSelected(new Set())
     setSearch({ kind: 'running', results: [] })
-    const iterator = searchFiles(state, criteria)
+    const iterator = searchFiles(state, criteria, getClockDate().getTime())
     const found: SearchResult[] = []
     const step = () => {
       let finished = false
@@ -248,7 +251,7 @@ function Find({ window: appWindow, args }: AppProps) {
       fs.get(),
       [{ kind: 'node', id: result.node.id }],
       parent,
-      Date.now(),
+      fsTimestamp(),
       newNodeId,
     )
     if (plan.ok) plan.actions.forEach(fsStore.dispatch)
@@ -259,7 +262,7 @@ function Find({ window: appWindow, args }: AppProps) {
       fs.get(),
       { op: 'copy', ids: [result.node.id] },
       DOCUMENTS_DIR,
-      Date.now(),
+      fsTimestamp(),
       newNodeId,
     )
     if (plan.ok) plan.actions.forEach(fsStore.dispatch)
@@ -484,7 +487,11 @@ function Find({ window: appWindow, args }: AppProps) {
                     checked={criteria.modified.kind === 'between'}
                     onChange={() =>
                       update({
-                        modified: { kind: 'between', from: dateInput(new Date()), to: dateInput(new Date()) },
+                        modified: {
+                          kind: 'between',
+                          from: dateInput(wallClockDate(settings)),
+                          to: dateInput(wallClockDate(settings)),
+                        },
                       })
                     }
                   />
@@ -764,8 +771,8 @@ function Find({ window: appWindow, args }: AppProps) {
                       <td title={result.folder}>{result.folder}</td>
                       <td>{result.node.kind === 'file' ? `${Math.ceil(result.bytes / 1024)} KB` : ''}</td>
                       <td>{result.type}</td>
-                      <td title={new Date(result.node.modified).toLocaleString()}>
-                        {new Date(result.node.modified).toLocaleDateString()}
+                      <td title={formatDateTime(settings, result.node.modified)}>
+                        {formatDateTime(settings, result.node.modified)}
                       </td>
                     </>
                   )}

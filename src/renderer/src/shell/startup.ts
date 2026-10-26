@@ -39,7 +39,10 @@ export function installStartMenu(apps: readonly AppManifest[]): void {
   startMenuFolder()
   const content = JSON.stringify(installed)
   if (marker?.kind === 'file') {
-    if (marker.content !== content) fs.write(marker.id, content)
+    if (marker.content !== content) {
+      const written = fs.write(marker.id, content)
+      if (!written.ok) console.error(written.error)
+    }
   } else {
     const created = createNode(WINDOWS_DIR, 'WIN95SM.INI', { kind: 'file', content })
     if ('id' in created) fs.setAttributes(created.id, { hidden: true, system: true })

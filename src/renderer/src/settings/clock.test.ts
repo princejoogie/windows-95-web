@@ -1,9 +1,35 @@
 import { describe, expect, it } from 'vitest'
-import { clockOffsetForParts, clockParts, formatClock } from './clock'
+import {
+  clockOffsetForParts,
+  clockParts,
+  formatClock,
+  formatDateTime,
+  formatTimeDate,
+  virtualTimestamp,
+} from './clock'
 import { defaultSettings } from './model'
 import { saverIsDue } from './ScreenSaverHost'
 
 describe('virtual system clock', () => {
+  it('uses the selected zone and regional pattern once for persisted virtual timestamps', () => {
+    const now = Date.UTC(2026, 9, 26)
+    const target = Date.UTC(1995, 7, 24, 5, 5)
+    const settings = {
+      ...defaultSettings,
+      timeZone: 'Asia/Manila',
+      clockOffset: target - now,
+    } satisfies typeof defaultSettings
+    const timestamp = virtualTimestamp(settings, now)
+    expect(timestamp).toBe(target)
+    expect(formatTimeDate(settings, timestamp)).toBe('1:05 PM 8/24/95')
+    expect(formatDateTime(settings, timestamp)).toBe('8/24/95 1:05 PM')
+    expect(
+      formatDateTime(
+        { ...settings, regional: { ...settings.regional, dateFormat: 'dd/MM/yyyy', time24: true } },
+        timestamp,
+      ),
+    ).toBe('24/08/1995 13:05')
+  })
   it('sets a wall clock in the selected zone without changing the host clock', () => {
     const now = Date.UTC(1995, 7, 24, 0, 0, 0)
     const desired = { year: 1996, month: 2, day: 29, hour: 13, minute: 5, second: 9 }

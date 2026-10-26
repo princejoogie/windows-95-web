@@ -444,7 +444,13 @@ export function execute(session: Session, filesystem: FsState, input: string, no
           error = invalid
           break
         }
-        if (existing && (existing.kind === 'folder' || existing.kind === 'drive' || node.kind === 'folder')) {
+        if (
+          existing &&
+          (existing.attributes?.readOnly ||
+            existing.kind === 'folder' ||
+            existing.kind === 'drive' ||
+            node.kind === 'folder')
+        ) {
           error = 'Access denied'
           break
         }
@@ -608,7 +614,8 @@ export function execute(session: Session, filesystem: FsState, input: string, no
       const existing = findChild(state, target.parent, target.name)
       const error = nameError(state, target.parent, target.name, existing?.id)
       if (error) output = [error]
-      else if (existing && existing.kind !== 'file') output = ['Access denied']
+      else if (existing && (existing.kind !== 'file' || existing.attributes?.readOnly))
+        output = ['Access denied']
       else {
         const content =
           (redirection.append && existing?.kind === 'file' ? existing.content : '') +

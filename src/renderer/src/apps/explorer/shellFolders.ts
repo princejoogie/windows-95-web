@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import { type ComponentType, useSyncExternalStore } from 'react'
 import type { Location } from './model'
 
 export type ShellFolderId = 'controlpanel' | 'printers' | 'network' | 'fonts'
@@ -35,7 +35,17 @@ export interface ShellFolder {
 }
 
 const folders = new Map<ShellFolderId, ShellFolder>()
+const listeners = new Set<() => void>()
 export const registerShellFolder = (folder: ShellFolder): void => {
   folders.set(folder.id, folder)
+  for (const listener of listeners) listener()
 }
 export const shellFolder = (id: ShellFolderId): ShellFolder | undefined => folders.get(id)
+const subscribe = (listener: () => void) => {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+export const useShellFolder = (id?: ShellFolderId): ShellFolder | undefined =>
+  useSyncExternalStore(subscribe, () => (id ? shellFolder(id) : undefined))

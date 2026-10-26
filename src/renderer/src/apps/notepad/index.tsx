@@ -1,6 +1,8 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import { createNode, fs, useFs } from '../../fs/store'
 import { DOCUMENTS_DIR, type NodeId } from '../../fs/types'
+import { formatTimeDate } from '../../settings/clock'
+import { settingsStore } from '../../settings/store'
 import { useKeyDown } from '../../shell/context'
 import { rememberDocument } from '../../shell/recent'
 import { launch } from '../../shell/system'
@@ -19,7 +21,7 @@ import {
   Separator,
   TextBox,
 } from '../../ui'
-import { type DocumentState, documentReducer, findText } from './document'
+import { type DocumentState, documentReducer, findText, loadDocument } from './document'
 import { notepadIcon } from './icon'
 import { defaultPageSettings, PageSetup } from './PageSetup'
 import { PrinterPrompt } from './PrinterPrompt'
@@ -43,7 +45,7 @@ const FILTERS = [
 function initialDocument(file: NodeId | undefined): DocumentState {
   const node = file ? fs.get().nodes[file] : undefined
   const text = node?.kind === 'file' ? node.content : ''
-  return { file: node?.kind === 'file' ? node.id : null, text, saved: text, undo: [] }
+  return loadDocument(node?.kind === 'file' ? node.id : null, text, formatTimeDate(settingsStore.get()))
 }
 
 export function Notepad({ window: windowApi, args }: AppProps) {
@@ -69,7 +71,10 @@ export function Notepad({ window: windowApi, args }: AppProps) {
     if (findOpen) requestAnimationFrame(() => findInput.current?.focus())
   }
   useEffect(() => {
-    editor.current?.focus()
+    const area = editor.current
+    area?.focus()
+    if (area && /^\.LOG(?:\r\n|\r|\n|$)/.test(area.value))
+      area.setSelectionRange(area.value.length, area.value.length)
   }, [])
 
   useEffect(() => windowApi.setTitle(`${name} - Notepad`), [windowApi, name])
@@ -112,7 +117,11 @@ export function Notepad({ window: windowApi, args }: AppProps) {
       setPrompt({ kind: 'file', mode: 'save', next })
       return
     }
-    fs.write(file.id, document.text)
+    const result = fs.write(file.id, document.text)
+    if (!result.ok) {
+      setPrompt({ kind: 'error', message: result.error })
+      return
+    }
     rememberDocument(file.id)
     dispatch({ type: 'save', file: file.id })
     setPrompt(null)
@@ -124,13 +133,27 @@ export function Notepad({ window: windowApi, args }: AppProps) {
     if (prompt.mode === 'open') {
       const node = result.kind === 'existing' ? fs.get().nodes[result.id] : undefined
       if (node?.kind !== 'file') return
-      dispatch({ type: 'load', file: node.id, text: node.content })
+      dispatch({
+        type: 'load',
+        file: node.id,
+        text: node.content,
+        stamp: formatTimeDate(settingsStore.get()),
+      })
+      requestAnimationFrame(() => {
+        const area = editor.current
+        const at = area && /^\.LOG(?:\r\n|\r|\n|$)/.test(node.content) ? area.value.length : 0
+        area?.setSelectionRange(at, at)
+      })
       rememberDocument(node.id)
     } else {
       let id: NodeId
       if (result.kind === 'existing') {
         id = result.id
-        fs.write(id, document.text)
+        const written = fs.write(id, document.text)
+        if (!written.ok) {
+          setPrompt({ kind: 'error', message: written.error })
+          return
+        }
       } else {
         const created = createNode(result.parent, result.name, { kind: 'file', content: document.text })
         if ('error' in created) {
@@ -199,10 +222,7 @@ export function Notepad({ window: windowApi, args }: AppProps) {
   }
 
   const timeDate = () => {
-    const now = new Date()
-    replaceSelection(
-      `${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} ${now.toLocaleDateString('en-US')}`,
-    )
+    replaceSelection(formatTimeDate(settingsStore.get()))
   }
 
   useKeyDown((event) => {

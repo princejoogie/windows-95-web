@@ -31,6 +31,31 @@ const letter: Document = {
 }
 
 describe('RTF', () => {
+  it('preserves picture bytes, dimensions, and placement between formatted text', () => {
+    const picture = { kind: 'picture', format: 'png', data: 'iVBORw0KGgo=', width: 120, height: 70 } as const
+    const doc: Document = {
+      paragraphs: [{ ...DEFAULT_PARAGRAPH, runs: [run('Before', { bold: true }), picture, run('After')] }],
+    }
+    const rtf = writeRtf(doc)
+    expect(rtf).toContain('\\pict\\pngblip\\picw120\\pich70\\picwgoal1800\\pichgoal1050')
+    expect(rtf).toContain('89504e470d0a1a0a')
+    expect(rtf).not.toContain('<img')
+    expect(parseRtf(rtf)).toEqual(doc)
+    expect(plainText(doc)).toBe('BeforeAfter')
+  })
+
+  it('reads JPEG pictures and ignores unsupported or corrupt picture data', () => {
+    const doc: Document = {
+      paragraphs: [
+        {
+          ...DEFAULT_PARAGRAPH,
+          runs: [{ kind: 'picture', format: 'jpeg', data: '/9j/2Q==', width: 5, height: 4 }],
+        },
+      ],
+    }
+    expect(parseRtf(writeRtf(doc))).toEqual(doc)
+    expect(plainText(parseRtf('{\\rtf1 A{\\pict\\pngblip\\picw1\\pich1 xyz}B}'))).toBe('AB')
+  })
   it('writes a file other RTF readers recognize', () => {
     const rtf = writeRtf(letter)
     expect(rtf.startsWith('{\\rtf1\\ansi')).toBe(true)
@@ -72,7 +97,7 @@ describe('RTF', () => {
 \\pard\\par
 }`
     const doc = parseRtf(rtf)
-    expect(doc.paragraphs.map((p) => p.runs.map((r) => r.text).join(''))).toEqual([
+    expect(doc.paragraphs.map((p) => p.runs.map((r) => ('kind' in r ? '' : r.text)).join(''))).toEqual([
       'Title',
       'Body with blue text and é and — nbsp.',
       '',

@@ -23,6 +23,17 @@ export interface Run extends RunStyle {
   readonly text: string
 }
 
+export interface Picture {
+  readonly kind: 'picture'
+  readonly format: 'png' | 'jpeg'
+  /** Encoded image bytes, without a data URL prefix. */
+  readonly data: string
+  readonly width: number
+  readonly height: number
+}
+
+export type Inline = Run | Picture
+
 export interface ParagraphStyle {
   readonly align: Alignment
   /** Twips. */
@@ -36,7 +47,7 @@ export interface ParagraphStyle {
 }
 
 export interface Paragraph extends ParagraphStyle {
-  readonly runs: readonly Run[]
+  readonly runs: readonly Inline[]
 }
 
 export interface Document {
@@ -74,12 +85,17 @@ export const sameRunStyle = (a: RunStyle, b: RunStyle): boolean =>
   a.color === b.color
 
 /** Joins neighbouring runs with the same style and drops empty ones, so equal documents compare equal. */
-export function normalizeRuns(runs: readonly Run[]): Run[] {
-  const out: Run[] = []
+export function normalizeRuns(runs: readonly Inline[]): Inline[] {
+  const out: Inline[] = []
   for (const run of runs) {
+    if ('kind' in run) {
+      out.push(run)
+      continue
+    }
     if (!run.text) continue
     const last = out[out.length - 1]
-    if (last && sameRunStyle(last, run)) out[out.length - 1] = { ...last, text: last.text + run.text }
+    if (last && !('kind' in last) && sameRunStyle(last, run))
+      out[out.length - 1] = { ...last, text: last.text + run.text }
     else out.push(run)
   }
   return out
@@ -96,7 +112,7 @@ export function normalize(doc: Document): Document {
 
 /** The document as Notepad would see it. */
 export const plainText = (doc: Document): string =>
-  doc.paragraphs.map((p) => p.runs.map((r) => r.text).join('')).join('\n')
+  doc.paragraphs.map((p) => p.runs.map((r) => ('kind' in r ? '' : r.text)).join('')).join('\n')
 
 export function fromPlainText(text: string, style: RunStyle = DEFAULT_RUN): Document {
   const lines = text.replace(/\r\n?/g, '\n').split('\n')
