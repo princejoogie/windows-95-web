@@ -80,6 +80,7 @@ export interface WindowApi {
   readonly focused: boolean
   readonly minimized: boolean
   setTitle(title: string): void
+  setWindowSpec(spec: WindowSpec): void
   onCloseRequest(handler: () => Promise<boolean>): () => void
   onHelpRequest(handler: () => void): () => void
   close(): void
