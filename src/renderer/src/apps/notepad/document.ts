@@ -8,15 +8,22 @@ export interface DocumentState {
 }
 
 type DocumentAction =
-  | { type: 'load'; file: NodeId | null; text: string }
+  | { type: 'load'; file: NodeId | null; text: string; stamp?: string }
   | { type: 'edit'; text: string }
   | { type: 'save'; file: NodeId }
   | { type: 'undo' }
 
+export function loadDocument(file: NodeId | null, text: string, stamp?: string): DocumentState {
+  const lineBreak = /\r\n|\r|\n/.exec(text)?.[0] ?? '\r\n'
+  const loaded =
+    file && stamp && /^\.LOG(?:\r\n|\r|\n|$)/.test(text) ? `${text}${lineBreak}${stamp}${lineBreak}` : text
+  return { file, text: loaded, saved: text, undo: [] }
+}
+
 export function documentReducer(state: DocumentState, action: DocumentAction): DocumentState {
   switch (action.type) {
     case 'load':
-      return { file: action.file, text: action.text, saved: action.text, undo: [] }
+      return loadDocument(action.file, action.text, action.stamp)
     case 'edit':
       return action.text === state.text
         ? state

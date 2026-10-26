@@ -1,7 +1,7 @@
 import { type RefObject, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { isProtected } from '../../fs/fs'
-import { fs, fsStore, newNodeId } from '../../fs/store'
+import { fs, fsStore, fsTimestamp, newNodeId } from '../../fs/store'
 import { DESKTOP_DIR, type NodeId } from '../../fs/types'
 import { createStore, useStore } from '../../lib/store'
 import { planPaste } from '../../shell/clipboard'
@@ -137,7 +137,7 @@ function finish(event: PointerEvent): void {
     before,
     { op: event.ctrlKey ? 'copy' : 'cut', ids: drag.ids },
     destination.id,
-    Date.now(),
+    fsTimestamp(),
     newNodeId,
   )
   if (!plan.ok) {

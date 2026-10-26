@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { BANNER, execute, newSession, prompt } from '../apps/dosprompt/interpreter'
 import { nextPage, print, ROWS, type Screen, wrap } from '../apps/dosprompt/screen'
-import { fsStore } from '../fs/store'
+import { fsStore, fsTimestamp } from '../fs/store'
 
 export function DosSession({ onWindows }: { onWindows: () => void }) {
   const [session, setSession] = useState(newSession)
@@ -14,7 +14,7 @@ export function DosSession({ onWindows }: { onWindows: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const [caretVisible, setCaretVisible] = useState(true)
   const waiting = screen.queue.length > 0
-  const prefix = session.pending.kind === 'ready' ? prompt(session, fsStore.get(), Date.now()) : ''
+  const prefix = session.pending.kind === 'ready' ? prompt(session, fsStore.get(), fsTimestamp()) : ''
   const lines = waiting
     ? [...screen.lines, '-- More --']
     : [...screen.lines, ...wrap([`${prefix}${input} `])].slice(-ROWS)
@@ -42,7 +42,7 @@ export function DosSession({ onWindows }: { onWindows: () => void }) {
       onWindows()
       return
     }
-    const result = execute(session, fsStore.get(), input, Date.now())
+    const result = execute(session, fsStore.get(), input, fsTimestamp())
     for (const action of result.actions) fsStore.dispatch(action)
     if (result.effects.some((effect) => effect.kind === 'exit')) {
       onWindows()

@@ -7,7 +7,7 @@ import {
   useState,
 } from 'react'
 import { children, isInside, isProtected, uniqueName } from '../fs/fs'
-import { createNode, fs, fsStore, newNodeId, useFs } from '../fs/store'
+import { createNode, fs, fsStore, fsTimestamp, newNodeId, useFs } from '../fs/store'
 import {
   DESKTOP_DIR,
   DOCUMENTS_DIR,
@@ -428,7 +428,7 @@ export function Desktop({ size }: { size: Size }) {
   const paste = (clipNow: Clip, dest: NodeId, at: Point | null) => {
     const before = fs.get()
     const created = carry(
-      planPaste(fs.get(), clipNow, dest, Date.now(), newNodeId),
+      planPaste(fs.get(), clipNow, dest, fsTimestamp(), newNodeId),
       dest === DESKTOP_DIR ? at : null,
     )
     remember(before, fs.get(), clipNow?.op === 'cut' ? 'Move' : 'Copy')
@@ -466,14 +466,14 @@ export function Desktop({ size }: { size: Size }) {
             fs.get(),
             ids.map((id) => ({ kind: 'node', id })),
             DESKTOP_DIR,
-            Date.now(),
+            fsTimestamp(),
             newNodeId,
           ),
           at,
         )
       },
       createShortcut: () =>
-        carry(planShortcuts(fs.get(), targetsOf(scope), DESKTOP_DIR, Date.now(), newNodeId), null),
+        carry(planShortcuts(fs.get(), targetsOf(scope), DESKTOP_DIR, fsTimestamp(), newNodeId), null),
       remove: () => askDelete(scope, false),
       undo,
       rename: () => key && startRename(key),
@@ -481,7 +481,7 @@ export function Desktop({ size }: { size: Size }) {
       sendToDocuments: () =>
         paste({ op: 'copy', ids: nodesOf(scope).map((node) => node.id) }, DOCUMENTS_DIR, null),
       sendToDesktop: () =>
-        carry(planShortcuts(fs.get(), targetsOf(scope), DESKTOP_DIR, Date.now(), newNodeId), null),
+        carry(planShortcuts(fs.get(), targetsOf(scope), DESKTOP_DIR, fsTimestamp(), newNodeId), null),
       emptyRecycleBin: () => setPrompt({ kind: 'empty' }),
       arrange: (by) => {
         saveArrangement({ ...arrangement, by })
@@ -778,7 +778,7 @@ export function Desktop({ size }: { size: Size }) {
   }
 
   function undo() {
-    const problem = undoLast(fs.get(), fsStore.dispatch)
+    const problem = undoLast(fs.get(), fsStore.dispatch, fsTimestamp())
     if (problem) showError('Undo', problem)
   }
 

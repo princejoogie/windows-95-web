@@ -64,7 +64,7 @@ export interface Settings extends BackgroundSettings {
   regional: {
     locale: (typeof locales)[number]
     currency: string
-    dateFormat: 'M/d/yyyy' | 'dd/MM/yyyy' | 'yyyy-MM-dd'
+    dateFormat: 'M/d/yy' | 'M/d/yyyy' | 'dd/MM/yyyy' | 'yyyy-MM-dd'
     time24: boolean
   }
   accessibility: {
@@ -125,7 +125,7 @@ export const defaultSettings: Settings = {
   timeZone: 'Asia/Manila',
   adjustForDaylightSaving: true,
   keyboard: { repeatDelay: 500, repeatRate: 20, cursorBlink: 530 },
-  regional: { locale: 'English (United States)', currency: '$', dateFormat: 'M/d/yyyy', time24: false },
+  regional: { locale: 'English (United States)', currency: '$', dateFormat: 'M/d/yy', time24: false },
   accessibility: {
     stickyKeys: false,
     filterKeys: false,
@@ -267,7 +267,7 @@ export function parseSettings(value: unknown, nodes: readonly FsNode[] = []): Se
       currency: text(regional.currency, '$', 8),
       dateFormat: choice(
         regional.dateFormat,
-        ['M/d/yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd'],
+        ['M/d/yy', 'M/d/yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd'],
         defaults.regional.dateFormat,
       ),
       time24: bool(regional.time24, false),
