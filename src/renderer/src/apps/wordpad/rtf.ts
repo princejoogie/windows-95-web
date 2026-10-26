@@ -9,7 +9,11 @@ import {
   type ParagraphStyle,
   type Picture,
   type RunStyle,
+  TWIPS_PER_PIXEL,
 } from './model'
+
+/** The editor stores positive whole pixels; foreign twip goals round to the nearest pixel. */
+const picturePixels = (size: number): number => Math.max(1, Math.round(size))
 
 /** Writes the subset of RTF 1.5 that WordPad produces: fonts, colors, character and paragraph formatting. */
 export function writeRtf(doc: Document): string {
@@ -68,7 +72,9 @@ function writeRun(
     const hex = Array.from(atob(run.data), (byte) => byte.charCodeAt(0).toString(16).padStart(2, '0')).join(
       '',
     )
-    return `{\\pict\\${run.format === 'png' ? 'pngblip' : 'jpegblip'}\\picw${run.width}\\pich${run.height}\\picwgoal${run.width * 15}\\pichgoal${run.height * 15}\n${hex}}`
+    const width = picturePixels(run.width)
+    const height = picturePixels(run.height)
+    return `{\\pict\\${run.format === 'png' ? 'pngblip' : 'jpegblip'}\\picw${width}\\pich${height}\\picwgoal${width * TWIPS_PER_PIXEL}\\pichgoal${height * TWIPS_PER_PIXEL}\n${hex}}`
   }
   let props = `\\plain\\f${fontIndex(run.font)}\\fs${Math.round(run.size * 2)}`
   if (run.bold) props += '\\b'
@@ -191,6 +197,10 @@ export function parseRtf(source: string): Document {
       return
     }
     if (group.destination === 'pict') {
+      if (star) {
+        group.destination = 'skip'
+        return
+      }
       const picture = group.picture
       if (!picture) return
       if (word === 'pngblip') picture.format = 'png'
@@ -375,15 +385,15 @@ export function parseRtf(source: string): Document {
         /^(?:[0-9a-fA-F]{2})+$/.test(picture.hex)
       ) {
         const bytes = picture.hex.match(/../g) ?? []
-        const width = picture.goalWidth ? picture.goalWidth / 15 : picture.width
-        const height = picture.goalHeight ? picture.goalHeight / 15 : picture.height
+        const width = picture.goalWidth ? picture.goalWidth / TWIPS_PER_PIXEL : picture.width
+        const height = picture.goalHeight ? picture.goalHeight / TWIPS_PER_PIXEL : picture.height
         if (width > 0 && height > 0)
           runs.push({
             kind: 'picture',
             format: picture.format,
             data: btoa(bytes.map((byte) => String.fromCharCode(Number.parseInt(byte, 16))).join('')),
-            width,
-            height,
+            width: picturePixels(width),
+            height: picturePixels(height),
           })
       }
       // A bullet declared in the numbering group belongs to the paragraph around it.
