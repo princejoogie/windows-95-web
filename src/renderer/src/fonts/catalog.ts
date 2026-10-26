@@ -60,7 +60,7 @@ async function sourceBytes(source: FontSource): Promise<Uint8Array<ArrayBuffer>>
 async function loadFont(id: string, file: string, source: FontSource): Promise<InstalledFont> {
   const bytes = await sourceBytes(source)
   const metadata = inspectFont(bytes)
-  const family = `Win95Font-${id}`
+  const family = metadata.name
   const face = await new FontFace(family, bytes).load()
   const previous = faces.get(id)
   if (previous) document.fonts.delete(previous)
@@ -125,6 +125,10 @@ export function ensureFonts(): Promise<void> {
 export function useFonts(): readonly InstalledFont[] {
   void ensureFonts()
   return useStore(fontCatalog, (fonts) => fonts)
+}
+export function useFontChoices(existing: readonly string[]): readonly string[] {
+  const installed = useFonts()
+  return [...new Set([...existing, ...installed.map((font) => font.name)])]
 }
 
 export async function installFont(input: {

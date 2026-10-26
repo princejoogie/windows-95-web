@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { connect, sleep } from './cdp.mjs'
 
@@ -65,11 +65,165 @@ const checkbox = async (label, within = 'body') => {
 const inputValue = (label) => `document.querySelector('input[aria-label=${JSON.stringify(label)}]').value`
 const persisted = (path) => `JSON.parse(localStorage.getItem('win95.settings.v1'))?.${path}`
 try {
-  if (phase === 'exit') await app.eval('setTimeout(() => window.win95.shutdown(), 100)')
   if (process.argv.includes('--fresh')) {
     await app.eval('localStorage.clear()')
     await reload()
   }
+  if (phase === 'font-virtual') {
+    await reload()
+    const data = `data:font/ttf;base64,${readFileSync(new URL('../../src/renderer/src/assets/fonts/micross.ttf', import.meta.url)).toString('base64')}`
+    await run('notepad')
+    await app.type(data)
+    await app.key('s', ['Control'])
+    await fill('input[id$="-name"]', 'virtual.ttf')
+    await clickText('Save', dialog('Save As'))
+    await sleep(300)
+    const source = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.kind==='file'&&n.name==='virtual.ttf').id`,
+    )
+    await check(
+      10,
+      'font bytes saved as a real virtual font file',
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.id===${JSON.stringify(source)}).content.length`,
+      data.length,
+    )
+    await reload()
+    await openPanel('Fonts')
+    await app.key('f', ['Alt'])
+    await clickText('Install New Font...')
+    await clickText('..', '[aria-label="Font folders"]')
+    await clickText('My Documents', '[aria-label="Font folders"]')
+    await clickText('virtual.ttf', dialog('Add Fonts'))
+    await shot('virtual-source-file')
+    await clickText('OK', dialog('Add Fonts'))
+    await app.waitFor(`!document.querySelector(${JSON.stringify(dialog('Add Fonts'))})`)
+    await check(
+      10,
+      'actual virtual font installs its parsed family and bytes',
+      `JSON.parse(localStorage.getItem('win95.fonts.v1')).map(f=>({name:f.name,file:f.file,bytes:f.byteLength,source:f.source.kind}))`,
+      [{ name: 'Microsoft Sans Serif', file: 'virtual.ttf', bytes: 652664, source: 'copy' }],
+    )
+    await reload()
+    await app.clickOn('[data-desktop-item="app:mycomputer"]', { count: 2 })
+    await app.clickOn('[data-node-id="c"]', { count: 2 })
+    await app.clickOn('[data-node-id="documents"]', { count: 2 })
+    await app.clickOn(`[data-node-id="${source}"]`)
+    await app.key('Delete')
+    await clickText('Yes')
+    await reload()
+    await openPanel('Fonts')
+    await app.waitFor(`document.querySelector('[data-window]').textContent.includes('Microsoft Sans Serif')`)
+    await check(
+      10,
+      'copied font remains loaded after original source is recycled',
+      `[...document.fonts].some(f=>f.family==='Microsoft Sans Serif'&&f.status==='loaded')`,
+      true,
+    )
+    await shot('copied-font-source-removed')
+  }
+  if (phase === 'font-negative') {
+    await reload()
+    await run('notepad')
+    await app.type('This file is not a font.')
+    await app.key('s', ['Control'])
+    await fill('input[id$="-name"]', 'bad.ttf')
+    await clickText('Save', dialog('Save As'))
+    await sleep(300)
+    await check(
+      10,
+      'invalid font fixture is an actual persisted virtual file',
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).some(n=>n.kind==='file'&&n.name==='bad.ttf'&&n.content==='This file is not a font.')`,
+      true,
+    )
+    await reload()
+    await openPanel('Fonts')
+    await app.key('f', ['Alt'])
+    await clickText('Install New Font...')
+    await clickText('..', '[aria-label="Font folders"]')
+    await clickText('My Documents', '[aria-label="Font folders"]')
+    await clickText('bad.ttf', dialog('Add Fonts'))
+    await clickText('OK', dialog('Add Fonts'))
+    await check(
+      10,
+      'renamed text is rejected through installation UI',
+      `[...document.querySelectorAll(${JSON.stringify(dialog('Add Fonts'))})].some(e=>e.textContent.includes('does not contain supported'))`,
+      true,
+    )
+    await check(
+      10,
+      'invalid font creates no installed catalog entry',
+      `JSON.parse(localStorage.getItem('win95.fonts.v1')??'[]').length`,
+      0,
+    )
+    await shot('invalid-font-rejected')
+    await app.key('Escape')
+    await clickText('Cancel', dialog('Add Fonts'))
+    await check(
+      10,
+      'Cancel leaves the font catalog unchanged',
+      `JSON.parse(localStorage.getItem('win95.fonts.v1')??'[]').length`,
+      0,
+    )
+  }
+  if (phase === 'font-linked') {
+    await reload()
+    await openPanel('Fonts')
+    await app.key('f', ['Alt'])
+    await clickText('Install New Font...')
+    await clickText('MICROSS.TTF', dialog('Add Fonts'))
+    await checkbox('Copy fonts to Fonts folder', dialog('Add Fonts'))
+    await clickText('OK', dialog('Add Fonts'))
+    await app.waitFor(`!document.querySelector(${JSON.stringify(dialog('Add Fonts'))})`)
+    await check(
+      10,
+      'unchecked copy keeps an available media reference',
+      `JSON.parse(localStorage.getItem('win95.fonts.v1')).map(f=>({name:f.name,source:f.source}))`,
+      [{ name: 'Microsoft Sans Serif', source: { kind: 'bundled', id: 'micross' } }],
+    )
+    await reload()
+    await openPanel('Fonts')
+    await app.waitFor(`document.querySelector('[data-window]').textContent.includes('Microsoft Sans Serif')`)
+    await check(
+      10,
+      'media reference loads the actual font after reload',
+      `[...document.fonts].some(f=>f.family==='Microsoft Sans Serif'&&f.status==='loaded')`,
+      true,
+    )
+    await shot('linked-font-reload')
+  }
+  if (phase === 'printer-shortcut') {
+    const baseline = process.argv.includes('--baseline')
+    await reload()
+    await openPanel('Date/Time')
+    await fill('input[aria-label="Year"]', '1995')
+    await clickText('OK', dialog('Date/Time Properties'))
+    await reload()
+    await run('printers')
+    await clickText('Add Printer', '[data-window]')
+    await app.key('f', ['Alt'])
+    await clickText('Create Shortcut', '[role=menu]')
+    await clickText('Yes', dialog('Shortcut'))
+    await sleep(300)
+    await check(
+      9,
+      'Add Printer shortcut records virtual creation year',
+      `new Date(Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.app==='shell:printers:add-printer').created).getUTCFullYear()`,
+      baseline || process.argv.includes('--before-clock') ? new Date().getUTCFullYear() : 1995,
+    )
+    await reload()
+    const printer = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.app==='shell:printers:add-printer').id`,
+    )
+    await app.clickOn(`[data-desktop-item="${printer}"]`, { count: 2 })
+    await check(
+      9,
+      'Add Printer desktop shortcut opens its wizard',
+      `!!document.querySelector(${JSON.stringify(dialog('Add Printer Wizard'))})`,
+      !baseline,
+    )
+    await shot(baseline ? 'before-folder-only' : 'wizard-after-reload')
+  }
+  if (phase === 'exit') await app.eval('setTimeout(() => window.win95.shutdown(), 100)')
   if (phase === 'shortcuts') {
     await reload()
     await run('control')
@@ -468,7 +622,7 @@ try {
     await check(
       10,
       'installed browser font face loaded',
-      `[...document.fonts].some(f=>f.family.startsWith('Win95Font-')&&f.status==='loaded'&&f.family.length>30)`,
+      `[...document.fonts].some(f=>f.family==='Microsoft Sans Serif'&&f.status==='loaded')`,
       true,
     )
     await shot('installed')
