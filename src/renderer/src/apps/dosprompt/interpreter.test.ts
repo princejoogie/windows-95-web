@@ -54,6 +54,28 @@ function machine() {
 }
 
 describe('COMMAND.COM', () => {
+  it('reports Access denied for read-only redirection and COPY without emitting write actions', () => {
+    const dos = machine()
+    dos.run('ECHO protected > LOCKED.TXT')
+    dos.run('ECHO recovery > SOURCE.TXT')
+    const node = dos.node('LOCKED.TXT')
+    if (!node) throw new Error('missing fixture')
+    const locked = fsReducer(dos.state, {
+      type: 'setAttributes',
+      id: node.id,
+      attributes: { readOnly: true },
+    })
+    for (const command of [
+      'ECHO lost > LOCKED.TXT',
+      'ECHO lost >> LOCKED.TXT',
+      'COPY /Y SOURCE.TXT LOCKED.TXT',
+    ]) {
+      const result = execute(dos.session, locked, command, NOW)
+      expect(result.output).toContain('Access denied')
+      expect(result.actions.some((action) => action.type === 'write')).toBe(false)
+      expect(result.actions.reduce(fsReducer, locked)).toEqual(locked)
+    }
+  })
   it('starts with the Windows 95 banner and C:\\WINDOWS> prompt', () => {
     const dos = machine()
     expect(BANNER.slice(0, 2)).toEqual([

@@ -1,9 +1,13 @@
 import { createStore, useStore } from '../lib/store'
-import { emptyDrive, fsReducer, type ShortcutTarget, validateName } from './fs'
+import { getClockDate } from '../settings/store'
+import { checkWrite, emptyDrive, fsReducer, type ShortcutTarget, validateName, type WriteResult } from './fs'
 import type { Attributes, FsNode, FsState, NodeId, ProgramSpec, ShortcutSettings } from './types'
 
 const KEY = 'w95.fs.v1'
 const SAVE_DELAY_MS = 250
+
+/** Virtual system time for filesystem mutations. Elapsed interaction timers use the host clock. */
+export const fsTimestamp = (): number => getClockDate().getTime()
 
 function load(): FsState | null {
   try {
@@ -16,7 +20,7 @@ function load(): FsState | null {
 }
 
 const saved = load()
-export const fsStore = createStore(fsReducer, saved ?? emptyDrive(Date.now()))
+export const fsStore = createStore(fsReducer, saved ?? emptyDrive(fsTimestamp()))
 
 let timer: ReturnType<typeof setTimeout> | undefined
 const save = () => {
@@ -32,7 +36,12 @@ addEventListener('beforeunload', () => {
 
 /** Installs every app's executable. Desktop shortcuts are created only on the first boot. */
 export function installPrograms(programs: readonly ProgramSpec[]): void {
-  fsStore.dispatch({ type: 'installPrograms', programs, shortcuts: saved === null, at: Date.now() })
+  fsStore.dispatch({
+    type: 'installPrograms',
+    programs,
+    shortcuts: saved === null,
+    at: fsTimestamp(),
+  })
 }
 
 export function useFs<T>(select: (state: FsState) => T): T {
@@ -52,7 +61,7 @@ export function createNode(parent: NodeId, name: string, spec: NewNode): { id: N
   const error = validateName(fsStore.get(), parent, name)
   if (error) return { error }
   const id = newNodeId()
-  const at = Date.now()
+  const at = fsTimestamp()
   const node = { ...spec, id, name, parent, modified: at, created: at } as FsNode
   fsStore.dispatch({ type: 'create', node })
   return { id }
@@ -60,17 +69,21 @@ export function createNode(parent: NodeId, name: string, spec: NewNode): { id: N
 
 export const fs = {
   get: fsStore.get,
-  write: (id: NodeId, content: string) => fsStore.dispatch({ type: 'write', id, content, at: Date.now() }),
+  write(id: NodeId, content: string): WriteResult {
+    const result = checkWrite(fsStore.get(), id)
+    if (result.ok) fsStore.dispatch({ type: 'write', id, content, at: fsTimestamp() })
+    return result
+  },
   rename(id: NodeId, name: string): string | null {
     const node = fsStore.get().nodes[id]
     if (!node?.parent) return 'This item cannot be renamed.'
     const error = validateName(fsStore.get(), node.parent, name, id)
-    if (!error) fsStore.dispatch({ type: 'rename', id, name, at: Date.now() })
+    if (!error) fsStore.dispatch({ type: 'rename', id, name, at: fsTimestamp() })
     return error
   },
-  move: (id: NodeId, parent: NodeId) => fsStore.dispatch({ type: 'move', id, parent, at: Date.now() }),
-  recycle: (id: NodeId) => fsStore.dispatch({ type: 'recycle', id, at: Date.now() }),
-  restore: (id: NodeId) => fsStore.dispatch({ type: 'restore', id, at: Date.now() }),
+  move: (id: NodeId, parent: NodeId) => fsStore.dispatch({ type: 'move', id, parent, at: fsTimestamp() }),
+  recycle: (id: NodeId) => fsStore.dispatch({ type: 'recycle', id, at: fsTimestamp() }),
+  restore: (id: NodeId) => fsStore.dispatch({ type: 'restore', id, at: fsTimestamp() }),
   purge: (id: NodeId) => fsStore.dispatch({ type: 'purge', id }),
   emptyRecycleBin: () => fsStore.dispatch({ type: 'emptyRecycleBin' }),
   setShortcut: (id: NodeId, target: ShortcutTarget, settings: ShortcutSettings) =>

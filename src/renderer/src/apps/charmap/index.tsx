@@ -59,6 +59,21 @@ export function CharacterMap({ window: windowApi }: AppProps) {
       event.preventDefault()
       launch('help', { book: 'charmap' })
     }
+    if (!event.altKey || event.ctrlKey || event.metaKey) return
+    const actions: Record<string, () => void> = {
+      s: () => pick(selected),
+      a: () => document.getElementById(`${id}-chars`)?.focus(),
+      h: () => launch('help', { book: 'charmap' }),
+      f: () => document.getElementById(`${id}-font`)?.focus(),
+      c: () => {
+        if (chars) void copy()
+      },
+    }
+    const action = actions[event.key.toLowerCase()]
+    if (action) {
+      event.preventDefault()
+      action()
+    }
   })
 
   return (

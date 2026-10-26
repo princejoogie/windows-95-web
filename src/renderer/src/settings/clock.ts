@@ -67,6 +67,46 @@ const localeCodes: Record<Settings['regional']['locale'], string> = {
   'Japanese (Japan)': 'ja-JP',
 }
 
+/** Absolute virtual time. Stored file timestamps already include this offset. */
+export const virtualTimestamp = (settings: Settings, now = Date.now()): number => now + settings.clockOffset
+
+/** Adapts legacy date formatters that read local Date fields. Do not store this value as a timestamp. */
+export function wallClockDate(settings: Settings, timestamp = virtualTimestamp(settings)): Date {
+  const parts = clockParts(timestamp, settings.timeZone, settings.adjustForDaylightSaving)
+  return new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second)
+}
+
+export function formatDate(settings: Settings, timestamp = virtualTimestamp(settings)): string {
+  const { year, month, day } = clockParts(timestamp, settings.timeZone, settings.adjustForDaylightSaving)
+  const two = (value: number) => String(value).padStart(2, '0')
+  switch (settings.regional.dateFormat) {
+    case 'M/d/yy':
+      return `${month}/${day}/${two(year % 100)}`
+    case 'M/d/yyyy':
+      return `${month}/${day}/${year}`
+    case 'dd/MM/yyyy':
+      return `${two(day)}/${two(month)}/${year}`
+    case 'yyyy-MM-dd':
+      return `${year}-${two(month)}-${two(day)}`
+  }
+}
+
+export function formatTime(settings: Settings, timestamp = virtualTimestamp(settings)): string {
+  const { hour, minute } = clockParts(timestamp, settings.timeZone, settings.adjustForDaylightSaving)
+  const minutes = String(minute).padStart(2, '0')
+  return settings.regional.time24
+    ? `${String(hour).padStart(2, '0')}:${minutes}`
+    : `${hour % 12 || 12}:${minutes} ${hour < 12 ? 'AM' : 'PM'}`
+}
+
+export function formatDateTime(settings: Settings, timestamp = virtualTimestamp(settings)): string {
+  return `${formatDate(settings, timestamp)} ${formatTime(settings, timestamp)}`
+}
+
+export function formatTimeDate(settings: Settings, timestamp = virtualTimestamp(settings)): string {
+  return `${formatTime(settings, timestamp)} ${formatDate(settings, timestamp)}`
+}
+
 export function formatClock(settings: Settings, now = Date.now()): { time: string; longDate: string } {
   const zone = settings.adjustForDaylightSaving ? settings.timeZone : 'UTC'
   const date = new Date(

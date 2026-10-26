@@ -3,10 +3,11 @@ import {
   DEFAULT_PARAGRAPH,
   DEFAULT_RUN,
   type Document,
+  type Inline,
   normalize,
   type Paragraph,
   type ParagraphStyle,
-  type Run,
+  type Picture,
   type RunStyle,
 } from './model'
 
@@ -59,10 +60,16 @@ function writeParagraph(
 }
 
 function writeRun(
-  run: Run,
+  run: Inline,
   fontIndex: (name: string) => number,
   colorIndex: (hex: string) => number,
 ): string {
+  if ('kind' in run) {
+    const hex = Array.from(atob(run.data), (byte) => byte.charCodeAt(0).toString(16).padStart(2, '0')).join(
+      '',
+    )
+    return `{\\pict\\${run.format === 'png' ? 'pngblip' : 'jpegblip'}\\picw${run.width}\\pich${run.height}\\picwgoal${run.width * 15}\\pichgoal${run.height * 15}\n${hex}}`
+  }
   let props = `\\plain\\f${fontIndex(run.font)}\\fs${Math.round(run.size * 2)}`
   if (run.bold) props += '\\b'
   if (run.italic) props += '\\i'
@@ -95,7 +102,7 @@ const signed16 = (code: number): number => (code > 32767 ? code - 65536 : code)
 
 export const isRtf = (text: string): boolean => /^\s*\{\\rtf/.test(text)
 
-type Destination = 'body' | 'fonttbl' | 'colortbl' | 'pn' | 'skip'
+type Destination = 'body' | 'fonttbl' | 'colortbl' | 'pn' | 'pict' | 'skip'
 
 interface Group {
   run: RunStyle
@@ -103,6 +110,14 @@ interface Group {
   destination: Destination
   /** Bytes to skip after a `\uN`, per `\ucN`. */
   uc: number
+  picture?: {
+    format: Picture['format'] | null
+    hex: string
+    width: number
+    height: number
+    goalWidth: number
+    goalHeight: number
+  }
 }
 
 /**
@@ -114,7 +129,7 @@ export function parseRtf(source: string): Document {
   const fonts = new Map<number, string>()
   const colors: string[] = []
   const paragraphs: Paragraph[] = []
-  let runs: Run[] = []
+  let runs: Inline[] = []
   let group: Group = { run: DEFAULT_RUN, paragraph: DEFAULT_PARAGRAPH, destination: 'body', uc: 1 }
   const stack: Group[] = []
   let fontEntry: { index: number; name: string } | null = null
@@ -132,6 +147,9 @@ export function parseRtf(source: string): Document {
     switch (group.destination) {
       case 'body':
         runs.push({ ...group.run, text })
+        break
+      case 'pict':
+        if (group.picture) group.picture.hex += text.replace(/\s/g, '')
         break
       case 'fonttbl':
         if (fontEntry) {
@@ -172,6 +190,17 @@ export function parseRtf(source: string): Document {
       starPending = true
       return
     }
+    if (group.destination === 'pict') {
+      const picture = group.picture
+      if (!picture) return
+      if (word === 'pngblip') picture.format = 'png'
+      if (word === 'jpegblip') picture.format = 'jpeg'
+      if (word === 'picw') picture.width = param
+      if (word === 'pich') picture.height = param
+      if (word === 'picwgoal') picture.goalWidth = param
+      if (word === 'pichgoal') picture.goalHeight = param
+      return
+    }
     if (group.destination === 'fonttbl') {
       if (word === 'f') fontEntry = { index: param, name: '' }
       return
@@ -202,7 +231,6 @@ export function parseRtf(source: string): Document {
       case 'pntext':
       case 'stylesheet':
       case 'info':
-      case 'pict':
       case 'object':
       case 'header':
       case 'footer':
@@ -218,6 +246,10 @@ export function parseRtf(source: string): Document {
       case 'latentstyles':
       case 'datastore':
         group.destination = 'skip'
+        break
+      case 'pict':
+        group.destination = 'pict'
+        group.picture = { format: null, hex: '', width: 0, height: 0, goalWidth: 0, goalHeight: 0 }
         break
       case 'par':
         endParagraph()
@@ -335,6 +367,25 @@ export function parseRtf(source: string): Document {
     } else if (char === '}') {
       const parent = stack.pop()
       if (!parent) break
+      const picture = group.picture
+      if (
+        group.destination === 'pict' &&
+        parent.destination !== 'pict' &&
+        picture?.format &&
+        /^(?:[0-9a-fA-F]{2})+$/.test(picture.hex)
+      ) {
+        const bytes = picture.hex.match(/../g) ?? []
+        const width = picture.goalWidth ? picture.goalWidth / 15 : picture.width
+        const height = picture.goalHeight ? picture.goalHeight / 15 : picture.height
+        if (width > 0 && height > 0)
+          runs.push({
+            kind: 'picture',
+            format: picture.format,
+            data: btoa(bytes.map((byte) => String.fromCharCode(Number.parseInt(byte, 16))).join('')),
+            width,
+            height,
+          })
+      }
       // A bullet declared in the numbering group belongs to the paragraph around it.
       group =
         group.destination === 'pn'

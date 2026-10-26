@@ -4,11 +4,11 @@ import {
   DEFAULT_RUN,
   type Document,
   hexColor,
+  type Inline,
   normalize,
   type Paragraph,
   type ParagraphStyle,
   pixelsToTwips,
-  type Run,
   type RunStyle,
   twipsToPixels,
 } from './model'
@@ -54,7 +54,9 @@ export function paragraphCss(paragraph: ParagraphStyle): string {
   return parts.join(';')
 }
 
-function renderRun(run: Run): string {
+function renderRun(run: Inline): string {
+  if ('kind' in run)
+    return `<img src="data:image/${run.format};base64,${escapeHtml(run.data)}" width="${run.width}" height="${run.height}" alt="Picture">`
   const text = escapeHtml(run.text).replace(/\n/g, '<br>')
   return `<span style="${escapeHtml(runCss(run))}">${text}</span>`
 }
@@ -168,7 +170,7 @@ export function paragraphStyleFrom(element: HTMLElement, bullet: boolean): Parag
 /** Reads the editor's DOM back into a document. */
 export function readDocument(root: HTMLElement): Document {
   const paragraphs: Paragraph[] = []
-  let current: { style: ParagraphStyle; runs: Run[] } | null = null
+  let current: { style: ParagraphStyle; runs: Inline[] } | null = null
 
   const open = (style: ParagraphStyle) => {
     if (current) close()
@@ -178,7 +180,8 @@ export function readDocument(root: HTMLElement): Document {
     if (!current) return
     const runs = current.runs
     const last = runs[runs.length - 1]
-    if (last?.text.endsWith('\n')) runs[runs.length - 1] = { ...last, text: last.text.slice(0, -1) }
+    if (last && !('kind' in last) && last.text.endsWith('\n'))
+      runs[runs.length - 1] = { ...last, text: last.text.slice(0, -1) }
     paragraphs.push({ ...current.style, runs })
     current = null
   }
@@ -194,6 +197,20 @@ export function readDocument(root: HTMLElement): Document {
       return
     }
     if (!(node instanceof HTMLElement)) return
+    if (node instanceof HTMLImageElement) {
+      const match = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(node.src)
+      if (match && (match[1] === 'png' || match[1] === 'jpeg') && match[2]) {
+        current ??= { style: DEFAULT_PARAGRAPH, runs: [] }
+        current.runs.push({
+          kind: 'picture',
+          format: match[1],
+          data: match[2],
+          width: node.width || node.naturalWidth,
+          height: node.height || node.naturalHeight,
+        })
+      }
+      return
+    }
     if (node.tagName === 'BR') {
       emit('\n', style)
       return

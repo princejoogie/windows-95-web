@@ -11,6 +11,23 @@ const id = (n: number) => n as WindowId
 const order = (state: WindowsState) => state.windows.map((w) => w.appId)
 
 describe('windowsReducer', () => {
+  it('switches a Help topic between a fixed dialog and a resizable client without changing other windows', () => {
+    const topics = run(open('help'), open('other'), {
+      type: 'setWindowSpec',
+      id: id(1),
+      spec: { kind: 'fixed' },
+    })
+    const article = windowsReducer(topics, {
+      type: 'setWindowSpec',
+      id: id(1),
+      spec: { kind: 'resizable', width: 490, height: 410 },
+    })
+    expect(article.windows[0]).toMatchObject({ size: { width: 490, height: 410 }, maximized: false })
+    const maximized = windowsReducer(article, { type: 'toggleMaximize', id: id(1) })
+    const back = windowsReducer(maximized, { type: 'setWindowSpec', id: id(1), spec: { kind: 'fixed' } })
+    expect(back.windows.find((window) => window.id === id(1))).toMatchObject({ size: null, maximized: false })
+    expect(back.windows.find((window) => window.id === id(2))).toBe(topics.windows[1])
+  })
   it('undoes only windows that Minimize All minimized', () => {
     const initial = run(open('a'), open('b'), { type: 'minimize', id: id(1) })
     const minimized = windowsReducer(initial, { type: 'minimizeAll' })

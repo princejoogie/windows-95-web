@@ -434,6 +434,11 @@ function Help({ args, window: appWindow }: AppProps) {
   }
   useEffect(() => {
     appWindow.setTitle(showTopics ? `Help Topics: ${book.title}` : book.title)
+    appWindow.setWindowSpec(
+      showTopics
+        ? { kind: 'fixed' }
+        : { kind: 'resizable', width: 490, height: 410, minWidth: 280, minHeight: 160 },
+    )
   }, [appWindow, book.title, showTopics])
   useEffect(() => {
     if (!showTopics) return
@@ -497,7 +502,10 @@ function Help({ args, window: appWindow }: AppProps) {
     globalThis.print()
   }
   return (
-    <div ref={root} className="relative flex h-[410px] w-[490px] flex-col">
+    <div
+      ref={root}
+      className={`relative flex flex-col ${showTopics ? 'h-[410px] w-[490px]' : 'h-full w-full min-h-0'}`}
+    >
       {showTopics ? (
         <HelpTopics
           book={book}

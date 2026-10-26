@@ -1,4 +1,6 @@
 import { type ReactNode, useId, useState } from 'react'
+import { wallClockDate } from '../../settings/clock'
+import { settingsStore } from '../../settings/store'
 import { Button, Checkbox, ComboBox, Dialog, GroupBox, ListBox, Radio, Tabs, TextBox } from '../../ui'
 import { FONT_SIZES, FONTS, scriptsFor } from './fonts'
 import { runCss } from './html'
@@ -574,7 +576,7 @@ export function DateTimeDialog({
   onInsert: (text: string) => void
   onClose: () => void
 }) {
-  const [formats] = useState(() => dateTimeFormats(new Date()))
+  const [formats] = useState(() => dateTimeFormats(wallClockDate(settingsStore.get())))
   const [choice, setChoice] = useState(formats[0] ?? '')
   return (
     <Dialog title="Date and Time" onClose={onClose} className="w-[300px]">
