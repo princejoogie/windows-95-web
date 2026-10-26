@@ -134,7 +134,7 @@ export const scenes = [
   {
     id: 'start',
     title: 'Programs > Accessories > Games',
-    duration: 4.8,
+    duration: 3.6,
     camera: 'full',
     async setup(c) {
       if (!(await c.eval(`!!${startButton}`))) await reset(c)
@@ -188,6 +188,14 @@ export const scenes = [
       await c.click(el(`[data-cell="${flags[1]}"]`), { button: 'right' })
       await wait(450)
       await c.click(el(`[data-cell="${flags[1]}"]`), { button: 'right' })
+      const counters = await c.eval(
+        `[...document.querySelectorAll('output.mine-counter')].map((e) => e.getAttribute('aria-label'))`,
+      )
+      console.log(`  Counters read ${counters.join(' and ')}`)
+      await c.check(
+        `(() => { const [mines, time] = [...document.querySelectorAll('output.mine-counter')].map((e) => e.getAttribute('aria-label')); return mines === 'Mines left: 98' && /^Time: [1-9]$/.test(time) })()`,
+        'Counters read 98 mines left and a running timer',
+      )
       await c.framed(appWindow, 'Minesweeper Expert window')
       await c.check(
         `document.querySelectorAll('[data-cell]').length === 480 && document.querySelectorAll('.mine-cell.mine-open').length >= ${Math.min(this.plan.opened, 20)} && /flag$/.test(document.querySelector('[data-cell="${flags[0]}"]').getAttribute('aria-label')) && /question$/.test(document.querySelector('[data-cell="${flags[1]}"]').getAttribute('aria-label'))`,
@@ -325,7 +333,7 @@ export const scenes = [
   {
     id: 'doom',
     title: 'Doom 95 corridor, combat, and automap',
-    duration: 8.4,
+    duration: 7.2,
     camera: appWindow,
     async setup(c) {
       await launch(c, 'doom95')
@@ -349,8 +357,13 @@ export const scenes = [
       await c.keyUp('Control')
       await c.key('Tab')
       await c.checkpoint('automap')
-      await wait(1500)
+      await wait(1300)
       await c.key('Tab')
+      await c.keyDown('ArrowLeft')
+      await c.keyDown('ArrowUp')
+      await wait(900)
+      await c.keyUp('ArrowLeft')
+      await c.keyUp('ArrowUp')
       await c.framed(appWindow, 'Doom 95 window')
       await c.check(
         `!!document.querySelector('canvas')`,
@@ -488,7 +501,7 @@ export const scenes = [
   {
     id: 'display',
     title: 'Appearance schemes and screen saver',
-    duration: 7.2,
+    duration: 6.0,
     camera: '[role=dialog]',
     pointer: [560, 640],
     async setup(c) {
@@ -498,13 +511,13 @@ export const scenes = [
       await c.click(text('Appearance', '[role=tab]'))
     },
     async action(c) {
-      await wait(300)
+      await wait(200)
       await choose(c, 'Scheme', 'Eggplant')
       await c.click(text('Apply', '[role=dialog] button'))
-      await wait(900)
+      await wait(800)
       await choose(c, 'Scheme', 'Windows Standard')
       await c.click(text('Apply', '[role=dialog] button'))
-      await wait(450)
+      await wait(300)
       await c.click(text('Screen Saver', '[role=tab]'))
       await choose(c, 'Screen saver', 'Starfield Simulation')
       await c.framed('[role=dialog]', 'Display Properties dialog')
@@ -546,11 +559,11 @@ export const scenes = [
 // Beat-length highlights from the encoded scenes. Offsets are seconds into each scene.
 export const teaser = [
   { scene: 'opening', from: 0, duration: 1.8 },
-  { scene: 'start', from: 3, duration: 1.8 },
+  { scene: 'start', from: 1.8, duration: 1.8 },
   { scene: 'mines', from: 0.6, duration: 1.2 },
   { scene: 'solitaire-win', from: 2.4, duration: 1.8 },
   { scene: 'doom', from: 1.2, duration: 1.8 },
   { scene: 'shutdown', from: 4.4, duration: 1.6 },
 ]
 
-export const poster = { scene: 'start', at: 4.5 }
+export const poster = { scene: 'start', at: 3.3 }

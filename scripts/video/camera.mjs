@@ -17,7 +17,12 @@ export function closeUp(rect, label = 'close-up') {
     throw new Error(`${label} is ${focus.width}x${focus.height}, larger than a 2x close-up`)
   if (focus.x < 0 || focus.y < 0 || focus.x + focus.width > APP.width || focus.y + focus.height > APP.height)
     throw new Error(`${label} extends outside the ${APP.width}x${APP.height} app`)
-  const x = clamp(Math.round(focus.x + focus.width / 2 - CROP.width / 2), 0, APP.width - CROP.width)
+  // The crop has only 64 px of horizontal slack. Centering would slice the desktop icon column on
+  // the left edge, so the crop stays at x=0 whenever the target fits there.
+  const x =
+    focus.x + focus.width <= CROP.width
+      ? 0
+      : clamp(Math.round(focus.x + focus.width / 2 - CROP.width / 2), 0, APP.width - CROP.width)
   const y = clamp(Math.round(focus.y + focus.height / 2 - CROP.height / 2), 0, APP.height - CROP.height)
   return { scale: 2, x, y, focus }
 }

@@ -45,6 +45,18 @@ export function soundtrack(scenes, file) {
     starts.push(offset)
     offset += scene.duration
   })
+  // Game-audio scenes duck the score, with a short ramp at each scene change.
+  const quietOf = (scene) => (scene.id === 'doom' ? 0.6 : 1)
+  const level = new Float32Array(count)
+  scenes.forEach((scene, index) => {
+    const from = Math.round(starts[index] * rate)
+    const to = Math.min(count, Math.round((starts[index] + scene.duration) * rate))
+    const previous = index ? quietOf(scenes[index - 1]) : quietOf(scene)
+    for (let i = from; i < to; i++)
+      level[i] = previous + (quietOf(scene) - previous) * Math.min(1, (i - from) / (rate * 0.3))
+  })
+  // Equal-power curves keep the summed pad level steady while two chords overlap.
+  const fade = (x) => Math.sin((Math.PI / 2) * Math.min(1, Math.max(0, x)))
   const fadeOut = Math.min(2.4, scenes.at(-1).duration)
   regions.forEach((region, index) => {
     const overlap = 0.25
@@ -53,27 +65,26 @@ export function soundtrack(scenes, file) {
     const length = end - start
     const attack = index ? overlap * 2 : 0.6
     const release = index === regions.length - 1 ? fadeOut : overlap * 2
+    const first = Math.round(start * rate)
     region.chord.forEach((note, n) => {
       const freq = midi(note)
       voice(
         start,
         length,
-        (t) => {
-          const env = Math.min(1, t / attack) * Math.min(1, Math.max(0, (length - t) / release))
-          return (
-            env *
-            (Math.sin(tau * freq * t + 0.25 * Math.sin(tau * 0.19 * t + n)) +
-              0.17 * Math.sin(tau * freq * 2.002 * t))
-          )
-        },
-        0.05,
+        (t) =>
+          fade(t / attack) *
+          fade((length - t) / release) *
+          (level[Math.min(count - 1, first + Math.round(t * rate))] ?? 1) *
+          (Math.sin(tau * freq * t + 0.25 * Math.sin(tau * 0.19 * t + n)) +
+            0.17 * Math.sin(tau * freq * 2.002 * t)),
+        0.046,
         (n - 1.5) / 3,
       )
     })
   })
   scenes.forEach((scene, index) => {
     const chord = chords[Math.floor(index / 2) % chords.length]
-    const quiet = scene.id === 'doom' ? 0.6 : 1
+    const quiet = quietOf(scene)
     const ending = index === scenes.length - 1
     const at0 = starts[index]
     for (let n = 0; n * beat < scene.duration - 0.25; n++) {
@@ -94,12 +105,12 @@ export function soundtrack(scenes, file) {
         const freq = midi(chord[(n + index) % chord.length] + 12)
         voice(
           at,
-          0.65,
+          0.9,
           (t) =>
             (Math.sin(tau * freq * t) + 0.08 * Math.sin(tau * freq * 3 * t)) *
-            Math.exp(-t * 6) *
+            Math.exp(-t * 4.5) *
             Math.min(1, t / 0.008),
-          0.042 * quiet,
+          0.065 * quiet,
           index % 2 ? -0.3 : 0.3,
         )
       }

@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { closeUp, full, inShot, shotGraph, shots, viewFilter } from './camera.mjs'
 
 describe('close-up framing', () => {
-  it('centers the target in a 960x540 crop of the app', () => {
+  it('centers the target vertically and keeps the left icon column whole', () => {
     const view = closeUp({ x: 257, y: 187, width: 510, height: 367 })
-    expect(view).toMatchObject({ scale: 2, x: 32, y: 101 })
+    expect(view).toMatchObject({ scale: 2, x: 0, y: 101 })
     expect(inShot(view.focus, view)).toBe(true)
+  })
+
+  it('shifts right only as far as a wide target needs', () => {
+    expect(closeUp({ x: 32, y: 114, width: 960, height: 540 })).toMatchObject({ x: 32, y: 114 })
+    expect(closeUp({ x: 100, y: 0, width: 900, height: 300 })).toMatchObject({ x: 64 })
   })
 
   it('keeps the crop inside the app when the target sits on an edge', () => {
