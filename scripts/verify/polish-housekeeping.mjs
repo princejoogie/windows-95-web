@@ -12,6 +12,10 @@ const active = new Set([
   'polish.config.mjs',
   'polish-housekeeping.mjs',
   'doomfix-episode.mjs',
+  'finalfix-shell.mjs',
+  'finalfix-shell-assets.mjs',
+  'finalfix-apps-documents.mjs',
+  'finalfix-apps-controlpanel.mjs',
 ])
 const scripts = readdirSync(directory)
 let historical = 0
