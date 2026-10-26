@@ -238,6 +238,9 @@ export function parseRtf(source: string): Document {
       case 'pn':
         group.destination = 'pn'
         break
+      case 'shppict':
+        break
+      case 'nonshppict':
       case 'pntext':
       case 'stylesheet':
       case 'info':
