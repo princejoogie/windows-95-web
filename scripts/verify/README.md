@@ -66,7 +66,7 @@ node scripts/verify/finalfix-apps-documents.mjs 9450 D:/codes/worktrees/windows-
 
 `finalfix-shell.mjs` and `finalfix-shell-assets.mjs` use CDP port 9440 and proof directory `D:/codes/worktrees/windows-95-web/proof/finalfix-shell`. Launch a separate production process with those values before running them. The shell driver accepts `dialogs`, `modeless`, `shell`, `power`, `regressions`, or `existing` as its first argument. Power commands can close that process.
 
-`finalfix-apps-controlpanel.mjs` uses `cdp.mjs` and defaults to port 9452. Launch a separate production process with `W95_CDP_PORT=9452` and a dedicated `W95_DATA_DIR`. Its proof defaults to `D:/codes/worktrees/windows-95-web/proof/finalfix-apps-controlpanel`. `W95_PROOF_DIR` overrides that path. The font format regression check is `node --test scripts/fonts.test.mjs`.
+`finalfix-apps-controlpanel.mjs` uses `cdp.mjs` and defaults to port 9452. Launch a separate production process with `W95_CDP_PORT=9452` and a dedicated `W95_DATA_DIR`. Its proof defaults to `D:/codes/worktrees/windows-95-web/proof/finalfix-apps-controlpanel`. `W95_PROOF_DIR` overrides that path. The font format regression check is `pnpm exec vitest run scripts/fonts.test.mjs`.
 
 ```powershell
 $env:W95_CDP_PORT = '9452'
