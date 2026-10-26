@@ -1447,7 +1447,7 @@ export function FolderView({
           buttons={['Yes', 'No']}
           onClose={(answer) => {
             if (answer === 'Yes')
-              carry(planShortcuts(fs.get(), prompt.targets, DESKTOP_DIR, Date.now(), newNodeId))
+              carry(planShortcuts(fs.get(), prompt.targets, DESKTOP_DIR, fsTimestamp(), newNodeId))
             setPrompt(null)
           }}
         />
