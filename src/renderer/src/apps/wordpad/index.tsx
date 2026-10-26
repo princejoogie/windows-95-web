@@ -49,7 +49,7 @@ import {
   toggle,
   toggleBullets,
 } from './editor'
-import { readDocument, renderDocument } from './html'
+import { normalizeHtmlImages, readDocument, readPicture, renderDocument, renderPicture } from './html'
 import { wordpadIcon, wordpadSmallIcon } from './icons'
 import {
   type Alignment,
@@ -381,14 +381,13 @@ export function WordPad({ window: windowApi, args }: AppProps) {
     try {
       const items = await navigator.clipboard.read()
       for (const item of items) {
+        if (kind === 'rich' && item.types.includes('text/html')) {
+          await pasteHtml(await (await item.getType('text/html')).text())
+          return
+        }
         if (kind === 'rich' && item.types.includes('image/png')) {
           const blob = await item.getType('image/png')
           await pasteImage(blob)
-          return
-        }
-        if (kind === 'rich' && item.types.includes('text/html')) {
-          const html = await (await item.getType('text/html')).text()
-          edit(() => insertHtml(html))
           return
         }
         if (item.types.includes('text/plain')) {
@@ -407,6 +406,11 @@ export function WordPad({ window: windowApi, args }: AppProps) {
     }
   }
 
+  const pasteHtml = async (html: string) => {
+    const normalized = await normalizeHtmlImages(html)
+    edit(() => insertHtml(normalized))
+  }
+
   const pasteImage = async (blob: Blob) => {
     const data = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
@@ -418,11 +422,8 @@ export function WordPad({ window: windowApi, args }: AppProps) {
     const image = new Image()
     image.src = data
     await image.decode()
-    edit(() =>
-      insertHtml(
-        `<img src="${data}" width="${image.naturalWidth}" height="${image.naturalHeight}" alt="Picture">`,
-      ),
-    )
+    const picture = readPicture(image)
+    if (picture) edit(() => insertHtml(renderPicture(picture)))
   }
 
   const findNext = () => {
@@ -715,6 +716,13 @@ export function WordPad({ window: windowApi, args }: AppProps) {
             refreshSelection()
           }}
           onPaste={(event) => {
+            const html = event.clipboardData.getData('text/html')
+            if (html) {
+              event.preventDefault()
+              keeper.remember()
+              void pasteHtml(html).catch(() => message('WordPad cannot paste this picture.', 'warning'))
+              return
+            }
             const image = [...event.clipboardData.files].find(
               (file) => file.type === 'image/png' || file.type === 'image/jpeg',
             )
