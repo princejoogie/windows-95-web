@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { closeUp, full, inShot } from './camera.mjs'
 import { connect, wait } from './cdp.mjs'
 import { scenes } from './scenes.mjs'
 
@@ -55,38 +56,98 @@ export async function stopElectron(child) {
   } else child.kill()
 }
 
+function bounds(c, selectors) {
+  return c.eval(`(() => {
+    const rects = ${JSON.stringify(selectors)}
+      .flatMap((selector) => [...document.querySelectorAll(selector)])
+      .filter((e) => e.getClientRects().length)
+      .map((e) => e.getBoundingClientRect())
+    if (!rects.length) throw Error(${JSON.stringify(`Missing framing target ${selectors.join(', ')}`)})
+    const left = Math.min(...rects.map((r) => r.left))
+    const top = Math.min(...rects.map((r) => r.top))
+    const right = Math.max(...rects.map((r) => r.right))
+    const bottom = Math.max(...rects.map((r) => r.bottom))
+    return { x: left, y: top, width: right - left, height: bottom - top }
+  })()`)
+}
+
+async function view(c, target, label) {
+  if (target === 'full') return full()
+  if (target === 'center') return closeUp({ x: 32, y: 114, width: 960, height: 540 }, label)
+  if (typeof target === 'object' && !Array.isArray(target)) return closeUp(target, label)
+  const selectors = [target].flat()
+  return closeUp(await bounds(c, selectors), `${label} close-up on ${selectors.join(', ')}`)
+}
+
 async function record(c, scene, folder, proof) {
   mkdirSync(folder, { recursive: true })
   const frames = []
   const cues = []
   const errors = []
   const duration = scene.captureDuration ?? scene.duration
+  const camera = [{ time: 0, view: await view(c, scene.camera ?? 'full', scene.id) }]
+  const framing = []
   await c.shot(join(folder, 'initial.png'))
   frames.push({ file: 'initial.png', time: 0 })
   await c.eval('window.__videoAudio.start()')
   const start = performance.now()
-  const saveFrame = (data, source, sourceTimestamp) => {
-    const time = (performance.now() - start) / 1000
+  const now = () => (performance.now() - start) / 1000
+  const pageClock = await c.eval('performance.now()')
+  const pageOffset = pageClock - (start + performance.now()) / 2
+  let lastScreencast = 0
+  const saveFrame = (data, source, sourceTimestamp, at = performance.now()) => {
     const file = `${String(frames.length).padStart(6, '0')}.png`
     writeFileSync(join(folder, file), Buffer.from(data, 'base64'))
-    frames.push({ file, time, source, sourceTimestamp })
+    frames.push({ file, time: (at - start) / 1000, source, sourceTimestamp })
   }
   const remove = c.on('Page.screencastFrame', (event) => {
+    lastScreencast = performance.now()
     saveFrame(event.data, 'screencast', event.metadata.timestamp)
     c.send('Page.screencastFrameAck', { sessionId: event.sessionId }).catch((error) =>
       errors.push(error.message),
     )
   })
-  c.cue = (kind) => cues.push({ kind, time: (performance.now() - start) / 1000 })
+  c.cue = (kind) => cues.push({ kind, time: now() })
+  c.camera = async (target) => {
+    const next = await view(c, target, scene.id)
+    camera.push({ time: now(), view: next })
+  }
+  // Cuts on a screen change. Call it before the input that causes the change: the page reports the
+  // animation frame that first shows it, and the cut later snaps to the first captured frame after.
+  c.cutWhen = async (expression, target, timeout = 3000) => {
+    const changed = await c.eval(`new Promise((resolve, reject) => {
+      const end = performance.now() + ${timeout}
+      const tick = (time) => {
+        if (${expression}) resolve({ time, epoch: performance.timeOrigin + time })
+        else if (performance.now() > end) reject(new Error(${JSON.stringify(`Timed out: ${expression}`)}))
+        else requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    })`)
+    const next = await view(c, target, scene.id)
+    camera.push({ time: (changed.time - pageOffset - start) / 1000, view: next, epoch: changed.epoch })
+  }
+  c.framed = async (selectors, name) => {
+    const shot = camera.at(-1).view
+    const rect = await bounds(c, [selectors].flat())
+    if (!inShot(rect, shot))
+      throw new Error(`Framing failed: ${name} ${JSON.stringify(rect)} is outside ${JSON.stringify(shot)}`)
+    framing.push({ name, time: now(), rect, shot })
+    console.log(`  PASS ${name} is fully inside the ${shot.scale}x shot`)
+  }
   c.checkpoint = (name) => c.shot(join(proof, `${scene.id}-${name}.png`))
+  c.smooth = true
   let sampling = true
   let sampler
   try {
     await c.send('Page.startScreencast', { format: 'png', maxWidth: 1024, maxHeight: 768, everyNthFrame: 1 })
     sampler = (async () => {
       while (sampling) {
+        const requested = performance.now()
         const result = await c.send('Page.captureScreenshot', { format: 'png' })
-        if (sampling) saveFrame(result.data, 'screenshot')
+        // A screencast frame that arrived during the request is newer than this screenshot.
+        if (sampling && lastScreencast < requested)
+          saveFrame(result.data, 'screenshot', undefined, (requested + performance.now()) / 2)
         await wait(200)
       }
     })().catch((error) => errors.push(error.message))
@@ -109,6 +170,13 @@ async function record(c, scene, folder, proof) {
     })
     await c.shot(join(proof, `${scene.id}.png`))
     if (errors.length) throw new Error(errors.join('\n'))
+    for (const cut of camera.filter((entry) => entry.epoch)) {
+      const first = frames.find((frame) =>
+        frame.sourceTimestamp ? frame.sourceTimestamp * 1000 >= cut.epoch : frame.time >= cut.time,
+      )
+      cut.detected = cut.time
+      cut.time = first?.time ?? cut.time
+    }
     const timeline = frames.filter((frame) => frame.time < duration)
     const concat = ['ffconcat version 1.0']
     for (let i = 0; i < timeline.length; i++) {
@@ -122,14 +190,18 @@ async function record(c, scene, folder, proof) {
     writeFileSync(join(folder, 'frames.ffconcat'), `${concat.join('\n')}\n`)
     writeFileSync(
       join(folder, 'frames.json'),
-      `${JSON.stringify({ duration, frames: timeline, cues, audioTracks }, null, 2)}\n`,
+      `${JSON.stringify({ duration, frames: timeline, cues, camera, framing, audioTracks }, null, 2)}\n`,
     )
-    return { ...scene, folder, frames: timeline.length, audioTracks, cues }
+    return { ...scene, folder, frames: timeline.length, audioTracks, cues, camera, framing }
   } finally {
     sampling = false
     await sampler
     c.cue = () => {}
+    c.camera = async () => {}
+    c.cutWhen = async () => {}
+    c.framed = async () => {}
     c.checkpoint = () => {}
+    c.smooth = false
     remove()
   }
 }
@@ -164,7 +236,7 @@ export async function capture(root, work, proof, log, only) {
       )
       if (geometry.width !== 1024 || geometry.height !== 768 || geometry.dpr !== 1)
         throw new Error(`Wrong capture geometry: ${JSON.stringify(geometry)}`)
-      await c.move(930, 690)
+      await c.move(...(scene.pointer ?? [930, 690]))
       results.push({ ...(await record(c, scene, join(work, scene.id), proof)), cdpPort: port })
       writeFileSync(
         join(work, 'capture.json'),

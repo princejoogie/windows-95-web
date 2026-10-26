@@ -61,22 +61,137 @@
       return results
     },
   }
+  const cursors = {
+    arrow: {
+      hotspot: [0, 0],
+      rows: [
+        'B',
+        'BB',
+        'BWB',
+        'BWWB',
+        'BWWWB',
+        'BWWWWB',
+        'BWWWWWB',
+        'BWWWWWWB',
+        'BWWWWWWWB',
+        'BWWWWWWWWB',
+        'BWWWWWWWWWB',
+        'BWWWWWWBBBBB',
+        'BWWWBWWB',
+        'BWWB.BWWB',
+        'BWB..BWWB',
+        'BB....BWWB',
+        'B.....BWWB',
+        '.......BWWB',
+        '.......BBB',
+      ],
+    },
+    crosshair: {
+      hotspot: [7, 7],
+      rows: [
+        '.......B',
+        '.......B',
+        '.......B',
+        '.......B',
+        '.......B',
+        '.......B',
+        '',
+        'BBBBBB.B.BBBBBB',
+        '',
+        '.......B',
+        '.......B',
+        '.......B',
+        '.......B',
+        '.......B',
+        '.......B',
+      ],
+    },
+    text: {
+      hotspot: [3, 8],
+      rows: [
+        'BBB.BBB',
+        '...B',
+        '...B',
+        '...B',
+        '...B',
+        '...B',
+        '...B',
+        '...B',
+        '...B',
+        '...B',
+        '...B',
+        '...B',
+        '...B',
+        '...B',
+        '...B',
+        'BBB.BBB',
+      ],
+    },
+  }
+  function bitmap({ rows }) {
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(...rows.map((row) => row.length))
+    canvas.height = rows.length
+    const context = canvas.getContext('2d')
+    rows.forEach((row, y) => {
+      ;[...row].forEach((pixel, x) => {
+        if (pixel === '.') return
+        context.fillStyle = pixel === 'W' ? '#ffffff' : '#000000'
+        context.fillRect(x, y, 1, 1)
+      })
+    })
+    return canvas.toDataURL()
+  }
+  function cursorFor(target) {
+    if (!(target instanceof Element)) return 'arrow'
+    const keyword = getComputedStyle(target).cursor.split(',').at(-1).trim()
+    if (keyword === 'none') return null
+    if (keyword === 'crosshair') return 'crosshair'
+    if (keyword === 'text') return 'text'
+    if (target.closest('canvas')) return null
+    return 'arrow'
+  }
   document.addEventListener('DOMContentLoaded', () => {
-    const pointer = document.createElement('div')
-    pointer.style.cssText =
-      'position:fixed;left:900px;top:650px;width:12px;height:19px;pointer-events:none;z-index:2147483647;image-rendering:pixelated'
-    pointer.innerHTML =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="19" viewBox="0 0 12 19" shape-rendering="crispEdges"><path fill="white" stroke="black" d="M0 0v16l4-4 3 6 3-1-3-6h5z"/></svg>'
-    document.body.append(pointer)
+    const pointers = Object.fromEntries(
+      Object.entries(cursors).map(([name, shape]) => {
+        const image = document.createElement('img')
+        image.src = bitmap(shape)
+        image.dataset.videoPointer = name
+        image.style.cssText =
+          'position:fixed;left:0;top:0;display:none;pointer-events:none;z-index:2147483647;image-rendering:pixelated'
+        document.body.append(image)
+        return [name, image]
+      }),
+    )
+    let x = 900
+    let y = 650
+    let shown = ''
+    const render = () => {
+      const kind = cursorFor(document.elementFromPoint(x, y))
+      const key = kind ? `${kind}:${x}:${y}` : 'hidden'
+      if (key !== shown) {
+        shown = key
+        for (const [name, image] of Object.entries(pointers)) {
+          image.style.display = name === kind ? 'block' : 'none'
+          if (name !== kind) continue
+          const [hx, hy] = cursors[name].hotspot
+          image.style.transform = `translate(${x - hx}px, ${y - hy}px)`
+        }
+      }
+    }
+    const update = () => {
+      render()
+      requestAnimationFrame(update)
+    }
     document.addEventListener(
       'pointermove',
       (event) => {
-        pointer.style.left = `${Math.round(event.clientX)}px`
-        pointer.style.top = `${Math.round(event.clientY)}px`
-        pointer.style.display =
-          event.target instanceof Element && event.target.closest('canvas') ? 'none' : 'block'
+        x = Math.round(event.clientX)
+        y = Math.round(event.clientY)
+        render()
       },
       true,
     )
+    requestAnimationFrame(update)
   })
 })()

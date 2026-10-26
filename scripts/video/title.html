@@ -32,12 +32,12 @@ window.drawCard = async (title, subtitle, index) => {
   if (index < 10) {
     const progress = (index + 1) / 10
     const width = Math.round(80 + 564 * progress)
-    const height = Math.round(18 + 152 * progress)
+    const height = Math.round(18 + 132 * progress)
     context.strokeStyle = '#c0c0c0'
     context.strokeRect(Math.round((960 - width) / 2), Math.round((540 - height) / 2), width, height)
     return
   }
-  const x = 158, y = 184, w = 644, h = 172
+  const x = 158, y = 195, w = 644, h = 150
   context.fillStyle = '#000000'; context.fillRect(x, y, w, h)
   context.fillStyle = '#ffffff'; context.fillRect(x, y, w - 1, h - 1)
   context.fillStyle = '#808080'; context.fillRect(x + 1, y + 1, w - 3, h - 3)
@@ -46,7 +46,7 @@ window.drawCard = async (title, subtitle, index) => {
   context.font = '11px Win95Bold'; context.textBaseline = 'top'; context.fillStyle = '#ffffff'
   context.fillText('Windows 95', x + 8, y + 7)
   pixelText(title, 480, y + 45, title.length > 21 ? 2 : 3, '#000000', true)
-  pixelText(subtitle, 480, y + 114, 1, '#000000')
+  pixelText(subtitle, 480, y + 106, 1, '#000000')
 }
 window.drawContactSheet = async (images) => {
   frame.width = 1920
