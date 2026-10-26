@@ -382,7 +382,10 @@ export function WordPad({ window: windowApi, args }: AppProps) {
       const items = await navigator.clipboard.read()
       for (const item of items) {
         if (kind === 'rich' && item.types.includes('text/html')) {
-          await pasteHtml(await (await item.getType('text/html')).text())
+          await pasteHtml(
+            await (await item.getType('text/html')).text(),
+            item.types.includes('image/png') ? await item.getType('image/png') : null,
+          )
           return
         }
         if (kind === 'rich' && item.types.includes('image/png')) {
@@ -406,9 +409,16 @@ export function WordPad({ window: windowApi, args }: AppProps) {
     }
   }
 
-  const pasteHtml = async (html: string) => {
-    const normalized = await normalizeHtmlImages(html)
-    edit(() => insertHtml(normalized))
+  const pasteHtml = async (html: string, fallback: Blob | null = null) => {
+    const normalized = await normalizeHtmlImages(html).catch((error: unknown) => {
+      if (fallback) return null
+      throw error
+    })
+    if (fallback && !normalized?.imagesPersistable) {
+      await pasteImage(fallback)
+      return
+    }
+    if (normalized) edit(() => insertHtml(normalized.html))
   }
 
   const pasteImage = async (blob: Blob) => {
@@ -716,16 +726,18 @@ export function WordPad({ window: windowApi, args }: AppProps) {
             refreshSelection()
           }}
           onPaste={(event) => {
+            const image = [...event.clipboardData.files].find(
+              (file) => file.type === 'image/png' || file.type === 'image/jpeg',
+            )
             const html = event.clipboardData.getData('text/html')
             if (html) {
               event.preventDefault()
               keeper.remember()
-              void pasteHtml(html).catch(() => message('WordPad cannot paste this picture.', 'warning'))
+              void pasteHtml(html, image ?? null).catch(() =>
+                message('WordPad cannot paste this picture.', 'warning'),
+              )
               return
             }
-            const image = [...event.clipboardData.files].find(
-              (file) => file.type === 'image/png' || file.type === 'image/jpeg',
-            )
             if (!image) return
             event.preventDefault()
             keeper.remember()

@@ -97,16 +97,24 @@ export function readPicture(image: HTMLImageElement): Picture | null {
   return size ? { kind: 'picture', format: match[1], data: match[2], ...size } : null
 }
 
-export async function normalizeHtmlImages(html: string): Promise<string> {
+export async function normalizeHtmlImages(
+  html: string,
+): Promise<{ html: string; imagesPersistable: boolean }> {
   const root = document.createElement('div')
   root.innerHTML = html
-  for (const image of root.querySelectorAll('img')) {
-    if (!pictureSource.test(image.src)) continue
+  const images = [...root.querySelectorAll('img')]
+  let imagesPersistable = images.length > 0
+  for (const image of images) {
+    if (!pictureSource.test(image.src)) {
+      imagesPersistable = false
+      continue
+    }
     await image.decode()
     const picture = readPicture(image)
     if (picture) image.outerHTML = renderPicture(picture)
+    else imagesPersistable = false
   }
-  return root.innerHTML
+  return { html: root.innerHTML, imagesPersistable }
 }
 
 function renderRun(run: Inline): string {
