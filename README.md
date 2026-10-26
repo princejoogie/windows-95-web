@@ -1,140 +1,96 @@
 # Windows 95
 
-A Windows 95 desktop built with React, TypeScript, and Electron 45. The same renderer runs in a web browser. The shell provides Start, a taskbar, movable windows, a persistent virtual C: drive, and Notepad. Apps register through their own folders.
+A Windows 95 recreation built with React, TypeScript, and Electron. The same renderer also runs in a web browser. Open the Start menu, write a document, draw in Paint, play a game, or change the desktop's appearance.
 
-The renderer uses local fonts, icons, and assets. Documents stay in the virtual drive, separate from the host's files. Electron stores them in its user profile. A web browser stores them for the current origin. Development and production use different origins, so they have separate virtual drives even with the same Electron profile.
+![Windows Explorer showing the virtual WINDOWS folder and installed apps on the teal desktop](docs/screenshots/explorer.png)
 
-## Install offline
+## Explore the desktop
 
-Use Node.js and pnpm. Desktop development and packaging require Windows x64. The pnpm store and Electron download cache must already contain the versions in `pnpm-lock.yaml`.
+The shell has a taskbar, movable and resizable windows, keyboard menus, desktop shortcuts, file dialogs, and a persistent virtual C: drive.
+
+| Area | What's included |
+| --- | --- |
+| Files and folders | Windows Explorer, My Computer, Recycle Bin, Find Files, and shortcuts with editable properties. |
+| Documents and drawing | Notepad, WordPad with rich text and pictures, Paint, Calculator, and Character Map. |
+| Games | Minesweeper, Solitaire with card backs and the win animation, numbered FreeCell deals, Hearts against computer players, and Doom 95. |
+| Customization | Control Panel with appearance schemes, backgrounds, screen savers, fonts, mouse and keyboard settings, sounds, and a virtual clock. |
+| Help and commands | Windows Help with app topics and an MS-DOS Prompt that works with the virtual drive. |
+
+## Screenshots
+
+| Solitaire card backs | Doom 95 |
+| --- | --- |
+| ![Solitaire with the Select Card Back dialog and twelve card designs](docs/screenshots/solitaire-card-backs.png) | ![Doom 95 combat with the pistol, an enemy, and the status bar](docs/screenshots/doom-combat.png) |
+| Paint | Display Properties |
+| ![Paint with a sun and mountains drawn using shapes and flood fill](docs/screenshots/paint.png) | ![Display Properties with the Eggplant appearance scheme applied](docs/screenshots/display-appearance.png) |
+
+These are real captures of the production Electron app. Open an image to see it at full size.
+
+## Run locally
+
+Use Windows x64 for desktop development and packaging. Install Node.js 22.12 or later and pnpm. The browser renderer uses the same source without the Electron host.
+
+For an offline install, the pnpm store must contain the packages in `pnpm-lock.yaml`, and the Electron download cache must contain Electron 45.0.0. An empty cache cannot support an offline install.
 
 ```powershell
-pnpm install --offline
+pnpm install --offline --frozen-lockfile
 ```
 
-The postinstall step extracts Electron from its local cache. An empty cache cannot support an offline install.
+The install, development, and build scripts import fonts, cursors, and sounds from the builder's installed Windows. `W95_SYSTEM_ROOT` overrides the source directory. Missing assets fall back to the bundled font, CSS cursors, and silence. See the [system asset documentation](src/renderer/src/system/README.md) for sources and handling.
 
-## Run the desktop
+### Start the desktop
 
 ```powershell
 pnpm dev
 ```
 
-The desktop shows a boot message, then the teal background and taskbar. Open **Start > Programs > Accessories > Notepad**, or use **Start > Run** and enter `notepad`.
+After boot, open **Start > Programs** to choose an app. **Start > Run** accepts names such as `notepad`, `mspaint`, `sol`, and `doom95`.
 
-Drag a title bar to move a window. The outline moves until you release the mouse. Drag an edge or corner to resize. Use the title buttons to minimize, maximize, restore, or close a window. Click a taskbar button to restore a minimized window.
-
-Use Ctrl+Esc to toggle Start and Escape to dismiss it. F2 renames a selected desktop file. Delete asks for confirmation before moving the file to `C:\RECYCLED`. F11 toggles the Electron host's full screen mode.
-
-Windows opens Start when tapped. Windows+R opens Run, Windows+E opens Explorer, Windows+F opens Find, Windows+M minimizes all windows, and Shift+Windows+M restores them. These bindings apply in windowed and full screen mode when Electron receives the keys. The app uses no global keyboard hook and does not suppress the host Windows shell. A physical Windows key or Windows shortcut consumed by the host opens the host's Start menu or command instead, even in full screen mode. Ctrl+Esc and the in-app Start button remain available. CDP key injection checks app routing and does not verify physical host key capture.
-
-The launch wrapper clears `ELECTRON_RUN_AS_NODE`, which Electron-based terminals can inherit. Clear this variable yourself if you launch an Electron executable directly.
-
-## Run the web renderer
+### Start the browser renderer
 
 ```powershell
 pnpm dev:web --port 5401
 ```
 
-Open the local address printed by Vite. Choose another port if 5401 is occupied. In the web build, click the safe-to-turn-off screen to boot again.
+Open `http://localhost:5401`. Choose another port if 5401 is occupied. Without a port override, the web configuration uses port 5395.
 
-## Check and build
+### Build and package
 
-```powershell
-pnpm typecheck
-pnpm lint
-pnpm test
-pnpm build
-pnpm build:web
-```
+| Command | Result |
+| --- | --- |
+| `pnpm build` | Electron main, preload, and renderer builds in `out/`. |
+| `pnpm start` | Preview the existing Electron build. Run `pnpm build` first. |
+| `pnpm build:web` | Static browser build in `dist/web/`. Serve this directory with a static web server. |
+| `pnpm package` | Build and package the Windows x64 desktop app and ZIP in `release/`. |
 
-Vitest runs pure logic tests without jsdom. `pnpm build` writes the Electron main, preload, and renderer files under `out/`. `pnpm build:web` writes the static web build to `dist/web/`.
+Close any running copy of the previous package before packaging. The outputs are `release/Windows 95-win32-x64/Windows 95.exe` and `release/Windows 95-win32-x64.zip`. Keep the executable with its entire folder. The packaged app needs neither this checkout nor `node_modules` at runtime.
 
-```powershell
-pnpm start
-```
+## Controls
 
-This launches the production Electron renderer through electron-vite preview.
+- Double-click desktop icons to open them. Right-click the desktop or a file for its menu.
+- Drag a title bar to move a window. Drag an edge or corner to resize it. Taskbar buttons restore minimized windows.
+- Press Ctrl+Esc to toggle Start, Escape to dismiss a menu or dialog, and Alt+F4 to close the active window.
+- Press F2 to rename a selected file. Delete asks before moving it to the Recycle Bin.
+- Press F11 to toggle Electron full screen. In the browser, click the safe-to-turn-off screen to boot again.
 
-## Package Windows
+Windows-key shortcuts work when the app receives them, including Windows+R for Run and Windows+E for Explorer. The host OS can consume these keys even in full screen. Ctrl+Esc and the Start button remain available.
 
-Close any running copy of the previous release, then run:
+## Saved data
 
-```powershell
-pnpm package
-```
+Documents, pictures, settings, and game records stay in browser storage, separate from the host's files. Electron keeps that storage in its user-data profile. A web browser keeps it for the current origin. Clearing that storage removes the saved desktop data.
 
-The command builds the app, copies the cached Electron runtime, embeds `src/renderer/public/icon.ico`, and creates these outputs:
+Development, production, and different web ports have separate storage origins. Changing the launch mode or URL can therefore show a different virtual drive. Use `W95_DATA_DIR` to select a separate Electron profile, as described in the [developer guide](docs/development.md#storage-and-profiles).
 
-- `release/Windows 95-win32-x64/Windows 95.exe` launches the app without an installer.
-- `release/Windows 95-win32-x64.zip` contains the complete portable app folder.
+## Develop
 
-Keep the executable with the rest of its folder. The package has no runtime dependency on this checkout or `node_modules`.
+The [developer guide](docs/development.md) covers the source layout, app manifests, virtual file system, shared UI, build checks, and live Electron checks.
 
-The icon script accepts ICO files with multiple images, including PNG images and 256-pixel directory entries. It replaces the executable's icon resources and reads them back to check every byte. To verify an existing package:
+## Scope and credits
 
-```powershell
-powershell.exe -NoProfile -File scripts/set-icon.ps1 -Executable 'release/Windows 95-win32-x64/Windows 95.exe' -Icon src/renderer/public/icon.ico -VerifyOnly
-```
+This is an independent recreation of the Windows 95 experience. It does not install Windows or run arbitrary Windows binaries. Network Neighborhood, printer setup, and hardware dialogs recreate the UI without configuring host devices or networking. WordPad reads RTF and text, and writes RTF for its rich document formats, including `.doc`. It does not implement the original binary Word or Write formats.
 
-## Add an app
+The MS-DOS Prompt implements commands such as `DIR`, `CD`, `COPY`, `TYPE`, and `ECHO` against the virtual drive. It is not a host command shell or a DOS emulator. Doom 95 is a custom TypeScript raycasting game with three built-in levels, generated graphics, and synthesized sound. It does not run the original Doom executable or load WAD files.
 
-Create `src/renderer/src/apps/<id>/index.tsx` and export `app: AppManifest`. The shell discovers the manifest with `import.meta.glob`. No shared registration edit is needed. Use [Notepad](src/renderer/src/apps/notepad/index.tsx) as the reference app and [AppManifest](src/renderer/src/shell/types.ts) for the full contract.
+Created by Prince Carlo Juguilon. The desktop and applications draw on Microsoft Windows 95, and Doom draws on id Software's game. Imported Windows fonts, cursors, and sounds come from the builder's own installation, are ignored by Git, and are not project-authored assets. The [system asset documentation](src/renderer/src/system/README.md) says not to distribute those generated Microsoft assets.
 
-Each manifest supplies an `id`, `title`, `icon`, `exe`, `window`, and `component`. A 32-pixel icon belongs in the app folder. Draw it with `pixelArt` from `icons/pixel.ts`. Set `smallIcon` for a separate 16-pixel version.
-
-Use the remaining manifest fields as needed:
-
-- `installDir` defaults to `C:\WINDOWS`. `exe` is the installed program name. Run accepts it with or without `.exe` and ignores case.
-- `startMenu` is a path under Programs. `['Accessories', 'Games']` adds two nested folders. An empty array puts the app directly under Programs.
-- `fileTypes` lists extensions without a dot. The shell uses them when a user opens a file.
-- `desktopShortcut` creates a shortcut on the first boot. The shell preserves a user's later deletion.
-- `desktop` defines a shell icon, its order, optional state-dependent image, and optional file-drop handler.
-
-A fixed window uses `{ kind: 'fixed' }`, sizes to its content, and cannot resize or maximize. A resizable window supplies `width`, `height`, and optional minimum sizes. These sizes describe the client area. Let the app root fill that area with `h-full w-full flex flex-col`.
-
-The component receives `{ window, args }`. `args.file` and `args.folder` are virtual node ids. `window` supplies `id`, `focused`, `minimized`, `setTitle()`, and `close()`. Register `onCloseRequest(handler)` to intercept the title-bar Close button. It returns a cleanup function. After any save prompt, call `close()` to finish closing.
-
-Pause game loops while `window.minimized` or `!window.focused`. Use `useKeyDown` from `shell/context.ts` for shortcuts that apply only to the focused app. The shell keeps windows in stable DOM order when their stacking order changes.
-
-### Use the virtual file system
-
-Use `fs`, `createNode`, and `useFs` from `fs/store.ts`. Use the pure functions in `fs/fs.ts` for paths, children, names, and extensions. The known folder ids live in `fs/types.ts`.
-
-Select a stable value with `useFs`, such as the whole state or one node. Derive arrays with `useMemo`. Returning a new array from the selector can cause repeated renders.
-
-Use `launch`, `openNode`, and `opener` from `shell/system.ts` for app launches and document opening.
-
-### Use the shared UI
-
-Import controls from `ui/index.ts`. `MenuBar` and `MenuList` accept labels with `&` before an accelerator. `Dialog` and `MessageBox` block their owning window and stack with it. Shell dialogs use `ShellDialogHost`. Escape dismisses the top dialog. Pointer use of a menu preserves the editor's focus and selection.
-
-`FileDialog` accepts `mode: 'open' | 'save'`, `initialFolder`, `initialName`, `filters`, `defaultExtension`, `onSelect`, and `onCancel`. Each filter has a label and an array of extensions. Use `'*'` for all files.
-
-`onSelect` receives either `{ kind: 'existing', id, parent, name }` or `{ kind: 'new', parent, name }`. The dialog confirms an overwrite but leaves creation and writing to the app. Open reads the existing node. Save writes its content with `fs.write` or creates a new node with `createNode`.
-
-Use theme colors and bevel utilities from `styles.css`. The shell uses the 16-color palette, local MS Sans Serif at 11 pixels, and 1-pixel bevels.
-
-## Run the live checks
-
-Start Electron with an isolated profile and a CDP port:
-
-```powershell
-$env:W95_DATA_DIR = Join-Path $env:TEMP 'win95-check'
-$env:W95_CDP_PORT = '9301'
-pnpm start
-```
-
-In another terminal, use the installed agent-browser CLI:
-
-```powershell
-$env:W95_CDP_PORT = '9301'
-node scripts/verify-shell.mjs smoke
-node scripts/verify-shell.mjs editing
-node scripts/verify-shell.mjs desktop
-node scripts/verify-shell.mjs shutdown
-```
-
-The shutdown check exits Electron after the safe screen. Confirm the process exits, then relaunch with the same profile and run `node scripts/verify-shell.mjs persistence`. Save `note.txt` through the smoke check before running persistence. Use the same launch mode for both runs so the storage origin stays the same.
-
-The checks use the `shell` browser session and save screenshots and check results under `../proof/shell/`. Override `W95_BROWSER_SESSION`, `W95_PROOF_DIR`, or `W95_AGENT_BROWSER` to change the session, output path, or CLI executable. CDP launches disable native window occlusion so a covered test window still accepts browser input.
+The [package metadata](package.json) declares `ISC`, but this repository does not include a `LICENSE` file.
