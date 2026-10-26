@@ -15,7 +15,14 @@ import { DESKTOP_DIR, DOCUMENTS_DIR, type FsNode, type NodeId, RECYCLED_DIR } fr
 import { icons } from '../../icons'
 import { useStore } from '../../lib/store'
 import { CreateShortcut } from '../../shell/CreateShortcut'
-import { type Clip, clipboard, type Plan, planPaste, planShortcuts } from '../../shell/clipboard'
+import {
+  type Clip,
+  clipboard,
+  type Plan,
+  planPaste,
+  planShortcuts,
+  type ShortcutCreationTarget,
+} from '../../shell/clipboard'
 import { useKeyDown } from '../../shell/context'
 import { DeleteConfirmation } from '../../shell/DeleteConfirmation'
 import { backgroundMenu, type DesktopActions, type MenuFacts, nodeMenu } from '../../shell/desktopMenus'
@@ -80,6 +87,7 @@ type Prompt =
   | { kind: 'bin-properties' }
   | { kind: 'floppy' }
   | { kind: 'shortcut' }
+  | { kind: 'shell-shortcut'; targets: readonly ShortcutCreationTarget[] }
 
 function Rename({ name, finish }: { name: string; finish: (name: string | null) => void }) {
   const input = useRef<HTMLInputElement>(null)
@@ -117,12 +125,16 @@ export function FolderView({
   window,
   exploring = false,
   select,
+  initialDialog,
+  initialError,
 }: {
   initial: Location
   window: WindowApi
   exploring?: boolean
   /** Selected and scrolled into view when the window opens. */
   select?: NodeId | undefined
+  initialDialog?: string | undefined
+  initialError?: string | undefined
 }) {
   const state = useFs((s) => s)
   const clip = useStore(clipboard, (s) => s)
@@ -135,7 +147,7 @@ export function FolderView({
   const typed = useRef({ text: '', at: 0 })
   const [location, setLocation] = useState(initial)
   const virtual = useShellFolder(location.kind === 'shell' ? location.id : undefined)
-  const [shellDialog, setShellDialog] = useState<string | null>(null)
+  const [shellDialog, setShellDialog] = useState<string | null>(initialDialog ?? null)
   const [shellViewOptions, setShellViewOptions] = useState<ReadonlySet<string>>(new Set())
   const ShellDialog = virtual?.Dialog
   const keyOf = (place: Location) =>
@@ -166,7 +178,9 @@ export function FolderView({
   const [context, setContext] = useState<{ x: number; y: number; id: NodeId | null } | null>(null)
   const [goPath, setGoPath] = useState('')
   const [shellMenu, setShellMenu] = useState<{ x: number; y: number; key: string } | null>(null)
-  const [prompt, setPrompt] = useState<Prompt | null>(null)
+  const [prompt, setPrompt] = useState<Prompt | null>(
+    initialError ? { kind: 'error', title: 'Problem with Shortcut', message: initialError } : null,
+  )
   const allNodes = useMemo(() => visibleNodes(state, location, sort, true), [state, location, sort])
   const nodes = useMemo(
     () => allNodes.filter((node) => settings.showHidden || !isHidden(node)),
@@ -234,6 +248,24 @@ export function FolderView({
   const shellProperties = () => {
     const action = virtual?.properties ?? virtual?.items.find((item) => item.key === singleShell?.key)?.action
     if (action) performShell(action)
+  }
+  const createShellShortcuts = () => {
+    if (!virtual) return
+    const targets: ShortcutCreationTarget[] = virtual.items
+      .filter((item) => selection.ids.has(item.key))
+      .map((item) =>
+        item.action.kind === 'app'
+          ? { kind: 'app', app: item.action.id, label: item.label }
+          : {
+              kind: 'shell',
+              label: item.label,
+              target:
+                item.action.kind === 'folder'
+                  ? { kind: 'folder', folder: item.action.id }
+                  : { kind: 'item', folder: virtual.id, item: item.key },
+            },
+      )
+    if (targets.length) setPrompt({ kind: 'shell-shortcut', targets })
   }
   const selectedCount = selected.length + selectedShell.length
   const preferenceKey = keyOf(location)
@@ -711,7 +743,7 @@ export function FolderView({
     },
     ...shellCommands(virtual?.fileCommands),
     'separator',
-    { label: 'Create &Shortcut', disabled: true },
+    { label: 'Create &Shortcut', disabled: !selectedShell.length, onSelect: createShellShortcuts },
     ...(virtual?.fileMutations === false
       ? []
       : [
@@ -1254,7 +1286,11 @@ export function FolderView({
                   },
                   ...shellCommands(virtual.contextCommands ?? virtual.fileCommands),
                   'separator',
-                  { label: 'Create &Shortcut', disabled: true },
+                  {
+                    label: 'Create &Shortcut',
+                    disabled: !selectedShell.length,
+                    onSelect: createShellShortcuts,
+                  },
                   { label: 'P&roperties', onSelect: shellProperties },
                 ]
               : shellMenu.key === 'tree:recycle'
@@ -1404,6 +1440,19 @@ export function FolderView({
             if ('error' in result) return result.error
             setSelection({ ids: new Set([result.id]), focus: result.id, anchor: result.id })
             return null
+          }}
+        />
+      )}
+      {prompt?.kind === 'shell-shortcut' && (
+        <MessageBox
+          title="Shortcut"
+          icon="question"
+          message="Windows cannot create a shortcut here. Do you want the shortcut to be placed on the desktop instead?"
+          buttons={['Yes', 'No']}
+          onClose={(answer) => {
+            if (answer === 'Yes')
+              carry(planShortcuts(fs.get(), prompt.targets, DESKTOP_DIR, fsTimestamp(), newNodeId))
+            setPrompt(null)
           }}
         />
       )}

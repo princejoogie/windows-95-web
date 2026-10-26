@@ -3,7 +3,7 @@ import { isInside } from '../fs/fs'
 import { fsStore } from '../fs/store'
 import { type NodeId, RECYCLED_DIR } from '../fs/types'
 import { createStore, useStore } from '../lib/store'
-import { type FontMetadata, fontBytes, fontData, inspectFont } from './sfnt'
+import { type FontMetadata, fontBytes, fontCharacterRanges, fontData, inspectFont } from './sfnt'
 
 type FontSource =
   | { readonly kind: 'bundled'; readonly id: string }
@@ -14,6 +14,7 @@ export interface InstalledFont extends FontMetadata {
   readonly family: string
   readonly file: string
   readonly source: FontSource
+  readonly characters: readonly (readonly [number, number])[]
 }
 export interface FontMedia {
   readonly id: string
@@ -34,9 +35,10 @@ for (const [path, url] of Object.entries(system)) {
 }
 export const fontMedia: readonly FontMedia[] = media
 export const FONT_CATALOG_KEY = 'win95.fonts.v1'
+const initialFonts: readonly InstalledFont[] = []
 export const fontCatalog = createStore(
   (_: readonly InstalledFont[], next: readonly InstalledFont[]) => next,
-  [],
+  initialFonts,
 )
 const faces = new Map<string, FontFace>()
 let loading: Promise<void> | undefined
@@ -60,13 +62,13 @@ async function sourceBytes(source: FontSource): Promise<Uint8Array<ArrayBuffer>>
 async function loadFont(id: string, file: string, source: FontSource): Promise<InstalledFont> {
   const bytes = await sourceBytes(source)
   const metadata = inspectFont(bytes)
-  const family = `Win95Font-${id}`
+  const family = metadata.name
   const face = await new FontFace(family, bytes).load()
   const previous = faces.get(id)
   if (previous) document.fonts.delete(previous)
   document.fonts.add(face)
   faces.set(id, face)
-  return { ...metadata, id, family, file, source }
+  return { ...metadata, id, family, file, source, characters: fontCharacterRanges(bytes) }
 }
 
 function savedSources(): { id: string; file: string; source: FontSource }[] {
@@ -126,6 +128,13 @@ export function useFonts(): readonly InstalledFont[] {
   void ensureFonts()
   return useStore(fontCatalog, (fonts) => fonts)
 }
+export const useFontsReady = (): boolean => useFonts() !== initialFonts
+export function useFontChoices(existing: readonly string[]): readonly string[] {
+  const installed = useFonts()
+  return [...new Set([...existing, ...installed.map((font) => font.name)])]
+}
+export const fontHasCharacter = (font: InstalledFont, code: number): boolean =>
+  font.characters.some(([first, last]) => code >= first && code <= last)
 
 export async function installFont(input: {
   file: string

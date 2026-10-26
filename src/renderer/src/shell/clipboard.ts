@@ -1,6 +1,7 @@
 import { type FsAction, findChild, fsReducer, isInside } from '../fs/fs'
-import { type FsNode, type FsState, type NodeId, RECYCLED_DIR } from '../fs/types'
+import { type FsNode, type FsState, type NodeId, RECYCLED_DIR, type ShellShortcutTarget } from '../fs/types'
 import { createStore } from '../lib/store'
+import { parseShellShortcutAddress, shellShortcutAddress } from './shellShortcut'
 
 /** What Cut or Copy put on the shell clipboard. Paste reads it; a pasted Cut empties it. */
 export type Clip = { readonly op: 'cut' | 'copy'; readonly ids: readonly NodeId[] } | null
@@ -11,6 +12,9 @@ export const clipboard = createStore<Clip, Clip>((_state, next) => next, null)
 export type ShortcutTarget =
   | { readonly kind: 'app'; readonly app: string; readonly label: string }
   | { readonly kind: 'node'; readonly id: NodeId }
+export type ShortcutCreationTarget =
+  | ShortcutTarget
+  | { readonly kind: 'shell'; readonly target: ShellShortcutTarget; readonly label: string }
 
 export type Plan =
   | { readonly ok: true; readonly actions: readonly FsAction[]; readonly created: readonly NodeId[] }
@@ -21,13 +25,21 @@ const MAX_HOPS = 8
 export type Resolved =
   | { readonly kind: 'app'; readonly app: string }
   | { readonly kind: 'node'; readonly node: FsNode }
+  | { readonly kind: 'shell'; readonly target: ShellShortcutTarget }
 
 /** Follows a shortcut to the app or node it opens. `null` when the target is gone or in the Recycle Bin. */
 export function resolveShortcut(state: FsState, node: FsNode): Resolved | null {
   let current: FsNode | undefined = node
   for (let hop = 0; hop < MAX_HOPS && current; hop++) {
     if (current.kind !== 'shortcut') return { kind: 'node', node: current }
-    if (current.target === undefined) return { kind: 'app', app: current.app }
+    if (current.target === undefined) {
+      if (typeof current.app !== 'string') return null
+      if (current.app.startsWith('shell:')) {
+        const target = parseShellShortcutAddress(current.app)
+        return target ? { kind: 'shell', target } : null
+      }
+      return { kind: 'app', app: current.app }
+    }
     current = state.nodes[current.target]
     if (current && isInside(state, current.id, RECYCLED_DIR)) return null
   }
@@ -123,7 +135,7 @@ export function planPaste(state: FsState, clip: Clip, dest: NodeId, at: number, 
 /** Creates one `Shortcut to X` in `dest` for each target. */
 export function planShortcuts(
   state: FsState,
-  targets: readonly ShortcutTarget[],
+  targets: readonly ShortcutCreationTarget[],
   dest: NodeId,
   at: number,
   makeId: () => NodeId,
@@ -134,7 +146,7 @@ export function planShortcuts(
   for (const target of targets) {
     const node = target.kind === 'node' ? working.nodes[target.id] : undefined
     if (target.kind === 'node' && !node) continue
-    const label = target.kind === 'app' ? target.label : (node?.name ?? '')
+    const label = target.kind === 'node' ? (node?.name ?? '') : target.label
     const base = {
       id: makeId(),
       name: shortcutName(working, dest, label),
@@ -147,7 +159,9 @@ export function planShortcuts(
       node:
         target.kind === 'app'
           ? { ...base, kind: 'shortcut', app: target.app }
-          : { ...base, kind: 'shortcut', target: target.id },
+          : target.kind === 'shell'
+            ? { ...base, kind: 'shortcut', app: shellShortcutAddress(target.target) }
+            : { ...base, kind: 'shortcut', target: target.id },
     }
     actions.push(action)
     working = fsReducer(working, action)

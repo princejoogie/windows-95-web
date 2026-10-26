@@ -5,7 +5,7 @@ import { Radio } from '../../ui'
 import { Wizard } from '../controlpanel/Wizard'
 import { printerIcon } from '../explorer/art'
 import { FolderView } from '../explorer/FolderView'
-import { registerShellFolder } from '../explorer/shellFolders'
+import { registerShellFolder, shellFolder } from '../explorer/shellFolders'
 
 const addPrinterIcon = pixelArt(
   [
@@ -89,8 +89,19 @@ registerShellFolder({
   ],
 })
 
-function Printers({ window }: AppProps) {
-  return <FolderView initial={{ kind: 'shell', id: 'printers' }} window={window} />
+function Printers({ window, args }: AppProps) {
+  const target = args.shellTarget
+  const item =
+    target?.kind === 'item'
+      ? shellFolder('printers')?.items.find((item) => item.key === target.item)
+      : undefined
+  return (
+    <FolderView
+      initial={{ kind: 'shell', id: 'printers' }}
+      initialDialog={item?.action.kind === 'dialog' ? item.action.id : undefined}
+      window={window}
+    />
+  )
 }
 
 export const app: AppManifest = {

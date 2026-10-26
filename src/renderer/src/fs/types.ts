@@ -20,6 +20,10 @@ interface NodeBase {
 }
 
 export type RunAs = 'normal' | 'minimized' | 'maximized'
+export type ShellFolderId = 'controlpanel' | 'printers' | 'network' | 'fonts'
+export type ShellShortcutTarget =
+  | { readonly kind: 'folder'; readonly folder: ShellFolderId }
+  | { readonly kind: 'item'; readonly folder: ShellFolderId; readonly item: string }
 
 /** What a shortcut's Shortcut tab edits besides its target. */
 export interface ShortcutSettings {

@@ -1,3 +1,4 @@
+import { shellFolder } from '../apps/explorer/shellFolders'
 import { children, extension, fileSize, pathOf } from '../fs/fs'
 import { type Attributes, type FsNode, type FsState, RECYCLED_DIR } from '../fs/types'
 import { resolveShortcut } from '../shell/clipboard'
@@ -176,6 +177,18 @@ export interface ShortcutInfo {
 export function shortcutInfo(state: FsState, node: FsNode): ShortcutInfo | null {
   if (node.kind !== 'shortcut') return null
   const resolved = resolveShortcut(state, node)
+  if (resolved?.kind === 'shell') {
+    const target = resolved.target
+    const folder = shellFolder(target.folder)
+    const item = target.kind === 'item' ? folder?.items.find((item) => item.key === target.item) : undefined
+    return {
+      type: item ? 'System folder item' : 'System folder',
+      location: folder?.title ?? target.folder,
+      target: item ? `${folder?.title ?? target.folder}\\${item.label}` : (folder?.title ?? target.folder),
+      startIn: '',
+      folder: null,
+    }
+  }
   const target =
     resolved?.kind === 'app'
       ? Object.values(state.nodes).find((other) => other.kind === 'program' && other.app === resolved.app)

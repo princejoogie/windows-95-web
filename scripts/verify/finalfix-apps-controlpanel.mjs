@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { connect, sleep } from './cdp.mjs'
 
@@ -8,6 +8,14 @@ const proof =
 mkdirSync(proof, { recursive: true })
 const app = await connect(Number(process.env.W95_CDP_PORT ?? 9452))
 const phase = process.argv[2] ?? 'baseline'
+writeFileSync(
+  join(proof, `${phase}-runtime.json`),
+  JSON.stringify(
+    await app.eval('({url:location.href,title:document.title,userAgent:navigator.userAgent})'),
+    null,
+    2,
+  ),
+)
 const results = []
 const dialog = (name) => `[role="dialog"][aria-label=${JSON.stringify(name)}]`
 const clickText = async (text, within = 'body', options = {}) => {
@@ -34,7 +42,7 @@ const run = async (command) => {
 }
 const openPanel = async (name) => {
   await run('control')
-  await clickText(name, '[data-window]', { count: 2 })
+  await clickText(name, '[data-window][aria-label="Control Panel"]', { count: 2 })
 }
 const reload = async () => {
   await app.send('Page.reload')
@@ -56,7 +64,550 @@ const checkbox = async (label, within = 'body') => {
 }
 const inputValue = (label) => `document.querySelector('input[aria-label=${JSON.stringify(label)}]').value`
 const persisted = (path) => `JSON.parse(localStorage.getItem('win95.settings.v1'))?.${path}`
+const chooseKeyboard = async (selector, name) => {
+  await app.clickOn(selector)
+  const index = await app.eval(
+    `[...document.querySelector('[role=listbox][id]').querySelectorAll('[role=option]')].findIndex(e=>e.textContent.trim()===${JSON.stringify(name)})`,
+  )
+  assert.ok(index >= 0, `Font option ${name} exists`)
+  await app.key('Home')
+  for (let n = 0; n < index; n++) await app.key('ArrowDown')
+  await app.key('Enter')
+}
+const checkRender = async (selector, behavior) => {
+  await app.send('DOM.enable')
+  await app.send('CSS.enable')
+  const tree = await app.send('DOM.getDocument')
+  const nodes = await app.send('DOM.querySelectorAll', {
+    nodeId: tree.result.root.nodeId,
+    selector: `${selector}, ${selector} *`,
+  })
+  const rendered = await Promise.all(
+    nodes.result.nodeIds.map((nodeId) => app.send('CSS.getPlatformFontsForNode', { nodeId })),
+  )
+  const fonts = rendered.flatMap((result) => result.result?.fonts ?? [])
+  const passed =
+    fonts.length > 0 &&
+    fonts.every(
+      (font) => font.isCustomFont && font.familyName === 'Microsoft Sans Serif' && font.glyphCount > 0,
+    )
+  results.push({ finding: 10, behavior, passed, fonts })
+  assert.ok(passed, behavior)
+  console.log('PASS', 10, behavior, fonts.filter((font) => font.isCustomFont).slice(0, 2))
+}
 try {
+  if (process.argv.includes('--fresh')) {
+    await app.eval('localStorage.clear()')
+    await reload()
+  }
+  if (phase === 'stale-shortcut') {
+    const baseline = process.argv.includes('--baseline')
+    await reload()
+    const data = `data:font/ttf;base64,${readFileSync(new URL('../../src/renderer/src/assets/fonts/micross.ttf', import.meta.url)).toString('base64')}`
+    await run('notepad')
+    await app.type(data)
+    await app.key('s', ['Control'])
+    await fill('input[id$="-name"]', 'linked.ttf')
+    await clickText('Save', dialog('Save As'))
+    await sleep(300)
+    const source = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.kind==='file'&&n.name==='linked.ttf').id`,
+    )
+    await reload()
+    await openPanel('Fonts')
+    await app.key('f', ['Alt'])
+    await clickText('Install New Font...')
+    await clickText('..', '[aria-label="Font folders"]')
+    await clickText('My Documents', '[aria-label="Font folders"]')
+    await clickText('linked.ttf', dialog('Add Fonts'))
+    await checkbox('Copy fonts to Fonts folder', dialog('Add Fonts'))
+    await clickText('OK', dialog('Add Fonts'))
+    await app.waitFor(`!document.querySelector(${JSON.stringify(dialog('Add Fonts'))})`)
+    await check(
+      9,
+      'stale-target fixture installs actual linked virtual font',
+      `JSON.parse(localStorage.getItem('win95.fonts.v1'))[0].source`,
+      { kind: 'link', node: source },
+    )
+    await clickText('Microsoft Sans Serif', '[data-window]')
+    await app.key('f', ['Alt'])
+    await clickText('Create Shortcut', '[role=menu]')
+    await clickText('Yes', dialog('Shortcut'))
+    await sleep(300)
+    const shortcut = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.name==='Shortcut to Microsoft Sans Serif').id`,
+    )
+    await reload()
+    await app.clickOn('[data-desktop-item="app:mycomputer"]', { count: 2 })
+    await app.clickOn('[data-node-id="c"]', { count: 2 })
+    await app.clickOn('[data-node-id="documents"]', { count: 2 })
+    await app.clickOn(`[data-node-id="${source}"]`)
+    await app.key('Delete')
+    await clickText('Yes')
+    await reload()
+    await app.clickOn(`[data-desktop-item="${shortcut}"]`, { count: 2 })
+    await sleep(300)
+    await check(
+      9,
+      'stale target opens a visible dismissible error',
+      `!!document.querySelector(${JSON.stringify(dialog('Problem with Shortcut'))})`,
+      !baseline,
+    )
+    await shot(baseline ? 'baseline-invisible-target' : 'visible-unavailable-target')
+    if (!baseline) await clickText('OK', dialog('Problem with Shortcut'))
+    await app.clickOn('[data-window] .explorer-items')
+    await app.key('Home')
+    await app.key('ArrowRight')
+    const selection = await app.eval(
+      `document.querySelector('[data-window] [role=option][aria-selected=true]')?.textContent.trim()??null`,
+    )
+    results.push({ finding: 9, behavior: 'keyboard selection after stale target', value: selection })
+    if (!baseline)
+      assert.equal(
+        selection,
+        'MS Sans Serif Bitmap',
+        'keyboard selection works after dismissing unavailable target',
+      )
+    await app.key('F10')
+    results.push({
+      finding: 9,
+      behavior: 'F10 activation observation',
+      value: await app.eval(
+        `({menuOpen:!!document.querySelector('[role=menu]'),focus:document.activeElement?.textContent,menubar:!!document.activeElement?.closest('[role=menubar]')})`,
+      ),
+    })
+    if (!baseline) {
+      await app.key('ArrowDown')
+      await check(
+        9,
+        'F10 then Down opens File menu after stale target',
+        `!!document.querySelector('[role=menu]')`,
+        true,
+      )
+    }
+    await shot(baseline ? 'baseline-keyboard-state' : 'keyboard-recovered')
+    await app.key('Escape')
+    await app.key('F4', ['Alt'])
+    await check(9, 'Alt+F4 closes the usable folder', `document.querySelectorAll('[data-window]').length`, 0)
+  }
+  if (phase === 'font-shortcuts') {
+    await reload()
+    await run('control')
+    await clickText('Fonts', '[data-window]')
+    await app.key('f', ['Alt'])
+    await clickText('Create Shortcut', '[role=menu]')
+    await clickText('Yes', dialog('Shortcut'))
+    await sleep(300)
+    await check(
+      9,
+      'Fonts folder shortcut persists its typed location',
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).some(n=>n.app==='shell:fonts:')`,
+      true,
+    )
+    await reload()
+    const folder = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.app==='shell:fonts:').id`,
+    )
+    await app.clickOn(`[data-desktop-item="${folder}"]`, { count: 2 })
+    await app.waitFor(`document.querySelector('[data-window]').textContent.includes('MS Sans Serif Bitmap')`)
+    await check(
+      9,
+      'Fonts desktop shortcut opens the Fonts folder',
+      `document.querySelector('[data-window]').getAttribute('aria-label')`,
+      'Fonts',
+    )
+    await clickText('MS Sans Serif Bitmap', '[data-window]')
+    await app.key('f', ['Alt'])
+    await clickText('Create Shortcut', '[role=menu]')
+    await clickText('Yes', dialog('Shortcut'))
+    await sleep(300)
+    await reload()
+    const sample = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.app==='shell:fonts:ms-sans-serif').id`,
+    )
+    await app.clickOn(`[data-desktop-item="${sample}"]`, { count: 2 })
+    await app.waitFor(
+      `!!document.querySelector(${JSON.stringify(dialog('MS Sans Serif Bitmap (TrueType)'))})`,
+    )
+    await check(
+      9,
+      'font-sample shortcut resolves after fresh catalog load',
+      `!!document.querySelector(${JSON.stringify(dialog('MS Sans Serif Bitmap (TrueType)'))})`,
+      true,
+    )
+    await shot('font-sample-target')
+  }
+  if (phase === 'consumers') {
+    await reload()
+    await run('wordpad')
+    const wordpad = '[data-window][aria-label$="WordPad"]'
+    await check(
+      10,
+      'WordPad retains Times New Roman as its default',
+      `document.querySelector(${JSON.stringify(`${wordpad} [role=combobox][aria-label="Font"]`)}).textContent.trim()`,
+      'Times New Roman',
+    )
+    await app.clickOn(`${wordpad} [role=combobox][aria-label="Font"]`)
+    await check(
+      10,
+      'installed family absent before installation',
+      `[...document.querySelector('[role=listbox][id]').querySelectorAll('[role=option]')].some(e=>e.textContent.trim()==='Microsoft Sans Serif')`,
+      false,
+    )
+    await check(
+      10,
+      'legacy and symbol font choices retained',
+      `['Times New Roman','Arial','Wingdings','Symbol'].every(name=>[...document.querySelector('[role=listbox][id]').querySelectorAll('[role=option]')].some(e=>e.textContent.trim()===name))`,
+      true,
+    )
+    await app.key('Escape')
+    await run('charmap')
+    await openPanel('Fonts')
+    await app.key('f', ['Alt'])
+    await clickText('Install New Font...')
+    await clickText('MICROSS.TTF', dialog('Add Fonts'))
+    await clickText('OK', dialog('Add Fonts'))
+    await app.waitFor(`!document.querySelector(${JSON.stringify(dialog('Add Fonts'))})`)
+    await app.clickOn('[data-window][aria-label="Fonts"] [aria-label="Close"]')
+    await clickText('Document - WordPad', '[data-taskbar]')
+    await chooseKeyboard(`${wordpad} [role=combobox][aria-label="Font"]`, 'Microsoft Sans Serif')
+    await app.clickOn('[contenteditable=true]')
+    await app.type('Installed font semantic roundtrip 123.')
+    await app.key('a', ['Control'])
+    await chooseKeyboard(`${wordpad} [role=combobox][aria-label="Font"]`, 'Microsoft Sans Serif')
+    await check(
+      10,
+      'already-open WordPad accepts newly installed font',
+      `document.querySelector(${JSON.stringify(`${wordpad} [role=combobox][aria-label="Font"]`)}).textContent.trim()`,
+      'Microsoft Sans Serif',
+    )
+    await check(
+      10,
+      'WordPad DOM retains semantic installed font family',
+      `[...document.querySelector('[contenteditable=true]').querySelectorAll('*')].some(e=>getComputedStyle(e).fontFamily.includes('Microsoft Sans Serif'))`,
+      true,
+    )
+    await check(
+      10,
+      'selected semantic family is a loaded installed face',
+      `[...document.fonts].some(f=>f.family==='Microsoft Sans Serif'&&f.status==='loaded')`,
+      true,
+    )
+    await shot('wordpad-installed')
+    await checkRender('[contenteditable=true]', 'WordPad renders glyphs from the installed custom face')
+    await app.key('s', ['Control'])
+    await fill('input[id$="-name"]', 'installed-font.rtf')
+    await clickText('Save', dialog('Save As'))
+    await sleep(300)
+    await check(
+      10,
+      'saved RTF records semantic family and text',
+      `(()=>{const n=Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.kind==='file'&&n.name==='installed-font.rtf');return !!n&&n.content.includes('Microsoft Sans Serif')&&n.content.includes('Installed font semantic roundtrip 123.')&&!n.content.includes('Win95Font-')})()`,
+      true,
+    )
+    await clickText('Character Map', '[data-taskbar]')
+    const charmap = '[data-window][aria-label="Character Map"]'
+    await chooseKeyboard(`${charmap} [role=combobox][aria-label="Font"]`, 'Microsoft Sans Serif')
+    await check(
+      10,
+      'already-open Character Map accepts installed font',
+      `document.querySelector(${JSON.stringify(`${charmap} [role=combobox][aria-label="Font"]`)}).textContent.trim()`,
+      'Microsoft Sans Serif',
+    )
+    await check(
+      10,
+      'Character Map grid uses installed family',
+      `[...document.querySelector(${JSON.stringify(charmap)}).querySelectorAll('[style]')].some(e=>getComputedStyle(e).fontFamily.includes('Microsoft Sans Serif'))`,
+      true,
+    )
+    await shot('charmap-installed')
+    await checkRender(
+      '[data-window][aria-label="Character Map"] fieldset',
+      'Character Map renders glyphs from the installed custom face',
+    )
+    await chooseKeyboard(`${charmap} [role=combobox][aria-label="Font"]`, 'Symbol')
+    await app.key('s', ['Alt'])
+    await check(
+      10,
+      'symbol-font character handling survives integration',
+      `document.querySelector(${JSON.stringify(charmap)}).querySelector('input').value.charCodeAt(0)`,
+      0xf041,
+    )
+    await reload()
+    await run('"C:\\My Documents\\installed-font.rtf"')
+    await check(
+      10,
+      'reopened WordPad text survives full reload',
+      `document.querySelector('[contenteditable=true]').textContent`,
+      'Installed font semantic roundtrip 123.',
+    )
+    await app.clickOn('[contenteditable=true]')
+    await app.key('a', ['Control'])
+    await check(
+      10,
+      'reopened WordPad keeps semantic family',
+      `[...document.querySelector('[contenteditable=true]').querySelectorAll('*')].some(e=>getComputedStyle(e).fontFamily.includes('Microsoft Sans Serif'))`,
+      true,
+    )
+    await check(
+      10,
+      'reopened document font is loaded from persistent catalog',
+      `[...document.fonts].some(f=>f.family==='Microsoft Sans Serif'&&f.status==='loaded')`,
+      true,
+    )
+    await shot('reopened-semantic-font')
+    await checkRender('[contenteditable=true]', 'reopened WordPad renders the persisted custom face')
+    await app.key('o', ['Alt'])
+    await clickText('Font...', '[role=menu]')
+    await check(
+      10,
+      'WordPad Font dialog also lists installed family',
+      `[...document.querySelector('[aria-label="Font list"]').querySelectorAll('[role=option]')].some(e=>e.textContent.trim()==='Microsoft Sans Serif')`,
+      true,
+    )
+    await shot('font-dialog-installed')
+  }
+  if (phase === 'font-virtual') {
+    await reload()
+    const data = `data:font/ttf;base64,${readFileSync(new URL('../../src/renderer/src/assets/fonts/micross.ttf', import.meta.url)).toString('base64')}`
+    await run('notepad')
+    await app.type(data)
+    await app.key('s', ['Control'])
+    await fill('input[id$="-name"]', 'virtual.ttf')
+    await clickText('Save', dialog('Save As'))
+    await sleep(300)
+    const source = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.kind==='file'&&n.name==='virtual.ttf').id`,
+    )
+    await check(
+      10,
+      'font bytes saved as a real virtual font file',
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.id===${JSON.stringify(source)}).content.length`,
+      data.length,
+    )
+    await reload()
+    await openPanel('Fonts')
+    await app.key('f', ['Alt'])
+    await clickText('Install New Font...')
+    await clickText('..', '[aria-label="Font folders"]')
+    await clickText('My Documents', '[aria-label="Font folders"]')
+    await clickText('virtual.ttf', dialog('Add Fonts'))
+    await shot('virtual-source-file')
+    await clickText('OK', dialog('Add Fonts'))
+    await app.waitFor(`!document.querySelector(${JSON.stringify(dialog('Add Fonts'))})`)
+    await check(
+      10,
+      'actual virtual font installs its parsed family and bytes',
+      `JSON.parse(localStorage.getItem('win95.fonts.v1')).map(f=>({name:f.name,file:f.file,bytes:f.byteLength,source:f.source.kind}))`,
+      [{ name: 'Microsoft Sans Serif', file: 'virtual.ttf', bytes: 652664, source: 'copy' }],
+    )
+    await reload()
+    await app.clickOn('[data-desktop-item="app:mycomputer"]', { count: 2 })
+    await app.clickOn('[data-node-id="c"]', { count: 2 })
+    await app.clickOn('[data-node-id="documents"]', { count: 2 })
+    await app.clickOn(`[data-node-id="${source}"]`)
+    await app.key('Delete')
+    await clickText('Yes')
+    await reload()
+    await openPanel('Fonts')
+    await app.waitFor(`document.querySelector('[data-window]').textContent.includes('Microsoft Sans Serif')`)
+    await check(
+      10,
+      'copied font remains loaded after original source is recycled',
+      `[...document.fonts].some(f=>f.family==='Microsoft Sans Serif'&&f.status==='loaded')`,
+      true,
+    )
+    await shot('copied-font-source-removed')
+  }
+  if (phase === 'font-negative') {
+    await reload()
+    await run('notepad')
+    await app.type('This file is not a font.')
+    await app.key('s', ['Control'])
+    await fill('input[id$="-name"]', 'bad.ttf')
+    await clickText('Save', dialog('Save As'))
+    await sleep(300)
+    await check(
+      10,
+      'invalid font fixture is an actual persisted virtual file',
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).some(n=>n.kind==='file'&&n.name==='bad.ttf'&&n.content==='This file is not a font.')`,
+      true,
+    )
+    await reload()
+    await openPanel('Fonts')
+    await app.key('f', ['Alt'])
+    await clickText('Install New Font...')
+    await clickText('..', '[aria-label="Font folders"]')
+    await clickText('My Documents', '[aria-label="Font folders"]')
+    await clickText('bad.ttf', dialog('Add Fonts'))
+    await clickText('OK', dialog('Add Fonts'))
+    await check(
+      10,
+      'renamed text is rejected through installation UI',
+      `[...document.querySelectorAll(${JSON.stringify(dialog('Add Fonts'))})].some(e=>e.textContent.includes('does not contain supported'))`,
+      true,
+    )
+    await check(
+      10,
+      'invalid font creates no installed catalog entry',
+      `JSON.parse(localStorage.getItem('win95.fonts.v1')??'[]').length`,
+      0,
+    )
+    await shot('invalid-font-rejected')
+    await app.key('Escape')
+    await clickText('Cancel', dialog('Add Fonts'))
+    await check(
+      10,
+      'Cancel leaves the font catalog unchanged',
+      `JSON.parse(localStorage.getItem('win95.fonts.v1')??'[]').length`,
+      0,
+    )
+  }
+  if (phase === 'font-linked') {
+    await reload()
+    await openPanel('Fonts')
+    await app.key('f', ['Alt'])
+    await clickText('Install New Font...')
+    await clickText('MICROSS.TTF', dialog('Add Fonts'))
+    await checkbox('Copy fonts to Fonts folder', dialog('Add Fonts'))
+    await clickText('OK', dialog('Add Fonts'))
+    await app.waitFor(`!document.querySelector(${JSON.stringify(dialog('Add Fonts'))})`)
+    await check(
+      10,
+      'unchecked copy keeps an available media reference',
+      `JSON.parse(localStorage.getItem('win95.fonts.v1')).map(f=>({name:f.name,source:f.source}))`,
+      [{ name: 'Microsoft Sans Serif', source: { kind: 'bundled', id: 'micross' } }],
+    )
+    await reload()
+    await openPanel('Fonts')
+    await app.waitFor(`document.querySelector('[data-window]').textContent.includes('Microsoft Sans Serif')`)
+    await check(
+      10,
+      'media reference loads the actual font after reload',
+      `[...document.fonts].some(f=>f.family==='Microsoft Sans Serif'&&f.status==='loaded')`,
+      true,
+    )
+    await shot('linked-font-reload')
+  }
+  if (phase === 'printer-shortcut') {
+    const baseline = process.argv.includes('--baseline')
+    await reload()
+    await openPanel('Date/Time')
+    await fill('input[aria-label="Year"]', '1995')
+    await clickText('OK', dialog('Date/Time Properties'))
+    await reload()
+    await run('printers')
+    await clickText('Add Printer', '[data-window]')
+    await app.key('f', ['Alt'])
+    await clickText('Create Shortcut', '[role=menu]')
+    await clickText('Yes', dialog('Shortcut'))
+    await sleep(300)
+    await check(
+      9,
+      'Add Printer shortcut records virtual creation year',
+      `new Date(Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.app==='shell:printers:add-printer').created).getUTCFullYear()`,
+      baseline || process.argv.includes('--before-clock') ? new Date().getUTCFullYear() : 1995,
+    )
+    await reload()
+    const printer = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.app==='shell:printers:add-printer').id`,
+    )
+    await app.clickOn(`[data-desktop-item="${printer}"]`, { count: 2 })
+    await check(
+      9,
+      'Add Printer desktop shortcut opens its wizard',
+      `!!document.querySelector(${JSON.stringify(dialog('Add Printer Wizard'))})`,
+      !baseline,
+    )
+    await shot(baseline ? 'before-folder-only' : 'wizard-after-reload')
+  }
+  if (phase === 'exit') await app.eval('setTimeout(() => window.win95.shutdown(), 100)')
+  if (phase === 'shortcuts') {
+    await reload()
+    await run('control')
+    await clickText('Display', '[data-window]')
+    await app.key('f', ['Alt'])
+    await app.key('s')
+    await shot('display-confirmation')
+    await clickText('No', dialog('Shortcut'))
+    await sleep(300)
+    await check(
+      9,
+      'No declines desktop shortcut creation',
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).filter(n=>n.app==='shell:controlpanel:display').length`,
+      0,
+    )
+    await app.key('f', ['Alt'])
+    await app.key('s')
+    await clickText('Yes', dialog('Shortcut'))
+    await sleep(300)
+    await check(
+      9,
+      'File menu creates persisted applet shortcut',
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).filter(n=>n.app==='shell:controlpanel:display').map(n=>({kind:n.kind,name:n.name,parent:n.parent}))`,
+      [{ kind: 'shortcut', name: 'Shortcut to Display', parent: 'desktop' }],
+    )
+    await reload()
+    const display = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.app==='shell:controlpanel:display').id`,
+    )
+    await app.clickOn(`[data-desktop-item="${display}"]`, { count: 2 })
+    await check(
+      9,
+      'desktop applet shortcut launches Display Properties',
+      `!!document.querySelector(${JSON.stringify(dialog('Display Properties'))})`,
+      true,
+    )
+    await shot('desktop-display-launch')
+    await clickText('Cancel', dialog('Display Properties'))
+    await app.clickOn('[data-window] [aria-label="Close"]')
+    await app.clickOn(`[data-desktop-item="${display}"]`)
+    await app.key('Enter', ['Alt'])
+    await clickText('Shortcut', dialog('Shortcut to Display Properties'))
+    await check(
+      9,
+      'special shortcut Properties exposes its named target',
+      `document.querySelector('input[aria-label="Target"]').value`,
+      'Control Panel\\Display',
+    )
+    await clickText('OK', dialog('Shortcut to Display Properties'))
+    await reload()
+    await app.clickOn('[data-desktop-item="app:network"]', { count: 2 })
+    await clickText('Entire Network', '[data-window]')
+    await app.key('F10', ['Shift'])
+    await clickText('Create Shortcut', '[role=menu]')
+    await clickText('Yes', dialog('Shortcut'))
+    await sleep(300)
+    await check(
+      9,
+      'keyboard context menu creates Entire Network shortcut',
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).filter(n=>n.app==='shell:network:entire-network').map(n=>n.name)`,
+      ['Shortcut to Entire Network'],
+    )
+    await reload()
+    const entire = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.app==='shell:network:entire-network').id`,
+    )
+    await app.clickOn(`[data-desktop-item="${entire}"]`)
+    await app.key('Enter')
+    await check(
+      9,
+      'Entire Network desktop shortcut reaches truthful browse error',
+      `document.querySelector(${JSON.stringify(dialog('Network Neighborhood'))}).textContent.includes('Unable to browse the network')`,
+      true,
+    )
+    await shot('entire-network-launch')
+    await clickText('OK', dialog('Network Neighborhood'))
+    await app.key('f', ['Alt'])
+    await clickText('Find Computer...', '[role=menu]')
+    await check(
+      9,
+      'Network folder Find Computer routes to final shell app',
+      `!!document.querySelector('[data-window][aria-label="Find: Computer"]')`,
+      true,
+    )
+    await shot('find-computer')
+  }
   if (phase === 'accessibility') {
     await reload()
     await openPanel('Accessibility Options')
@@ -369,7 +920,7 @@ try {
     await check(
       10,
       'installed browser font face loaded',
-      `[...document.fonts].some(f=>f.family.startsWith('Win95Font-')&&f.status==='loaded'&&f.family.length>30)`,
+      `[...document.fonts].some(f=>f.family==='Microsoft Sans Serif'&&f.status==='loaded')`,
       true,
     )
     await shot('installed')
@@ -443,5 +994,12 @@ try {
   }
 } finally {
   writeFileSync(join(proof, `${phase}-results.json`), JSON.stringify(results, null, 2))
+  if (phase !== 'exit')
+    writeFileSync(
+      join(proof, `${phase}-persisted.json`),
+      await app.eval(
+        `JSON.stringify({settings:JSON.parse(localStorage.getItem('win95.settings.v1')),fonts:JSON.parse(localStorage.getItem('win95.fonts.v1')),fs:JSON.parse(localStorage.getItem('w95.fs.v1'))},null,2)`,
+      ),
+    )
   app.close()
 }

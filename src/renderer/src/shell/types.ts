@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import type { FsState, NodeId } from '../fs/types'
+import type { FsState, NodeId, ShellShortcutTarget } from '../fs/types'
 
 export interface Point {
   readonly x: number
@@ -19,6 +19,7 @@ export interface LaunchArgs {
   readonly select?: NodeId
   /** A help book id, for Windows Help. */
   readonly book?: string
+  readonly shellTarget?: ShellShortcutTarget
 }
 
 /**

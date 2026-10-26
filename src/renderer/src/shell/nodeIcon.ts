@@ -1,3 +1,4 @@
+import { shellFolder } from '../apps/explorer/shellFolders'
 import { extension } from '../fs/fs'
 import { fsStore } from '../fs/store'
 import type { FsNode } from '../fs/types'
@@ -5,6 +6,7 @@ import { icons } from '../icons'
 import { resolveShortcut } from './clipboard'
 import { fileTypeIcons } from './fileTypeIcons'
 import { getApp } from './registry'
+import { shellShortcutApp } from './shellShortcut'
 
 export interface NodeIcon {
   readonly icon: string
@@ -30,6 +32,7 @@ export function nodeIcon(node: FsNode): NodeIcon {
       return { icon: getApp(node.app)?.icon ?? icons.program }
     case 'shortcut': {
       const target = resolveShortcut(fsStore.get(), node)
+      const shell = target?.kind === 'shell' ? target.target : null
       const chosen = node.icon ? iconChoice(node.icon) : undefined
       const icon = chosen
         ? chosen
@@ -37,7 +40,13 @@ export function nodeIcon(node: FsNode): NodeIcon {
           ? icons.program
           : target.kind === 'app'
             ? (getApp(target.app)?.icon ?? icons.program)
-            : nodeIcon(target.node).icon
+            : target.kind === 'shell'
+              ? ((shell?.kind === 'item'
+                  ? shellFolder(shell.folder)?.items.find((item) => item.key === shell.item)?.icon
+                  : undefined) ??
+                getApp(shellShortcutApp(target.target))?.icon ??
+                icons.folderClosed)
+              : nodeIcon(target.node).icon
       return { icon, overlay: icons.shortcutArrow }
     }
     case 'file':
