@@ -2,6 +2,8 @@
 
 This guide documents the app contracts and local checks. See the [README](../README.md#run-locally) for prerequisites, development commands, and package outputs.
 
+For public web builds and uploads, see [Deploy to Cloudflare Pages](deployment.md).
+
 ## Source layout
 
 | Path | Responsibility |

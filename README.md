@@ -2,6 +2,8 @@
 
 A Windows 95 recreation built with React, TypeScript, and Electron. The same renderer also runs in a web browser. Open the Start menu, write a document, draw in Paint, play a game, or change the desktop's appearance.
 
+[Live demo](https://win95.juguilon.com/)
+
 ![Windows Explorer showing the virtual WINDOWS folder and installed apps on the teal desktop](docs/screenshots/explorer.png)
 
 ## Explore the desktop
@@ -84,6 +86,8 @@ Development, production, and different web ports have separate storage origins. 
 ## Develop
 
 The [developer guide](docs/development.md) covers the source layout, app manifests, virtual file system, shared UI, build checks, and live Electron checks.
+
+See [Deploy to Cloudflare Pages](docs/deployment.md) for the public web build and upload commands.
 
 ## Scope and credits
 

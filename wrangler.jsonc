@@ -1,0 +1,5 @@
+{
+  "name": "windows-95-web",
+  "pages_build_output_dir": "./dist/web",
+  "compatibility_date": "2026-10-26"
+}
