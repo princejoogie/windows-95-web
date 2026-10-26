@@ -8,6 +8,7 @@ import {
   normalize,
   type Paragraph,
   type ParagraphStyle,
+  type Picture,
   pixelsToTwips,
   type RunStyle,
   twipsToPixels,
@@ -54,9 +55,62 @@ export function paragraphCss(paragraph: ParagraphStyle): string {
   return parts.join(';')
 }
 
+export function renderPicture(picture: Picture): string {
+  return `<img src="data:image/${picture.format};base64,${escapeHtml(picture.data)}" width="${picture.width}" height="${picture.height}" style="width:${picture.width}px;height:${picture.height}px;max-width:none" alt="Picture">`
+}
+
+const pictureSource = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/
+
+export function pictureSize({
+  width,
+  height,
+  naturalWidth,
+  naturalHeight,
+}: {
+  width: number | null
+  height: number | null
+  naturalWidth: number
+  naturalHeight: number
+}): Pick<Picture, 'width' | 'height'> | null {
+  const ratio = naturalWidth > 0 && naturalHeight > 0 ? naturalWidth / naturalHeight : null
+  const w = width ?? (height !== null && ratio ? height * ratio : naturalWidth)
+  const h = height ?? (width !== null && ratio ? width / ratio : naturalHeight)
+  return w > 0 && h > 0 ? { width: Math.max(1, Math.round(w)), height: Math.max(1, Math.round(h)) } : null
+}
+
+function specifiedPixels(css: string, attribute: string | null): number | null {
+  const styled = /^\d+(?:\.\d+)?px$/.test(css) ? Number.parseFloat(css) : 0
+  const value = styled > 0 ? styled : Number(attribute)
+  return Number.isFinite(value) && value > 0 ? value : null
+}
+
+/** Reads declared logical dimensions, which CSS layout constraints must not overwrite. */
+export function readPicture(image: HTMLImageElement): Picture | null {
+  const match = pictureSource.exec(image.src)
+  if (!match || (match[1] !== 'png' && match[1] !== 'jpeg') || !match[2]) return null
+  const size = pictureSize({
+    width: specifiedPixels(image.style.width, image.getAttribute('width')),
+    height: specifiedPixels(image.style.height, image.getAttribute('height')),
+    naturalWidth: image.naturalWidth,
+    naturalHeight: image.naturalHeight,
+  })
+  return size ? { kind: 'picture', format: match[1], data: match[2], ...size } : null
+}
+
+export async function normalizeHtmlImages(html: string): Promise<string> {
+  const root = document.createElement('div')
+  root.innerHTML = html
+  for (const image of root.querySelectorAll('img')) {
+    if (!pictureSource.test(image.src)) continue
+    await image.decode()
+    const picture = readPicture(image)
+    if (picture) image.outerHTML = renderPicture(picture)
+  }
+  return root.innerHTML
+}
+
 function renderRun(run: Inline): string {
-  if ('kind' in run)
-    return `<img src="data:image/${run.format};base64,${escapeHtml(run.data)}" width="${run.width}" height="${run.height}" style="width:${run.width}px;height:${run.height}px;max-width:none" alt="Picture">`
+  if ('kind' in run) return renderPicture(run)
   const text = escapeHtml(run.text).replace(/\n/g, '<br>')
   return `<span style="${escapeHtml(runCss(run))}">${text}</span>`
 }
@@ -198,16 +252,10 @@ export function readDocument(root: HTMLElement): Document {
     }
     if (!(node instanceof HTMLElement)) return
     if (node instanceof HTMLImageElement) {
-      const match = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(node.src)
-      if (match && (match[1] === 'png' || match[1] === 'jpeg') && match[2]) {
+      const picture = readPicture(node)
+      if (picture) {
         current ??= { style: DEFAULT_PARAGRAPH, runs: [] }
-        current.runs.push({
-          kind: 'picture',
-          format: match[1],
-          data: match[2],
-          width: node.width || node.naturalWidth,
-          height: node.height || node.naturalHeight,
-        })
+        current.runs.push(picture)
       }
       return
     }

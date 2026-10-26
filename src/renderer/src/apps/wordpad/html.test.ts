@@ -1,10 +1,44 @@
 import { describe, expect, it } from 'vitest'
-import { firstFamily, paragraphCss, pointsFrom, renderDocument, runCss } from './html'
+import { firstFamily, paragraphCss, pictureSize, pointsFrom, renderDocument, runCss } from './html'
 import { DEFAULT_PARAGRAPH, DEFAULT_RUN, type Document } from './model'
 
 const run = (text: string, style: Partial<typeof DEFAULT_RUN> = {}) => ({ ...DEFAULT_RUN, ...style, text })
 
 describe('rendering the document for the editor', () => {
+  it('preserves explicit logical dimensions independently of intrinsic aspect ratio', () => {
+    expect(pictureSize({ width: 800, height: 400, naturalWidth: 800, naturalHeight: 400 })).toEqual({
+      width: 800,
+      height: 400,
+    })
+    expect(pictureSize({ width: 640, height: 300, naturalWidth: 800, naturalHeight: 400 })).toEqual({
+      width: 640,
+      height: 300,
+    })
+    expect(pictureSize({ width: 640, height: 300, naturalWidth: 0, naturalHeight: 0 })).toEqual({
+      width: 640,
+      height: 300,
+    })
+  })
+  it('derives a missing dimension from the decoded image instead of the layout', () => {
+    expect(pictureSize({ width: 640, height: null, naturalWidth: 800, naturalHeight: 400 })).toEqual({
+      width: 640,
+      height: 320,
+    })
+    expect(pictureSize({ width: null, height: 200, naturalWidth: 800, naturalHeight: 400 })).toEqual({
+      width: 400,
+      height: 200,
+    })
+    expect(pictureSize({ width: null, height: null, naturalWidth: 800, naturalHeight: 400 })).toEqual({
+      width: 800,
+      height: 400,
+    })
+    expect(pictureSize({ width: null, height: null, naturalWidth: 0, naturalHeight: 0 })).toBeNull()
+  })
+  it('normalizes fractional logical dimensions to the document whole-pixel model', () => {
+    expect(
+      pictureSize({ width: 1000 / 15, height: 673 / 15, naturalWidth: 800, naturalHeight: 400 }),
+    ).toEqual({ width: 67, height: 45 })
+  })
   it('writes well-formed inline styles, quoting font names so the attribute survives', () => {
     const html = renderDocument({
       paragraphs: [{ ...DEFAULT_PARAGRAPH, runs: [run('Hi', { underline: true, color: '#ff0000' })] }],
