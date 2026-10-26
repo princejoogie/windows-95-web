@@ -100,6 +100,53 @@ try {
     await app.eval('localStorage.clear()')
     await reload()
   }
+  if (phase === 'font-shortcuts') {
+    await reload()
+    await run('control')
+    await clickText('Fonts', '[data-window]')
+    await app.key('f', ['Alt'])
+    await clickText('Create Shortcut', '[role=menu]')
+    await clickText('Yes', dialog('Shortcut'))
+    await sleep(300)
+    await check(
+      9,
+      'Fonts folder shortcut persists its typed location',
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).some(n=>n.app==='shell:fonts:')`,
+      true,
+    )
+    await reload()
+    const folder = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.app==='shell:fonts:').id`,
+    )
+    await app.clickOn(`[data-desktop-item="${folder}"]`, { count: 2 })
+    await app.waitFor(`document.querySelector('[data-window]').textContent.includes('MS Sans Serif Bitmap')`)
+    await check(
+      9,
+      'Fonts desktop shortcut opens the Fonts folder',
+      `document.querySelector('[data-window]').getAttribute('aria-label')`,
+      'Fonts',
+    )
+    await clickText('MS Sans Serif Bitmap', '[data-window]')
+    await app.key('f', ['Alt'])
+    await clickText('Create Shortcut', '[role=menu]')
+    await clickText('Yes', dialog('Shortcut'))
+    await sleep(300)
+    await reload()
+    const sample = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.app==='shell:fonts:ms-sans-serif').id`,
+    )
+    await app.clickOn(`[data-desktop-item="${sample}"]`, { count: 2 })
+    await app.waitFor(
+      `!!document.querySelector(${JSON.stringify(dialog('MS Sans Serif Bitmap (TrueType)'))})`,
+    )
+    await check(
+      9,
+      'font-sample shortcut resolves after fresh catalog load',
+      `!!document.querySelector(${JSON.stringify(dialog('MS Sans Serif Bitmap (TrueType)'))})`,
+      true,
+    )
+    await shot('font-sample-target')
+  }
   if (phase === 'consumers') {
     await reload()
     await run('wordpad')
@@ -857,5 +904,12 @@ try {
   }
 } finally {
   writeFileSync(join(proof, `${phase}-results.json`), JSON.stringify(results, null, 2))
+  if (phase !== 'exit')
+    writeFileSync(
+      join(proof, `${phase}-persisted.json`),
+      await app.eval(
+        `JSON.stringify({settings:JSON.parse(localStorage.getItem('win95.settings.v1')),fonts:JSON.parse(localStorage.getItem('win95.fonts.v1')),fs:JSON.parse(localStorage.getItem('w95.fs.v1'))},null,2)`,
+      ),
+    )
   app.close()
 }
