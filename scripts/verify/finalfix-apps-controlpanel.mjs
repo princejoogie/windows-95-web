@@ -100,6 +100,96 @@ try {
     await app.eval('localStorage.clear()')
     await reload()
   }
+  if (phase === 'stale-shortcut') {
+    const baseline = process.argv.includes('--baseline')
+    await reload()
+    const data = `data:font/ttf;base64,${readFileSync(new URL('../../src/renderer/src/assets/fonts/micross.ttf', import.meta.url)).toString('base64')}`
+    await run('notepad')
+    await app.type(data)
+    await app.key('s', ['Control'])
+    await fill('input[id$="-name"]', 'linked.ttf')
+    await clickText('Save', dialog('Save As'))
+    await sleep(300)
+    const source = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.kind==='file'&&n.name==='linked.ttf').id`,
+    )
+    await reload()
+    await openPanel('Fonts')
+    await app.key('f', ['Alt'])
+    await clickText('Install New Font...')
+    await clickText('..', '[aria-label="Font folders"]')
+    await clickText('My Documents', '[aria-label="Font folders"]')
+    await clickText('linked.ttf', dialog('Add Fonts'))
+    await checkbox('Copy fonts to Fonts folder', dialog('Add Fonts'))
+    await clickText('OK', dialog('Add Fonts'))
+    await app.waitFor(`!document.querySelector(${JSON.stringify(dialog('Add Fonts'))})`)
+    await check(
+      9,
+      'stale-target fixture installs actual linked virtual font',
+      `JSON.parse(localStorage.getItem('win95.fonts.v1'))[0].source`,
+      { kind: 'link', node: source },
+    )
+    await clickText('Microsoft Sans Serif', '[data-window]')
+    await app.key('f', ['Alt'])
+    await clickText('Create Shortcut', '[role=menu]')
+    await clickText('Yes', dialog('Shortcut'))
+    await sleep(300)
+    const shortcut = await app.eval(
+      `Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.name==='Shortcut to Microsoft Sans Serif').id`,
+    )
+    await reload()
+    await app.clickOn('[data-desktop-item="app:mycomputer"]', { count: 2 })
+    await app.clickOn('[data-node-id="c"]', { count: 2 })
+    await app.clickOn('[data-node-id="documents"]', { count: 2 })
+    await app.clickOn(`[data-node-id="${source}"]`)
+    await app.key('Delete')
+    await clickText('Yes')
+    await reload()
+    await app.clickOn(`[data-desktop-item="${shortcut}"]`, { count: 2 })
+    await sleep(300)
+    await check(
+      9,
+      'stale target opens a visible dismissible error',
+      `!!document.querySelector(${JSON.stringify(dialog('Problem with Shortcut'))})`,
+      !baseline,
+    )
+    await shot(baseline ? 'baseline-invisible-target' : 'visible-unavailable-target')
+    if (!baseline) await clickText('OK', dialog('Problem with Shortcut'))
+    await app.clickOn('[data-window] .explorer-items')
+    await app.key('Home')
+    await app.key('ArrowRight')
+    const selection = await app.eval(
+      `document.querySelector('[data-window] [role=option][aria-selected=true]')?.textContent.trim()??null`,
+    )
+    results.push({ finding: 9, behavior: 'keyboard selection after stale target', value: selection })
+    if (!baseline)
+      assert.equal(
+        selection,
+        'MS Sans Serif Bitmap',
+        'keyboard selection works after dismissing unavailable target',
+      )
+    await app.key('F10')
+    results.push({
+      finding: 9,
+      behavior: 'F10 activation observation',
+      value: await app.eval(
+        `({menuOpen:!!document.querySelector('[role=menu]'),focus:document.activeElement?.textContent,menubar:!!document.activeElement?.closest('[role=menubar]')})`,
+      ),
+    })
+    if (!baseline) {
+      await app.key('ArrowDown')
+      await check(
+        9,
+        'F10 then Down opens File menu after stale target',
+        `!!document.querySelector('[role=menu]')`,
+        true,
+      )
+    }
+    await shot(baseline ? 'baseline-keyboard-state' : 'keyboard-recovered')
+    await app.key('Escape')
+    await app.key('F4', ['Alt'])
+    await check(9, 'Alt+F4 closes the usable folder', `document.querySelectorAll('[data-window]').length`, 0)
+  }
   if (phase === 'font-shortcuts') {
     await reload()
     await run('control')

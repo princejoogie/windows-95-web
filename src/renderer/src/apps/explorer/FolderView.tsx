@@ -126,6 +126,7 @@ export function FolderView({
   exploring = false,
   select,
   initialDialog,
+  initialError,
 }: {
   initial: Location
   window: WindowApi
@@ -133,6 +134,7 @@ export function FolderView({
   /** Selected and scrolled into view when the window opens. */
   select?: NodeId | undefined
   initialDialog?: string | undefined
+  initialError?: string | undefined
 }) {
   const state = useFs((s) => s)
   const clip = useStore(clipboard, (s) => s)
@@ -176,7 +178,9 @@ export function FolderView({
   const [context, setContext] = useState<{ x: number; y: number; id: NodeId | null } | null>(null)
   const [goPath, setGoPath] = useState('')
   const [shellMenu, setShellMenu] = useState<{ x: number; y: number; key: string } | null>(null)
-  const [prompt, setPrompt] = useState<Prompt | null>(null)
+  const [prompt, setPrompt] = useState<Prompt | null>(
+    initialError ? { kind: 'error', title: 'Problem with Shortcut', message: initialError } : null,
+  )
   const allNodes = useMemo(() => visibleNodes(state, location, sort, true), [state, location, sort])
   const nodes = useMemo(
     () => allNodes.filter((node) => settings.showHidden || !isHidden(node)),

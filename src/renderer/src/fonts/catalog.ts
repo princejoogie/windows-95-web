@@ -35,9 +35,10 @@ for (const [path, url] of Object.entries(system)) {
 }
 export const fontMedia: readonly FontMedia[] = media
 export const FONT_CATALOG_KEY = 'win95.fonts.v1'
+const initialFonts: readonly InstalledFont[] = []
 export const fontCatalog = createStore(
   (_: readonly InstalledFont[], next: readonly InstalledFont[]) => next,
-  [],
+  initialFonts,
 )
 const faces = new Map<string, FontFace>()
 let loading: Promise<void> | undefined
@@ -127,6 +128,7 @@ export function useFonts(): readonly InstalledFont[] {
   void ensureFonts()
   return useStore(fontCatalog, (fonts) => fonts)
 }
+export const useFontsReady = (): boolean => useFonts() !== initialFonts
 export function useFontChoices(existing: readonly string[]): readonly string[] {
   const installed = useFonts()
   return [...new Set([...existing, ...installed.map((font) => font.name)])]

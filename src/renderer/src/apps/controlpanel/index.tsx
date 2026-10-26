@@ -1,4 +1,5 @@
 import '../../settings/apply'
+import { useFontsReady } from '../../fonts/catalog'
 import type { AppManifest, AppProps } from '../../shell/types'
 import { printerIcon } from '../explorer/art'
 import { FolderView } from '../explorer/FolderView'
@@ -179,15 +180,20 @@ registerShellFolder({
 })
 
 export function ControlPanel({ window, args }: AppProps) {
+  const fontsReady = useFontsReady()
   const target = args.shellTarget
   const folder = target?.folder ?? 'controlpanel'
   const item =
     target?.kind === 'item' ? shellFolder(folder)?.items.find((item) => item.key === target.item) : undefined
+  if (folder === 'fonts' && !fontsReady) return <div className="p-3">Loading fonts...</div>
   return (
     <FolderView
       initial={{ kind: 'shell', id: folder }}
-      initialDialog={
-        item?.action.kind === 'dialog' ? item.action.id : target?.kind === 'item' ? target.item : undefined
+      initialDialog={item?.action.kind === 'dialog' ? item.action.id : undefined}
+      initialError={
+        target?.kind === 'item' && !item
+          ? 'The shortcut target is unavailable. The item may have been removed or its font source is unavailable.'
+          : undefined
       }
       window={window}
     />
