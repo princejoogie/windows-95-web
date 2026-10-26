@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { fontHasCharacter, useFontChoices, useFonts } from '../../fonts/catalog'
 import { useKeyDown } from '../../shell/context'
 import { launch } from '../../shell/system'
 import type { AppManifest, AppProps } from '../../shell/types'
@@ -15,7 +16,13 @@ function fontFamily(font: string): string {
 }
 
 export function CharacterMap({ window: windowApi }: AppProps) {
+  const fonts = useFontChoices(FONTS)
   const [font, setFont] = useState('Arial')
+  const installed = useFonts().find((entry) => entry.name === font)
+  const glyph = (code: number) => {
+    const text = glyphFor(font, code)
+    return installed && !fontHasCharacter(installed, text.codePointAt(0) ?? 0) ? '' : text
+  }
   const [selected, setSelected] = useState(cellIndex(65))
   const [chars, setChars] = useState('')
   const [magnified, setMagnified] = useState<number | null>(null)
@@ -38,7 +45,7 @@ export function CharacterMap({ window: windowApi }: AppProps) {
 
   const pick = (index: number) => {
     const picked = cellCode(index)
-    if (picked !== null) setChars((value) => value + glyphFor(font, picked))
+    if (picked !== null) setChars((value) => value + glyph(picked))
   }
 
   const copy = async () => {
@@ -88,7 +95,7 @@ export function CharacterMap({ window: windowApi }: AppProps) {
           className="w-[150px]"
           value={font}
           onChange={setFont}
-          options={FONTS.map((name) => ({ key: name, label: name }))}
+          options={fonts.map((name) => ({ key: name, label: name }))}
         />
         <label htmlFor={`${id}-chars`} className="ml-[6px]">
           Ch<span className="underline">a</span>racters to copy:
@@ -167,7 +174,7 @@ export function CharacterMap({ window: windowApi }: AppProps) {
                 }`}
                 style={{ width: CELL_WIDTH, height: CELL_HEIGHT, fontFamily: fontFamily(font) }}
               >
-                {cell === null ? '' : glyphFor(font, cell)}
+                {cell === null ? '' : glyph(cell)}
               </button>
             )
           })}
@@ -185,7 +192,7 @@ export function CharacterMap({ window: windowApi }: AppProps) {
               fontFamily: fontFamily(font),
             }}
           >
-            {glyphFor(font, cellCode(magnified) ?? LAST_CODE)}
+            {glyph(cellCode(magnified) ?? LAST_CODE)}
           </div>
         )}
       </div>

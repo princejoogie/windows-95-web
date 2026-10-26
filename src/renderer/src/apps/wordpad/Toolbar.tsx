@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useFontChoices } from '../../fonts/catalog'
 import { ComboBox, type MenuEntry, MenuList } from '../../ui'
 import type { SelectionState } from './editor'
 import { FONT_SIZES, FONTS } from './fonts'
@@ -154,11 +155,12 @@ export interface FormatActions {
 }
 
 export function FormatBar({ state, actions }: { state: SelectionState; actions: FormatActions }) {
+  const choices = useFontChoices(FONTS)
   const [colors, setColors] = useState<{ x: number; y: number } | null>(null)
   const sizes = FONT_SIZES.includes(state.size)
     ? FONT_SIZES
     : [...FONT_SIZES, state.size].sort((a, b) => a - b)
-  const fonts = FONTS.includes(state.font) ? FONTS : [state.font, ...FONTS]
+  const fonts = choices.includes(state.font) ? choices : [state.font, ...choices]
   const colorItems: MenuEntry[] = [
     ...COLORS.map((color) => ({
       label: color.name,

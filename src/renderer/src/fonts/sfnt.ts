@@ -80,3 +80,64 @@ export function fontData(bytes: Uint8Array): string {
   for (const byte of bytes) binary += String.fromCharCode(byte)
   return `data:font/ttf;base64,${btoa(binary)}`
 }
+
+export function fontCharacterRanges(bytes: Uint8Array<ArrayBuffer>): readonly (readonly [number, number])[] {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const count = view.getUint16(4)
+  let cmap = 0
+  for (let n = 0; n < count; n++) {
+    const at = 12 + n * 16
+    if (view.getUint32(at) === 0x636d6170) cmap = view.getUint32(at + 8)
+  }
+  if (!cmap) return []
+  const candidates: { offset: number; priority: number }[] = []
+  for (let n = 0; n < view.getUint16(cmap + 2); n++) {
+    const at = cmap + 4 + n * 8
+    const platform = view.getUint16(at)
+    const encoding = view.getUint16(at + 2)
+    const offset = cmap + view.getUint32(at + 4)
+    const format = view.getUint16(offset)
+    if ((platform === 0 || platform === 3) && [0, 4, 6, 12].includes(format))
+      candidates.push({
+        offset,
+        priority: (format === 12 ? 10 : 0) + (platform === 0 ? 2 : encoding === 1 ? 1 : 0),
+      })
+  }
+  const offset = candidates.sort((a, b) => b.priority - a.priority)[0]?.offset
+  if (offset === undefined) return []
+  const format = view.getUint16(offset)
+  const ranges: [number, number][] = []
+  const add = (start: number, end = start) => {
+    const last = ranges.at(-1)
+    if (last && last[1] + 1 === start) last[1] = end
+    else ranges.push([start, end])
+  }
+  if (format === 12) {
+    for (let n = 0; n < view.getUint32(offset + 12); n++) {
+      const at = offset + 16 + n * 12
+      const start = view.getUint32(at) + (view.getUint32(at + 8) === 0 ? 1 : 0)
+      const end = view.getUint32(at + 4)
+      if (start <= end) add(start, end)
+    }
+  } else if (format === 4) {
+    const segments = view.getUint16(offset + 6) / 2
+    for (let n = 0; n < segments; n++) {
+      const end = view.getUint16(offset + 14 + n * 2)
+      const start = view.getUint16(offset + 16 + segments * 2 + n * 2)
+      const delta = view.getInt16(offset + 16 + segments * 4 + n * 2)
+      const rangeAt = offset + 16 + segments * 6 + n * 2
+      const range = view.getUint16(rangeAt)
+      for (let code = start; code <= end && code < 0xffff; code++) {
+        const glyph = range ? view.getUint16(rangeAt + range + (code - start) * 2) : (code + delta) & 0xffff
+        if (glyph && (!range || (glyph + delta) & 0xffff)) add(code)
+      }
+    }
+  } else if (format === 0) {
+    for (let code = 0; code < 256; code++) if (view.getUint8(offset + 6 + code)) add(code)
+  } else if (format === 6) {
+    const first = view.getUint16(offset + 6)
+    for (let n = 0; n < view.getUint16(offset + 8); n++)
+      if (view.getUint16(offset + 10 + n * 2)) add(first + n)
+  }
+  return ranges
+}

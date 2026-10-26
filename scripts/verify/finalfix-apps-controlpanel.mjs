@@ -42,7 +42,7 @@ const run = async (command) => {
 }
 const openPanel = async (name) => {
   await run('control')
-  await clickText(name, '[data-window]', { count: 2 })
+  await clickText(name, '[data-window][aria-label="Control Panel"]', { count: 2 })
 }
 const reload = async () => {
   await app.send('Page.reload')
@@ -64,10 +64,171 @@ const checkbox = async (label, within = 'body') => {
 }
 const inputValue = (label) => `document.querySelector('input[aria-label=${JSON.stringify(label)}]').value`
 const persisted = (path) => `JSON.parse(localStorage.getItem('win95.settings.v1'))?.${path}`
+const chooseKeyboard = async (selector, name) => {
+  await app.clickOn(selector)
+  const index = await app.eval(
+    `[...document.querySelector('[role=listbox][id]').querySelectorAll('[role=option]')].findIndex(e=>e.textContent.trim()===${JSON.stringify(name)})`,
+  )
+  assert.ok(index >= 0, `Font option ${name} exists`)
+  await app.key('Home')
+  for (let n = 0; n < index; n++) await app.key('ArrowDown')
+  await app.key('Enter')
+}
+const checkRender = async (selector, behavior) => {
+  await app.send('DOM.enable')
+  await app.send('CSS.enable')
+  const tree = await app.send('DOM.getDocument')
+  const nodes = await app.send('DOM.querySelectorAll', {
+    nodeId: tree.result.root.nodeId,
+    selector: `${selector}, ${selector} *`,
+  })
+  const rendered = await Promise.all(
+    nodes.result.nodeIds.map((nodeId) => app.send('CSS.getPlatformFontsForNode', { nodeId })),
+  )
+  const fonts = rendered.flatMap((result) => result.result?.fonts ?? [])
+  const passed =
+    fonts.length > 0 &&
+    fonts.every(
+      (font) => font.isCustomFont && font.familyName === 'Microsoft Sans Serif' && font.glyphCount > 0,
+    )
+  results.push({ finding: 10, behavior, passed, fonts })
+  assert.ok(passed, behavior)
+  console.log('PASS', 10, behavior, fonts.filter((font) => font.isCustomFont).slice(0, 2))
+}
 try {
   if (process.argv.includes('--fresh')) {
     await app.eval('localStorage.clear()')
     await reload()
+  }
+  if (phase === 'consumers') {
+    await reload()
+    await run('wordpad')
+    const wordpad = '[data-window][aria-label$="WordPad"]'
+    await check(
+      10,
+      'WordPad retains Times New Roman as its default',
+      `document.querySelector(${JSON.stringify(`${wordpad} [role=combobox][aria-label="Font"]`)}).textContent.trim()`,
+      'Times New Roman',
+    )
+    await app.clickOn(`${wordpad} [role=combobox][aria-label="Font"]`)
+    await check(
+      10,
+      'installed family absent before installation',
+      `[...document.querySelector('[role=listbox][id]').querySelectorAll('[role=option]')].some(e=>e.textContent.trim()==='Microsoft Sans Serif')`,
+      false,
+    )
+    await check(
+      10,
+      'legacy and symbol font choices retained',
+      `['Times New Roman','Arial','Wingdings','Symbol'].every(name=>[...document.querySelector('[role=listbox][id]').querySelectorAll('[role=option]')].some(e=>e.textContent.trim()===name))`,
+      true,
+    )
+    await app.key('Escape')
+    await run('charmap')
+    await openPanel('Fonts')
+    await app.key('f', ['Alt'])
+    await clickText('Install New Font...')
+    await clickText('MICROSS.TTF', dialog('Add Fonts'))
+    await clickText('OK', dialog('Add Fonts'))
+    await app.waitFor(`!document.querySelector(${JSON.stringify(dialog('Add Fonts'))})`)
+    await app.clickOn('[data-window][aria-label="Fonts"] [aria-label="Close"]')
+    await clickText('Document - WordPad', '[data-taskbar]')
+    await chooseKeyboard(`${wordpad} [role=combobox][aria-label="Font"]`, 'Microsoft Sans Serif')
+    await app.clickOn('[contenteditable=true]')
+    await app.type('Installed font semantic roundtrip 123.')
+    await app.key('a', ['Control'])
+    await chooseKeyboard(`${wordpad} [role=combobox][aria-label="Font"]`, 'Microsoft Sans Serif')
+    await check(
+      10,
+      'already-open WordPad accepts newly installed font',
+      `document.querySelector(${JSON.stringify(`${wordpad} [role=combobox][aria-label="Font"]`)}).textContent.trim()`,
+      'Microsoft Sans Serif',
+    )
+    await check(
+      10,
+      'WordPad DOM retains semantic installed font family',
+      `[...document.querySelector('[contenteditable=true]').querySelectorAll('*')].some(e=>getComputedStyle(e).fontFamily.includes('Microsoft Sans Serif'))`,
+      true,
+    )
+    await check(
+      10,
+      'selected semantic family is a loaded installed face',
+      `[...document.fonts].some(f=>f.family==='Microsoft Sans Serif'&&f.status==='loaded')`,
+      true,
+    )
+    await shot('wordpad-installed')
+    await checkRender('[contenteditable=true]', 'WordPad renders glyphs from the installed custom face')
+    await app.key('s', ['Control'])
+    await fill('input[id$="-name"]', 'installed-font.rtf')
+    await clickText('Save', dialog('Save As'))
+    await sleep(300)
+    await check(
+      10,
+      'saved RTF records semantic family and text',
+      `(()=>{const n=Object.values(JSON.parse(localStorage.getItem('w95.fs.v1')).nodes).find(n=>n.kind==='file'&&n.name==='installed-font.rtf');return !!n&&n.content.includes('Microsoft Sans Serif')&&n.content.includes('Installed font semantic roundtrip 123.')&&!n.content.includes('Win95Font-')})()`,
+      true,
+    )
+    await clickText('Character Map', '[data-taskbar]')
+    const charmap = '[data-window][aria-label="Character Map"]'
+    await chooseKeyboard(`${charmap} [role=combobox][aria-label="Font"]`, 'Microsoft Sans Serif')
+    await check(
+      10,
+      'already-open Character Map accepts installed font',
+      `document.querySelector(${JSON.stringify(`${charmap} [role=combobox][aria-label="Font"]`)}).textContent.trim()`,
+      'Microsoft Sans Serif',
+    )
+    await check(
+      10,
+      'Character Map grid uses installed family',
+      `[...document.querySelector(${JSON.stringify(charmap)}).querySelectorAll('[style]')].some(e=>getComputedStyle(e).fontFamily.includes('Microsoft Sans Serif'))`,
+      true,
+    )
+    await shot('charmap-installed')
+    await checkRender(
+      '[data-window][aria-label="Character Map"] fieldset',
+      'Character Map renders glyphs from the installed custom face',
+    )
+    await chooseKeyboard(`${charmap} [role=combobox][aria-label="Font"]`, 'Symbol')
+    await app.key('s', ['Alt'])
+    await check(
+      10,
+      'symbol-font character handling survives integration',
+      `document.querySelector(${JSON.stringify(charmap)}).querySelector('input').value.charCodeAt(0)`,
+      0xf041,
+    )
+    await reload()
+    await run('"C:\\My Documents\\installed-font.rtf"')
+    await check(
+      10,
+      'reopened WordPad text survives full reload',
+      `document.querySelector('[contenteditable=true]').textContent`,
+      'Installed font semantic roundtrip 123.',
+    )
+    await app.clickOn('[contenteditable=true]')
+    await app.key('a', ['Control'])
+    await check(
+      10,
+      'reopened WordPad keeps semantic family',
+      `[...document.querySelector('[contenteditable=true]').querySelectorAll('*')].some(e=>getComputedStyle(e).fontFamily.includes('Microsoft Sans Serif'))`,
+      true,
+    )
+    await check(
+      10,
+      'reopened document font is loaded from persistent catalog',
+      `[...document.fonts].some(f=>f.family==='Microsoft Sans Serif'&&f.status==='loaded')`,
+      true,
+    )
+    await shot('reopened-semantic-font')
+    await checkRender('[contenteditable=true]', 'reopened WordPad renders the persisted custom face')
+    await app.key('o', ['Alt'])
+    await clickText('Font...', '[role=menu]')
+    await check(
+      10,
+      'WordPad Font dialog also lists installed family',
+      `[...document.querySelector('[aria-label="Font list"]').querySelectorAll('[role=option]')].some(e=>e.textContent.trim()==='Microsoft Sans Serif')`,
+      true,
+    )
+    await shot('font-dialog-installed')
   }
   if (phase === 'font-virtual') {
     await reload()

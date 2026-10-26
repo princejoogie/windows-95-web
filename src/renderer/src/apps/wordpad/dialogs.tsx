@@ -1,4 +1,5 @@
 import { type ReactNode, useId, useState } from 'react'
+import { useFontChoices } from '../../fonts/catalog'
 import { wallClockDate } from '../../settings/clock'
 import { settingsStore } from '../../settings/store'
 import { Button, Checkbox, ComboBox, Dialog, GroupBox, ListBox, Radio, Tabs, TextBox } from '../../ui'
@@ -84,10 +85,11 @@ export function FontDialog({
   onApply: (style: RunStyle) => void
   onClose: () => void
 }) {
+  const choices = useFontChoices(FONTS)
   const [style, setStyle] = useState<RunStyle>(current)
   const [sizeText, setSizeText] = useState(String(current.size))
   const id = useId()
-  const fonts = FONTS.includes(style.font) ? FONTS : [style.font, ...FONTS]
+  const fonts = choices.includes(style.font) ? choices : [style.font, ...choices]
   const setStyleName = (name: FontStyleName) =>
     setStyle((s) => ({ ...s, bold: name.startsWith('Bold'), italic: name.endsWith('Italic') }))
   const commitSize = (text: string) => {

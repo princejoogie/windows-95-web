@@ -3,7 +3,7 @@ import { isInside } from '../fs/fs'
 import { fsStore } from '../fs/store'
 import { type NodeId, RECYCLED_DIR } from '../fs/types'
 import { createStore, useStore } from '../lib/store'
-import { type FontMetadata, fontBytes, fontData, inspectFont } from './sfnt'
+import { type FontMetadata, fontBytes, fontCharacterRanges, fontData, inspectFont } from './sfnt'
 
 type FontSource =
   | { readonly kind: 'bundled'; readonly id: string }
@@ -14,6 +14,7 @@ export interface InstalledFont extends FontMetadata {
   readonly family: string
   readonly file: string
   readonly source: FontSource
+  readonly characters: readonly (readonly [number, number])[]
 }
 export interface FontMedia {
   readonly id: string
@@ -66,7 +67,7 @@ async function loadFont(id: string, file: string, source: FontSource): Promise<I
   if (previous) document.fonts.delete(previous)
   document.fonts.add(face)
   faces.set(id, face)
-  return { ...metadata, id, family, file, source }
+  return { ...metadata, id, family, file, source, characters: fontCharacterRanges(bytes) }
 }
 
 function savedSources(): { id: string; file: string; source: FontSource }[] {
@@ -130,6 +131,8 @@ export function useFontChoices(existing: readonly string[]): readonly string[] {
   const installed = useFonts()
   return [...new Set([...existing, ...installed.map((font) => font.name)])]
 }
+export const fontHasCharacter = (font: InstalledFont, code: number): boolean =>
+  font.characters.some(([first, last]) => code >= first && code <= last)
 
 export async function installFont(input: {
   file: string
