@@ -32,6 +32,53 @@ const letter: Document = {
 
 describe('RTF', () => {
   it.each([
+    ['png', 'pngblip', '89504e470d0a1a0a', 'iVBORw0KGgo='],
+    ['jpeg', 'jpegblip', 'ffd8ffd9', '/9j/2Q=='],
+  ])(
+    'reads a Word shppict %s with metadata and skips its unsupported WMF fallback',
+    (format, blip, hex, data) => {
+      let doc = parseRtf(`{\\rtf1\\ansi{\\fonttbl{\\f0 Arial;}{\\f1 Times New Roman;}}\\f0\\b Before
+{\\*\\shppict{\\pict\\${blip}\\picw800\\pich400\\picwgoal1000\\pichgoal673
+{\\*\\blipuid 0123456789abcdef0123456789abcdef}
+{\\*\\picprop{\\sp{\\sn wzDescription}{\\sv Wrapped picture}}}
+${hex}}}
+{\\nonshppict{\\pict\\wmetafile8\\picw800\\pich400\\picwgoal1000\\pichgoal673 01020304}}
+\\b0\\f1\\i After}`)
+      for (let save = 0; save < 4; save++) {
+        expect(doc.paragraphs[0]?.runs.filter((inline) => 'kind' in inline)).toEqual([
+          { kind: 'picture', format, data, width: 67, height: 45 },
+        ])
+        expect(plainText(doc)).toBe('BeforeAfter')
+        expect(doc.paragraphs[0]?.runs[0]).toMatchObject({ text: 'Before', font: 'Arial', bold: true })
+        expect(doc.paragraphs[0]?.runs.at(-1)).toMatchObject({
+          text: 'After',
+          font: 'Times New Roman',
+          bold: false,
+          italic: true,
+        })
+        doc = parseRtf(writeRtf(doc))
+      }
+    },
+  )
+
+  it('shows the primary picture once even when nonshppict contains a readable fallback', () => {
+    const doc = parseRtf(
+      '{\\rtf1 Before{\\*\\shppict{\\pict\\pngblip\\picw1\\pich1 89504e470d0a1a0a}}{\\nonshppict{\\pict\\pngblip\\picw2\\pich2 ffd8ffd9}}After}',
+    )
+    expect(doc.paragraphs[0]?.runs.filter((inline) => 'kind' in inline)).toEqual([
+      { kind: 'picture', format: 'png', data: 'iVBORw0KGgo=', width: 1, height: 1 },
+    ])
+    expect(plainText(doc)).toBe('BeforeAfter')
+  })
+
+  it('keeps text around unsupported wrapped WMF and EMF without inventing a picture', () => {
+    const doc = parseRtf(
+      '{\\rtf1 Before{\\*\\shppict{\\pict\\emfblip\\picw1\\pich1 0102}}{\\nonshppict{\\pict\\wmetafile8\\picw1\\pich1 0304}}After}',
+    )
+    expect(plainText(doc)).toBe('BeforeAfter')
+    expect(doc.paragraphs[0]?.runs.filter((inline) => 'kind' in inline)).toEqual([])
+  })
+  it.each([
     ['blipuid', '{\\*\\blipuid 0123456789abcdef0123456789abcdef}'],
     [
       'picprop',
