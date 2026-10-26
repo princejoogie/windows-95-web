@@ -56,7 +56,7 @@ export function paragraphCss(paragraph: ParagraphStyle): string {
 
 function renderRun(run: Inline): string {
   if ('kind' in run)
-    return `<img src="data:image/${run.format};base64,${escapeHtml(run.data)}" width="${run.width}" height="${run.height}" style="width:${run.width}px;height:${run.height}px" alt="Picture">`
+    return `<img src="data:image/${run.format};base64,${escapeHtml(run.data)}" width="${run.width}" height="${run.height}" style="width:${run.width}px;height:${run.height}px;max-width:none" alt="Picture">`
   const text = escapeHtml(run.text).replace(/\n/g, '<br>')
   return `<span style="${escapeHtml(runCss(run))}">${text}</span>`
 }
